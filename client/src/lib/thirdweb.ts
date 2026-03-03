@@ -10,7 +10,7 @@ export const bscChain = bsc;
 
 export const wallets = [
   createWallet("io.metamask"),
-  createWallet("com.tokenpocket"),
+  createWallet("pro.tokenpocket"),
   walletConnect(),
   createWallet("com.trustwallet.app"),
   createWallet("io.rabby"),
