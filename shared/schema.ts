@@ -91,6 +91,26 @@ export const LEVEL_CONFIG = [
   { level: 7, name: "V7", people: 1000, amount: 10000000, bonus: 33, subLevel: 6, subCount: 2, lifetimeLock: true },
 ];
 
+export const adminUsers = pgTable("admin_users", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const messages = pgTable("messages", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  type: text("type").notNull().default("system"),
+  targetAddress: text("target_address"),
+  isPublished: boolean("is_published").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+
 export const EQUAL_LEVEL_BONUS = 10;
 
 export const WITHDRAW_MIN = 50;
