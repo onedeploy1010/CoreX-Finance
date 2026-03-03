@@ -1,8 +1,12 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useActiveAccount, useDisconnect, useActiveWallet } from "thirdweb/react";
 import { ConnectButton } from "thirdweb/react";
 import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { LEVEL_CONFIG } from "@shared/schema";
 import {
   User, Shield, Bell, Globe, ChevronRight,
   LogOut, Copy, Wallet, TrendingUp, Crown, Award
@@ -16,11 +20,47 @@ const MENU_ITEMS = [
   { icon: Award, label: "帮助中心", desc: "使用教程和常见问题" },
 ];
 
+function getLevelName(level: number) {
+  if (level === 0) return "普通";
+  return `V${level}`;
+}
+
 export default function ProfilePage() {
   const account = useActiveAccount();
   const { disconnect } = useDisconnect();
   const wallet = useActiveWallet();
   const { toast } = useToast();
+  const address = account?.address?.toLowerCase();
+
+  useEffect(() => {
+    if (account?.address) {
+      const ref = new URLSearchParams(window.location.search).get("ref");
+      apiRequest("POST", "/api/members/register", {
+        walletAddress: account.address,
+        referrerAddress: ref || null,
+      }).catch(() => {});
+    }
+  }, [account?.address]);
+
+  const { data: memberData } = useQuery({
+    queryKey: ["/api/members", address],
+    enabled: !!address,
+  });
+
+  const { data: teamStats } = useQuery({
+    queryKey: ["/api/members", address, "team-stats"],
+    enabled: !!address,
+  });
+
+  const { data: earningsData } = useQuery({
+    queryKey: ["/api/earnings", address],
+    enabled: !!address,
+  });
+
+  const { data: orderList = [] } = useQuery({
+    queryKey: ["/api/orders", address],
+    enabled: !!address,
+  });
 
   const shortAddress = account?.address
     ? `${account.address.slice(0, 6)}****${account.address.slice(-4)}`
@@ -39,6 +79,10 @@ export default function ProfilePage() {
       toast({ title: "已断开连接" });
     }
   };
+
+  const activeOrders = (orderList as any[]).filter((o: any) => o.status === "active").length;
+  const totalEarned = parseFloat(earningsData?.totalEarnings || "0") + parseFloat(earningsData?.totalRewards || "0");
+  const level = (memberData as any)?.level || teamStats?.level || 0;
 
   return (
     <div className="px-4 py-4 space-y-4">
@@ -75,7 +119,7 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-1 px-2 py-0.5 rounded-full"
                   style={{ background: "rgba(201,162,39,0.12)", border: "1px solid rgba(201,162,39,0.3)" }}>
                   <Crown size={10} style={{ color: "#C9A227" }} />
-                  <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>V2</span>
+                  <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>{getLevelName(level)}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">BSC 网络</span>
               </div>
@@ -120,15 +164,15 @@ export default function ProfilePage() {
       {account && (
         <div className="grid grid-cols-3 gap-3">
           <div className="stat-card rounded-xl p-3 text-center">
-            <div className="font-black text-lg" style={{ color: "#C9A227" }}>4</div>
+            <div className="font-black text-lg" style={{ color: "#C9A227" }}>{teamStats?.directCount || 0}</div>
             <div className="text-xs text-muted-foreground mt-0.5">直推人数</div>
           </div>
           <div className="stat-card rounded-xl p-3 text-center">
-            <div className="font-black text-lg" style={{ color: "#C9A227" }}>269.6</div>
+            <div className="font-black text-lg" style={{ color: "#C9A227" }}>{totalEarned.toFixed(2)}</div>
             <div className="text-xs text-muted-foreground mt-0.5">累计收益(U)</div>
           </div>
           <div className="stat-card rounded-xl p-3 text-center">
-            <div className="font-black text-lg" style={{ color: "#C9A227" }}>2</div>
+            <div className="font-black text-lg" style={{ color: "#C9A227" }}>{activeOrders}</div>
             <div className="text-xs text-muted-foreground mt-0.5">活跃订单</div>
           </div>
         </div>
