@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { type Server } from "http";
 import { storage } from "./storage";
-import { PRODUCTS, LEVEL_CONFIG, EQUAL_LEVEL_BONUS } from "@shared/schema";
+import { PRODUCTS, LEVEL_CONFIG, EQUAL_LEVEL_BONUS, WITHDRAW_MIN, WITHDRAW_FEE } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -178,6 +178,8 @@ export async function registerRoutes(
       const indirectRewards = await storage.getTotalRewards(req.params.address, "indirect_referral");
       const teamRewards = await storage.getTotalRewards(req.params.address, "team_bonus");
       const dailyRewards = await storage.getTotalRewards(req.params.address, "daily");
+      const availableBalance = await storage.getAvailableBalance(req.params.address);
+      const totalWithdrawn = await storage.getTotalWithdrawn(req.params.address);
       return res.json({
         totalEarnings,
         totalRewards,
@@ -185,7 +187,48 @@ export async function registerRoutes(
         indirectRewards,
         teamRewards,
         dailyRewards,
+        availableBalance: availableBalance.toFixed(6),
+        totalWithdrawn,
       });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/withdrawals", async (req, res) => {
+    try {
+      const { walletAddress, amount } = req.body;
+      if (!walletAddress) {
+        return res.status(400).json({ message: "钱包地址必填" });
+      }
+
+      const withdrawAmount = parseFloat(amount);
+      if (isNaN(withdrawAmount) || withdrawAmount < WITHDRAW_MIN) {
+        return res.status(400).json({ message: `最低提现金额 ${WITHDRAW_MIN} USDT` });
+      }
+
+      const member = await storage.getMember(walletAddress);
+      if (!member) {
+        return res.status(400).json({ message: "会员不存在" });
+      }
+
+      const available = await storage.getAvailableBalance(walletAddress);
+      if (withdrawAmount > available) {
+        return res.status(400).json({ message: `可提现余额不足，当前可提 ${available.toFixed(2)} USDT` });
+      }
+
+      const withdrawal = await storage.createWithdrawal(walletAddress, withdrawAmount, WITHDRAW_FEE);
+      return res.json(withdrawal);
+    } catch (err: any) {
+      console.error("Withdraw error:", err);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/withdrawals/:address", async (req, res) => {
+    try {
+      const list = await storage.getWithdrawalsByWallet(req.params.address);
+      return res.json(list);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }

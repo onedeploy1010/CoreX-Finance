@@ -39,6 +39,16 @@ export const rewards = pgTable("rewards", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const withdrawals = pgTable("withdrawals", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  walletAddress: text("wallet_address").notNull(),
+  amount: decimal("amount", { precision: 18, scale: 6 }).notNull(),
+  fee: decimal("fee", { precision: 18, scale: 6 }).notNull().default("1"),
+  actualAmount: decimal("actual_amount", { precision: 18, scale: 6 }).notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertMemberSchema = createInsertSchema(members).pick({
   walletAddress: true,
   referrerAddress: true,
@@ -60,6 +70,7 @@ export type InsertMember = z.infer<typeof insertMemberSchema>;
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Reward = typeof rewards.$inferSelect;
+export type Withdrawal = typeof withdrawals.$inferSelect;
 
 export const PRODUCTS = [
   { id: 1, name: "芯未来", nameEn: "CX Peak 01", days: 30, dailyRate: 0.3, minAmount: 200, description: "入门级稳健理财" },
@@ -81,3 +92,6 @@ export const LEVEL_CONFIG = [
 ];
 
 export const EQUAL_LEVEL_BONUS = 10;
+
+export const WITHDRAW_MIN = 50;
+export const WITHDRAW_FEE = 1;

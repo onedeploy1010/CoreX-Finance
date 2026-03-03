@@ -73,11 +73,19 @@ CoreX是基于BSC（Binance Smart Chain）链的USDT理财质押去中心化应�
 - 间推奖励: 被推荐人每日利息 × 5%
 - 团队奖励: V1-V7 拿伞下收益对应百分比
 
+## 提现规则
+- 不可提前赎回本金，到期自动返还
+- 日利润和奖励可随时提现
+- 最低提现金额: 50 USDT
+- 手续费: 每笔 1 USDT
+- 实际到账 = 提现金额 - 1 USDT
+
 ## 数据库表
 
 - **members**: walletAddress(unique), referrerAddress, level, lifetimeLock, createdAt
 - **orders**: walletAddress, productId, productName, amount, dailyRate, days, startDate, endDate, status, totalEarned, lastEarningDate, txHash
 - **rewards**: walletAddress, type(daily/direct_referral/indirect_referral/team_bonus), amount, fromAddress, fromOrderId, description, createdAt
+- **withdrawals**: walletAddress, amount, fee(default 1), actualAmount, status(pending/completed/rejected), createdAt
 
 ## API端点
 
@@ -91,6 +99,8 @@ CoreX是基于BSC（Binance Smart Chain）链的USDT理财质押去中心化应�
 - GET /api/orders/:address - 获取订单列表
 - GET /api/rewards/:address - 获取奖励记录
 - GET /api/earnings/:address - 获取收益汇总
+- POST /api/withdrawals - 提现申请（最低50U，手续费1U）
+- GET /api/withdrawals/:address - 提现记录
 - POST /api/process-daily - 每日结算（需定时调用）
 - GET /api/products - 产品列表
 - GET /api/levels - 等级配置

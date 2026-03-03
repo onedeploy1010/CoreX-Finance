@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { members, orders, rewards, LEVEL_CONFIG, EQUAL_LEVEL_BONUS, type Member, type InsertMember, type Order, type InsertOrder, type Reward } from "@shared/schema";
+import { members, orders, rewards, withdrawals, LEVEL_CONFIG, EQUAL_LEVEL_BONUS, type Member, type InsertMember, type Order, type InsertOrder, type Reward, type Withdrawal } from "@shared/schema";
 import { eq, desc, and, sql, lte } from "drizzle-orm";
 
 export interface IStorage {
@@ -28,6 +28,11 @@ export interface IStorage {
   getTeamAccountCount(walletAddress: string): Promise<number>;
   getMemberStaking(walletAddress: string): Promise<number>;
   checkAndUpgradeLevel(walletAddress: string): Promise<void>;
+
+  getAvailableBalance(walletAddress: string): Promise<number>;
+  createWithdrawal(walletAddress: string, amount: number, fee: number): Promise<Withdrawal>;
+  getWithdrawalsByWallet(walletAddress: string): Promise<Withdrawal[]>;
+  getTotalWithdrawn(walletAddress: string): Promise<string>;
 
   processDaily(): Promise<void>;
 }
@@ -248,6 +253,48 @@ export class DatabaseStorage implements IStorage {
       const cfg = LEVEL_CONFIG[newLevel];
       await this.updateMemberLevel(walletAddress, newLevel, cfg.lifetimeLock);
     }
+  }
+
+  async getAvailableBalance(walletAddress: string): Promise<number> {
+    const addr = walletAddress.toLowerCase();
+    const earningsResult = await db.select({
+      total: sql<string>`COALESCE(SUM(${orders.totalEarned}::numeric), 0)::text`
+    }).from(orders).where(eq(orders.walletAddress, addr));
+    const totalEarnings = parseFloat(earningsResult[0]?.total || "0");
+
+    const rewardsResult = await db.select({
+      total: sql<string>`COALESCE(SUM(${rewards.amount}::numeric), 0)::text`
+    }).from(rewards).where(eq(rewards.walletAddress, addr));
+    const totalRewards = parseFloat(rewardsResult[0]?.total || "0");
+
+    const withdrawnResult = await db.select({
+      total: sql<string>`COALESCE(SUM(${withdrawals.amount}::numeric), 0)::text`
+    }).from(withdrawals).where(and(eq(withdrawals.walletAddress, addr), sql`${withdrawals.status} != 'rejected'`));
+    const totalWithdrawn = parseFloat(withdrawnResult[0]?.total || "0");
+
+    return totalEarnings + totalRewards - totalWithdrawn;
+  }
+
+  async createWithdrawal(walletAddress: string, amount: number, fee: number): Promise<Withdrawal> {
+    const actualAmount = amount - fee;
+    const [withdrawal] = await db.insert(withdrawals).values({
+      walletAddress: walletAddress.toLowerCase(),
+      amount: amount.toString(),
+      fee: fee.toString(),
+      actualAmount: actualAmount.toString(),
+    }).returning();
+    return withdrawal;
+  }
+
+  async getWithdrawalsByWallet(walletAddress: string): Promise<Withdrawal[]> {
+    return db.select().from(withdrawals).where(eq(withdrawals.walletAddress, walletAddress.toLowerCase())).orderBy(desc(withdrawals.createdAt));
+  }
+
+  async getTotalWithdrawn(walletAddress: string): Promise<string> {
+    const result = await db.select({
+      total: sql<string>`COALESCE(SUM(${withdrawals.amount}::numeric), 0)::text`
+    }).from(withdrawals).where(and(eq(withdrawals.walletAddress, walletAddress.toLowerCase()), sql`${withdrawals.status} != 'rejected'`));
+    return result[0]?.total || "0";
   }
 
   async processDaily(): Promise<void> {

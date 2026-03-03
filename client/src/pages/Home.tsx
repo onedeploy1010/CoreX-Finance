@@ -129,9 +129,15 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
             </div>
           )}
 
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Shield size={12} style={{ color: "#C9A227" }} />
-            <span>到期自动返还本金 · 每日结算收益</span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Shield size={12} style={{ color: "#C9A227" }} />
+              <span>不可提前赎回 · 到期自动返还本金</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Shield size={12} style={{ color: "#C9A227" }} />
+              <span>日利润可提现 · 每笔最低50U · 手续费1U</span>
+            </div>
           </div>
 
           <Button
