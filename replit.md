@@ -14,6 +14,7 @@ CoreX是基于BSC（Binance Smart Chain）链的USDT理财质押去中心化应�
 - **状态管理**: TanStack Query
 - **后端**: Express.js
 - **数据库**: PostgreSQL (Drizzle ORM + @neondatabase/serverless)
+- **管理后台认证**: express-session + bcryptjs + connect-pg-simple
 
 ## 核心功能
 
@@ -34,25 +35,26 @@ CoreX是基于BSC（Binance Smart Chain）链的USDT理财质押去中心化应�
 - 奖励明细tab（按类型显示所有奖励记录）
 - 提现记录 / 立即提现功能
 
-### 3. 邀请页面 (2 tabs)
-**推荐 tab:**
-- 推荐链接复制
-- 直推/间推人数统计 + 当前等级
-- 团队有效账户数 + 团队质押业绩
-- 奖励规则说明（直推10%，间推5%，平级奖10%）
-- 直推会员列表 + 间推会员列表
-- 7级等级说明卡片
-
-**直推会员 tab:**
-- 面包屑导航 + 层级钻入
-- 逐层查看下线团队（每人显示质押额、团队业绩、有效账户）
-- 返回按钮 + 面包屑点击跳转
+### 3. 邀请页面 (3 tabs)
+**推荐 tab:** 直推/间推会员列表，推荐链接复制
+**团队 tab:** 逐层钻入查看下线团队
+**等级制度 tab:** V1-V7等级卡片，显示要求和奖励
 
 ### 4. 我的页面
 - 钱包连接状态
 - 账户统计（直推人数、累计收益、活跃订单）
 - 当前等级显示
-- 设置菜单
+- 消息通知设置（4项开关，localStorage存储）
+- 语言设置（5种语言选择，localStorage存储）
+
+### 5. 管理后台 (/admin)
+**登录:** 管理员账号密码认证（默认 admin/admin123）
+**统计台:** 会员/订单/资金统计卡片 + 图表（日注册、日质押、等级分布）
+**会员管理:** 搜索、分页列表、详情弹窗（含订单和提现记录）
+**订单管理:** 按状态筛选、分页、详情弹窗（日利息/释放天数/已提现/相关奖励）
+**提现管理:** 审核/拒绝操作、按状态筛选
+**消息管理:** 创建/编辑/发布/删除消息，支持全体或定向发送
+**财务管理:** 入金/出金/净余额/手续费收入统计 + 按日明细图表
 
 ## 会员等级体系
 
@@ -86,9 +88,12 @@ CoreX是基于BSC（Binance Smart Chain）链的USDT理财质押去中心化应�
 - **orders**: walletAddress, productId, productName, amount, dailyRate, days, startDate, endDate, status, totalEarned, lastEarningDate, txHash
 - **rewards**: walletAddress, type(daily/direct_referral/indirect_referral/team_bonus), amount, fromAddress, fromOrderId, description, createdAt
 - **withdrawals**: walletAddress, amount, fee(default 1), actualAmount, status(pending/completed/rejected), createdAt
+- **admin_users**: username(unique), passwordHash, createdAt
+- **messages**: title, content, type(system/reward/notice), targetAddress(nullable), isPublished, createdAt
 
 ## API端点
 
+### 前台API
 - POST /api/members/register - 注册/获取会员（自动绑定推荐人）
 - GET /api/members/:address - 获取会员信息
 - GET /api/members/:address/direct - 直推会员列表
@@ -104,12 +109,31 @@ CoreX是基于BSC（Binance Smart Chain）链的USDT理财质押去中心化应�
 - POST /api/process-daily - 每日结算（需定时调用）
 - GET /api/products - 产品列表
 - GET /api/levels - 等级配置
+- GET /api/messages/public - 公开消息
+- GET /api/messages/:address - 会员消息
+
+### 管理后台API
+- POST /api/admin/login - 管理员登录
+- POST /api/admin/logout - 退出登录
+- GET /api/admin/me - 当前管理员信息
+- GET /api/admin/dashboard - 统计台数据
+- GET /api/admin/members - 会员列表（分页/搜索）
+- GET /api/admin/members/:address - 会员详情
+- GET /api/admin/orders - 订单列表（分页/状态筛选）
+- GET /api/admin/orders/:id - 订单详情
+- GET /api/admin/withdrawals - 提现列表（分页/状态筛选）
+- PATCH /api/admin/withdrawals/:id - 审核提现
+- GET /api/admin/messages - 消息列表
+- POST /api/admin/messages - 创建消息
+- PATCH /api/admin/messages/:id - 更新消息
+- DELETE /api/admin/messages/:id - 删除消息
+- GET /api/admin/finance - 财务统计
 
 ## 文件结构
 
 ```
 client/src/
-├── App.tsx                    - 主应用，ThirdwebProvider包装
+├── App.tsx                    - 主应用，前台+后台路由
 ├── index.css                  - 暗金主题样式
 ├── lib/
 │   ├── thirdweb.ts           - thirdweb客户端配置，BSC链，钱包列表
@@ -119,8 +143,17 @@ client/src/
 └── pages/
     ├── Home.tsx              - 首页（产品列表 + 投资弹窗）
     ├── Orders.tsx            - 订单页面（订单 + 奖励明细）
-    ├── Invite.tsx            - 邀请页面（推荐 + 直推会员钻入）
-    └── Profile.tsx           - 个人中心
+    ├── Invite.tsx            - 邀请页面（推荐 + 团队 + 等级）
+    ├── Profile.tsx           - 个人中心（通知/语言设置）
+    └── admin/
+        ├── AdminLogin.tsx    - 管理员登录
+        ├── AdminLayout.tsx   - 后台布局（侧边栏）
+        ├── Dashboard.tsx     - 统计台
+        ├── Members.tsx       - 会员管理
+        ├── Orders.tsx        - 订单管理
+        ├── Withdrawals.tsx   - 提现管理
+        ├── Messages.tsx      - 消息管理
+        └── Finance.tsx       - 财务管理
 
 shared/
 └── schema.ts                 - 数据模型 + PRODUCTS + LEVEL_CONFIG
@@ -128,7 +161,8 @@ shared/
 server/
 ├── db.ts                     - 数据库连接（neon serverless）
 ├── storage.ts                - IStorage接口 + DatabaseStorage实现
-├── routes.ts                 - API路由
+├── routes.ts                 - 前台API路由
+├── adminRoutes.ts            - 管理后台API路由
 └── index.ts                  - Express服务器启动
 ```
 
@@ -145,6 +179,11 @@ server/
 - TokenPocket wallet ID: pro.tokenpocket
 - 支持钱包: MetaMask, TokenPocket, WalletConnect, Trust Wallet, Rabby, OKX
 
+## 管理后台
+- 默认管理员: admin / admin123
+- Session认证: express-session + connect-pg-simple (PostgreSQL存储)
+- 路由: /admin (登录), /admin/dashboard, /admin/members, /admin/orders, /admin/withdrawals, /admin/messages, /admin/finance
+
 ## 已安装依赖
 
 - thirdweb: Web3 SDK，支持BSC链和多种钱包
@@ -154,6 +193,8 @@ server/
 - framer-motion: 动画效果
 - lucide-react: 图标库
 - react-icons: 品牌图标
+- bcryptjs: 密码哈希
+- express-session + connect-pg-simple: 会话管理
 
 ## 运行命令
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import {
   LayoutDashboard, Users, ShoppingCart, ArrowDownToLine,
   MessageSquare, DollarSign, LogOut, Menu, X, ChevronRight
@@ -24,6 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: admin, isLoading, error } = useQuery({
     queryKey: ["/api/admin/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
   });
 
