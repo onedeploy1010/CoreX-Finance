@@ -3,7 +3,7 @@ import { bsc } from "thirdweb/chains";
 import { createWallet, walletConnect } from "thirdweb/wallets";
 
 export const client = createThirdwebClient({
-  clientId: "corex-dapp-client",
+  clientId: "55c901cbfcccbc3592ae2157f8c7c3b5",
 });
 
 export const bscChain = bsc;
