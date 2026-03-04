@@ -260,10 +260,16 @@ export default function OrdersPage() {
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="text-center">
                       <div className="text-xs text-muted-foreground mb-0.5">投资本金</div>
                       <div className="text-sm font-bold text-foreground">{parseFloat(order.amount).toFixed(0)} U</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-muted-foreground mb-0.5">每日利息</div>
+                      <div className="text-sm font-bold" style={{ color: "#E8C547" }}>
+                        +{(parseFloat(order.amount) * parseFloat(order.dailyRate) / 100).toFixed(2)} U
+                      </div>
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-muted-foreground mb-0.5">累计收益</div>
@@ -277,6 +283,12 @@ export default function OrdersPage() {
                         {order.status === "active" ? `${daysLeft} 天` : "本金已返还"}
                       </div>
                     </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs px-1" style={{ color: "rgba(201,162,39,0.5)" }}>
+                    <span>日利率: {order.dailyRate}%</span>
+                    <span>总天数: {order.days}天</span>
+                    <span>预计总收益: {(parseFloat(order.amount) * parseFloat(order.dailyRate) / 100 * order.days).toFixed(2)} U</span>
                   </div>
 
                   <div className="pt-2 border-t" style={{ borderColor: "rgba(201,162,39,0.12)" }}>
