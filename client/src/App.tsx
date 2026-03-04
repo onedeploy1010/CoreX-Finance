@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -19,7 +19,7 @@ import AdminWithdrawals from "@/pages/admin/Withdrawals";
 import AdminMessages from "@/pages/admin/Messages";
 import AdminFinance from "@/pages/admin/Finance";
 
-function Router() {
+function FrontendRoutes() {
   return (
     <Layout>
       <Switch>
@@ -33,7 +33,7 @@ function Router() {
   );
 }
 
-function AdminRouter() {
+function AdminRoutes() {
   return (
     <AdminLayout>
       <Switch>
@@ -49,17 +49,25 @@ function AdminRouter() {
   );
 }
 
+function AppRouter() {
+  const [location] = useLocation();
+
+  if (location === "/admin") {
+    return <AdminLogin />;
+  }
+  if (location.startsWith("/admin/")) {
+    return <AdminRoutes />;
+  }
+  return <FrontendRoutes />;
+}
+
 function App() {
   return (
     <ThirdwebProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
-          <Switch>
-            <Route path="/admin" component={AdminLogin} />
-            <Route path="/admin/:rest*" component={AdminRouter} />
-            <Route path="/:rest*" component={Router} />
-          </Switch>
+          <AppRouter />
         </TooltipProvider>
       </QueryClientProvider>
     </ThirdwebProvider>
