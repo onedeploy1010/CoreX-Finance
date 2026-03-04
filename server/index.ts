@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { registerAdminRoutes } from "./adminRoutes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { storage } from "./storage";
 
 const app = express();
 const httpServer = createServer(app);
@@ -100,6 +101,22 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+
+      const runDailyProcess = async () => {
+        try {
+          log("Running daily earnings process...", "cron");
+          await storage.processDaily();
+          log("Daily earnings process completed", "cron");
+        } catch (err: any) {
+          console.error("Daily cron error:", err);
+        }
+      };
+
+      setTimeout(() => runDailyProcess(), 10000);
+
+      const INTERVAL_MS = 60 * 60 * 1000;
+      setInterval(() => runDailyProcess(), INTERVAL_MS);
+      log(`Daily cron scheduled (every ${INTERVAL_MS / 1000 / 60} minutes)`, "cron");
     },
   );
 })();
