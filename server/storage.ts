@@ -35,6 +35,7 @@ export interface IStorage {
   getTotalWithdrawn(walletAddress: string): Promise<string>;
 
   processDaily(): Promise<void>;
+  processWalletOrders(walletAddress: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -297,56 +298,66 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.total || "0";
   }
 
-  async processDaily(): Promise<void> {
+  private async settleOrder(order: Order): Promise<boolean> {
     const now = new Date();
-    const activeOrds = await this.getActiveOrders();
+    const lastDate = order.lastEarningDate ? new Date(order.lastEarningDate) : new Date(order.startDate);
+    const endDate = new Date(order.endDate);
+    const effectiveNow = now > endDate ? endDate : now;
 
-    for (const order of activeOrds) {
-      const lastDate = order.lastEarningDate ? new Date(order.lastEarningDate) : new Date(order.startDate);
-      const endDate = new Date(order.endDate);
-      const effectiveNow = now > endDate ? endDate : now;
-
-      const diffMs = effectiveNow.getTime() - lastDate.getTime();
-      const daysPassed = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-
-      if (daysPassed < 1) {
-        if (now >= endDate) {
-          await this.completeOrder(order.id);
-        }
-        continue;
-      }
-
-      const dailyEarning = parseFloat(order.amount) * parseFloat(order.dailyRate) / 100;
-      const totalNewEarning = dailyEarning * daysPassed;
-      const newTotal = (parseFloat(order.totalEarned) + totalNewEarning).toFixed(6);
-
-      const newLastDate = new Date(lastDate.getTime() + daysPassed * 24 * 60 * 60 * 1000);
-      await this.updateOrderEarnings(order.id, newTotal, newLastDate);
-
+    const diffMs = effectiveNow.getTime() - lastDate.getTime();
+    const MIN_INTERVAL_MS = 60 * 1000;
+    if (diffMs < MIN_INTERVAL_MS) {
       if (now >= endDate) {
         await this.completeOrder(order.id);
       }
+      return false;
+    }
 
-      await this.createReward(
-        order.walletAddress, "daily",
-        totalNewEarning.toFixed(6),
-        undefined, order.id,
-        `${order.productName} 每日收益 x${daysPassed}天`
-      );
+    const daysElapsed = diffMs / (24 * 60 * 60 * 1000);
 
-      const member = await this.getMember(order.walletAddress);
-      if (member?.referrerAddress) {
-        const directReward = (totalNewEarning * 0.10).toFixed(6);
+    const dailyEarning = parseFloat(order.amount) * parseFloat(order.dailyRate) / 100;
+    const totalNewEarning = dailyEarning * daysElapsed;
+    const newTotal = (parseFloat(order.totalEarned) + totalNewEarning).toFixed(6);
+
+    await this.updateOrderEarnings(order.id, newTotal, effectiveNow);
+
+    if (now >= endDate) {
+      await this.completeOrder(order.id);
+    }
+
+    const hoursElapsed = daysElapsed * 24;
+    let description: string;
+    if (hoursElapsed < 1) {
+      description = `${order.productName} 实时收益 ${Math.round(hoursElapsed * 60)}分钟`;
+    } else if (daysElapsed < 1) {
+      description = `${order.productName} 实时收益 ${hoursElapsed.toFixed(1)}小时`;
+    } else {
+      description = `${order.productName} 每日收益 x${daysElapsed.toFixed(2)}天`;
+    }
+
+    await this.createReward(
+      order.walletAddress, "daily",
+      totalNewEarning.toFixed(6),
+      undefined, order.id,
+      description
+    );
+
+    const member = await this.getMember(order.walletAddress);
+    if (member?.referrerAddress) {
+      const directReward = (totalNewEarning * 0.10).toFixed(6);
+      if (parseFloat(directReward) > 0) {
         await this.createReward(
           member.referrerAddress, "direct_referral",
           directReward,
           order.walletAddress, order.id,
           `直推奖励 来自 ${order.walletAddress.slice(0, 6)}...`
         );
+      }
 
-        const referrer = await this.getMember(member.referrerAddress);
-        if (referrer?.referrerAddress) {
-          const indirectReward = (totalNewEarning * 0.05).toFixed(6);
+      const referrer = await this.getMember(member.referrerAddress);
+      if (referrer?.referrerAddress) {
+        const indirectReward = (totalNewEarning * 0.05).toFixed(6);
+        if (parseFloat(indirectReward) > 0) {
           await this.createReward(
             referrer.referrerAddress, "indirect_referral",
             indirectReward,
@@ -355,8 +366,33 @@ export class DatabaseStorage implements IStorage {
           );
         }
       }
+    }
 
-      await this.processTeamAndEqualBonus(order, totalNewEarning);
+    await this.processTeamAndEqualBonus(order, totalNewEarning);
+    return true;
+  }
+
+  async processWalletOrders(walletAddress: string): Promise<void> {
+    const walletOrders = await db.select().from(orders).where(
+      and(eq(orders.walletAddress, walletAddress.toLowerCase()), eq(orders.status, "active"))
+    );
+
+    let settled = false;
+    for (const order of walletOrders) {
+      const didSettle = await this.settleOrder(order);
+      if (didSettle) settled = true;
+    }
+
+    if (settled) {
+      await this.checkAndUpgradeLevel(walletAddress);
+    }
+  }
+
+  async processDaily(): Promise<void> {
+    const activeOrds = await this.getActiveOrders();
+
+    for (const order of activeOrds) {
+      await this.settleOrder(order);
     }
 
     const allMembers = await this.getAllMembers();

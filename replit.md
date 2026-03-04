@@ -75,6 +75,11 @@ CoreX是基于BSC（Binance Smart Chain）链的USDT理财质押去中心化应�
 - 间推奖励: 被推荐人每日利息 × 5%
 - 团队奖励: V1-V7 拿伞下收益对应百分比
 
+## 结算机制
+- **实时结算**: 用户查看订单/收益/奖励时自动触发该用户的订单结算（最小间隔1分钟）
+- **全量定时结算**: 每小时自动运行一次全量结算（服务器启动10秒后首次运行）
+- 收益按实际经过时间精确计算（支持分钟级精度，非整天）
+
 ## 提现规则
 - 不可提前赎回本金，到期自动返还
 - 日利润和奖励可随时提现
@@ -106,7 +111,7 @@ CoreX是基于BSC（Binance Smart Chain）链的USDT理财质押去中心化应�
 - GET /api/earnings/:address - 获取收益汇总
 - POST /api/withdrawals - 提现申请（最低50U，手续费1U）
 - GET /api/withdrawals/:address - 提现记录
-- POST /api/process-daily - 每日结算（需定时调用）
+- POST /api/process-daily - 全量结算（需定时调用，每小时自动执行）
 - GET /api/products - 产品列表
 - GET /api/levels - 等级配置
 - GET /api/messages/public - 公开消息

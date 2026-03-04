@@ -154,6 +154,7 @@ export async function registerRoutes(
 
   app.get("/api/orders/:address", async (req, res) => {
     try {
+      await storage.processWalletOrders(req.params.address);
       const orderList = await storage.getOrdersByWallet(req.params.address);
       return res.json(orderList);
     } catch (err: any) {
@@ -163,6 +164,7 @@ export async function registerRoutes(
 
   app.get("/api/rewards/:address", async (req, res) => {
     try {
+      await storage.processWalletOrders(req.params.address);
       const rewardList = await storage.getRewardsByWallet(req.params.address);
       return res.json(rewardList);
     } catch (err: any) {
@@ -172,6 +174,7 @@ export async function registerRoutes(
 
   app.get("/api/earnings/:address", async (req, res) => {
     try {
+      await storage.processWalletOrders(req.params.address);
       const totalEarnings = await storage.getTotalEarnings(req.params.address);
       const totalRewards = await storage.getTotalRewards(req.params.address);
       const directRewards = await storage.getTotalRewards(req.params.address, "direct_referral");
