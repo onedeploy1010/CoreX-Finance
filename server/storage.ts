@@ -13,6 +13,7 @@ export interface IStorage {
   updateMemberLevel(walletAddress: string, level: number, lifetimeLock: boolean): Promise<void>;
 
   createOrder(data: InsertOrder): Promise<Order>;
+  getOrderByTxHash(txHash: string): Promise<Order | undefined>;
   getOrdersByWallet(walletAddress: string): Promise<Order[]>;
   getActiveOrders(): Promise<Order[]>;
   updateOrderEarnings(orderId: number, earned: string, lastDate: Date): Promise<void>;
@@ -137,6 +138,11 @@ export class DatabaseStorage implements IStorage {
       ...data,
       walletAddress: data.walletAddress.toLowerCase(),
     }).returning();
+    return order;
+  }
+
+  async getOrderByTxHash(txHash: string): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.txHash, txHash));
     return order;
   }
 
@@ -305,35 +311,28 @@ export class DatabaseStorage implements IStorage {
     const effectiveNow = now > endDate ? endDate : now;
 
     const diffMs = effectiveNow.getTime() - lastDate.getTime();
-    const MIN_INTERVAL_MS = 60 * 1000;
-    if (diffMs < MIN_INTERVAL_MS) {
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+    const wholeDays = Math.floor(diffMs / ONE_DAY_MS);
+    if (wholeDays < 1) {
       if (now >= endDate) {
         await this.completeOrder(order.id);
       }
       return false;
     }
 
-    const daysElapsed = diffMs / (24 * 60 * 60 * 1000);
-
     const dailyEarning = parseFloat(order.amount) * parseFloat(order.dailyRate) / 100;
-    const totalNewEarning = dailyEarning * daysElapsed;
+    const totalNewEarning = dailyEarning * wholeDays;
     const newTotal = (parseFloat(order.totalEarned) + totalNewEarning).toFixed(6);
 
-    await this.updateOrderEarnings(order.id, newTotal, effectiveNow);
+    const settleDate = new Date(lastDate.getTime() + wholeDays * ONE_DAY_MS);
+    await this.updateOrderEarnings(order.id, newTotal, settleDate);
 
     if (now >= endDate) {
       await this.completeOrder(order.id);
     }
 
-    const hoursElapsed = daysElapsed * 24;
-    let description: string;
-    if (hoursElapsed < 1) {
-      description = `${order.productName} 实时收益 ${Math.round(hoursElapsed * 60)}分钟`;
-    } else if (daysElapsed < 1) {
-      description = `${order.productName} 实时收益 ${hoursElapsed.toFixed(1)}小时`;
-    } else {
-      description = `${order.productName} 每日收益 x${daysElapsed.toFixed(2)}天`;
-    }
+    const description = `${order.productName} daily earnings x${wholeDays} day${wholeDays > 1 ? "s" : ""}`;
 
     await this.createReward(
       order.walletAddress, "daily",
@@ -350,7 +349,7 @@ export class DatabaseStorage implements IStorage {
           member.referrerAddress, "direct_referral",
           directReward,
           order.walletAddress, order.id,
-          `直推奖励 来自 ${order.walletAddress.slice(0, 6)}...`
+          `Direct referral reward from ${order.walletAddress.slice(0, 6)}...`
         );
       }
 
@@ -362,7 +361,7 @@ export class DatabaseStorage implements IStorage {
             referrer.referrerAddress, "indirect_referral",
             indirectReward,
             order.walletAddress, order.id,
-            `间推奖励 来自 ${order.walletAddress.slice(0, 6)}...`
+            `Indirect referral reward from ${order.walletAddress.slice(0, 6)}...`
           );
         }
       }
@@ -426,7 +425,7 @@ export class DatabaseStorage implements IStorage {
             leader.walletAddress, "team_bonus",
             teamReward,
             order.walletAddress, order.id,
-            `V${leader.level}团队奖励 ${bonusRate}%`
+            `V${leader.level} team bonus ${bonusRate}%`
           );
         }
       }
@@ -438,7 +437,7 @@ export class DatabaseStorage implements IStorage {
             leader.walletAddress, "team_bonus",
             equalBonus,
             order.walletAddress, order.id,
-            `V${leader.level}平级奖 ${EQUAL_LEVEL_BONUS}%`
+            `V${leader.level} equal-level bonus ${EQUAL_LEVEL_BONUS}%`
           );
         }
       }

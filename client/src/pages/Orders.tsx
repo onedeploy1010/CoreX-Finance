@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useActiveAccount } from "thirdweb/react";
 import { useQuery } from "@tanstack/react-query";
-import { Wallet, TrendingUp, Clock, ArrowDownToLine, ClipboardList, Loader2, Award, Users, ChevronRight, AlertCircle, Shield } from "lucide-react";
+import { Wallet, TrendingUp, Clock, ArrowDownToLine, ClipboardList, Loader2, AlertCircle, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { WITHDRAW_MIN, WITHDRAW_FEE } from "@shared/schema";
 
 export default function OrdersPage() {
-  const [activeTab, setActiveTab] = useState<"orders" | "rewards" | "withdrawals">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "withdrawals">("orders");
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
@@ -29,18 +29,14 @@ export default function OrdersPage() {
     enabled: !!address,
   });
 
-  const { data: rewardList = [], isLoading: rewardsLoading } = useQuery({
-    queryKey: ["/api/rewards", address],
-    enabled: !!address,
-  });
-
   const { data: withdrawalList = [], isLoading: withdrawalsLoading } = useQuery({
     queryKey: ["/api/withdrawals", address],
     enabled: !!address,
   });
 
-  const availableBalance = parseFloat(earningsData?.availableBalance || "0");
-  const totalWithdrawn = parseFloat(earningsData?.totalWithdrawn || "0");
+  const availableBalance = parseFloat((earningsData as any)?.availableBalance || "0");
+  const totalWithdrawn = parseFloat((earningsData as any)?.totalWithdrawn || "0");
+  const totalDailyEarnings = parseFloat((earningsData as any)?.dailyRewards || "0");
 
   const handleWithdraw = async () => {
     if (!account) {
@@ -71,26 +67,6 @@ export default function OrdersPage() {
       toast({ title: "提现失败", description: err.message, variant: "destructive" });
     } finally {
       setWithdrawLoading(false);
-    }
-  };
-
-  const getRewardIcon = (type: string) => {
-    switch (type) {
-      case "daily": return <TrendingUp size={14} style={{ color: "#C9A227" }} />;
-      case "direct_referral": return <Users size={14} style={{ color: "#E8C547" }} />;
-      case "indirect_referral": return <ChevronRight size={14} style={{ color: "#D4A832" }} />;
-      case "team_bonus": return <Award size={14} style={{ color: "#FFD700" }} />;
-      default: return <ChevronRight size={14} style={{ color: "#C9A227" }} />;
-    }
-  };
-
-  const getRewardLabel = (type: string) => {
-    switch (type) {
-      case "daily": return "每日收益";
-      case "direct_referral": return "直推奖励";
-      case "indirect_referral": return "间推奖励";
-      case "team_bonus": return "团队奖励";
-      default: return type;
     }
   };
 
@@ -129,67 +105,48 @@ export default function OrdersPage() {
         <h2 className="font-bold text-base">我的订单</h2>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="stat-card rounded-xl p-4">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Wallet size={14} style={{ color: "#C9A227" }} />
-            <span className="text-xs text-muted-foreground">可提现余额</span>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="stat-card rounded-xl p-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Wallet size={12} style={{ color: "#C9A227" }} />
+            <span className="text-[10px] text-muted-foreground">可提现</span>
           </div>
-          <div className="font-black text-lg" data-testid="text-available-balance" style={{ color: "#C9A227" }}>
+          <div className="font-black text-base" data-testid="text-available-balance" style={{ color: "#C9A227" }}>
             {availableBalance.toFixed(2)}
           </div>
-          <div className="text-xs text-muted-foreground">USDT</div>
+          <div className="text-[10px] text-muted-foreground">USDT</div>
         </div>
-        <div className="stat-card rounded-xl p-4">
-          <div className="flex items-center gap-1.5 mb-2">
-            <TrendingUp size={14} style={{ color: "#E8C547" }} />
-            <span className="text-xs text-muted-foreground">已提现总额</span>
+        <div className="stat-card rounded-xl p-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <TrendingUp size={12} style={{ color: "#E8C547" }} />
+            <span className="text-[10px] text-muted-foreground">累计日收益</span>
           </div>
-          <div className="font-black text-lg" data-testid="text-total-withdrawn" style={{ color: "#E8C547" }}>
+          <div className="font-black text-base" style={{ color: "#E8C547" }}>
+            {totalDailyEarnings.toFixed(2)}
+          </div>
+          <div className="text-[10px] text-muted-foreground">USDT</div>
+        </div>
+        <div className="stat-card rounded-xl p-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <ArrowDownToLine size={12} style={{ color: "#6bc46b" }} />
+            <span className="text-[10px] text-muted-foreground">已提现</span>
+          </div>
+          <div className="font-black text-base" data-testid="text-total-withdrawn" style={{ color: "#6bc46b" }}>
             {totalWithdrawn.toFixed(2)}
           </div>
-          <div className="text-xs text-muted-foreground">USDT</div>
+          <div className="text-[10px] text-muted-foreground">USDT</div>
         </div>
       </div>
 
-      {earningsData && (
-        <div className="grid grid-cols-3 gap-2">
-          <div className="stat-card rounded-lg p-2.5 text-center">
-            <div className="text-[10px] text-muted-foreground">直推奖励</div>
-            <div className="font-bold text-xs" style={{ color: "#E8C547" }}>{parseFloat(earningsData.directRewards || "0").toFixed(2)}</div>
-          </div>
-          <div className="stat-card rounded-lg p-2.5 text-center">
-            <div className="text-[10px] text-muted-foreground">间推奖励</div>
-            <div className="font-bold text-xs" style={{ color: "#D4A832" }}>{parseFloat(earningsData.indirectRewards || "0").toFixed(2)}</div>
-          </div>
-          <div className="stat-card rounded-lg p-2.5 text-center">
-            <div className="text-[10px] text-muted-foreground">团队奖励</div>
-            <div className="font-bold text-xs" style={{ color: "#FFD700" }}>{parseFloat(earningsData.teamRewards || "0").toFixed(2)}</div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          data-testid="button-withdraw-history"
-          variant="outline"
-          className="w-full font-semibold text-sm"
-          style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.3)", color: "#C9A227" }}
-          onClick={() => setActiveTab("withdrawals")}
-        >
-          <Clock size={14} className="mr-1.5" />
-          提现记录
-        </Button>
-        <Button
-          data-testid="button-withdraw-now"
-          className="w-full font-bold text-sm"
-          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
-          onClick={() => setWithdrawOpen(true)}
-        >
-          <ArrowDownToLine size={14} className="mr-1.5" />
-          立即提现
-        </Button>
-      </div>
+      <Button
+        data-testid="button-withdraw-now"
+        className="w-full font-bold text-sm"
+        style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+        onClick={() => setWithdrawOpen(true)}
+      >
+        <ArrowDownToLine size={14} className="mr-1.5" />
+        立即提现
+      </Button>
 
       <div className="flex rounded-lg p-1 gap-1" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
         <button
@@ -201,16 +158,6 @@ export default function OrdersPage() {
           onClick={() => setActiveTab("orders")}
         >
           我的订单
-        </button>
-        <button
-          data-testid="tab-reward-detail"
-          className="flex-1 py-2 text-sm font-semibold rounded-md transition-all duration-200"
-          style={activeTab === "rewards"
-            ? { background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }
-            : { color: "rgba(255,255,255,0.5)" }}
-          onClick={() => setActiveTab("rewards")}
-        >
-          奖励明细
         </button>
         <button
           data-testid="tab-withdraw-history"
@@ -249,7 +196,7 @@ export default function OrdersPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="font-bold text-sm text-foreground">{order.productName}</div>
-                      <div className="text-xs text-muted-foreground">订单 #{order.id}</div>
+                      <div className="text-xs text-muted-foreground">Order #{order.id}</div>
                     </div>
                     <Badge
                       style={order.status === "active"
@@ -306,45 +253,6 @@ export default function OrdersPage() {
                 </div>
               );
             })
-          )}
-        </div>
-      )}
-
-      {activeTab === "rewards" && (
-        <div className="space-y-3">
-          {rewardsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin" style={{ color: "#C9A227" }} />
-            </div>
-          ) : (rewardList as any[]).length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Award size={40} className="mx-auto mb-3 opacity-30" />
-              <p>暂无奖励记录</p>
-            </div>
-          ) : (
-            (rewardList as any[]).map((reward: any) => (
-              <div
-                key={reward.id}
-                data-testid={`card-reward-${reward.id}`}
-                className="product-card rounded-xl p-3 flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                    style={{ background: "rgba(201,162,39,0.12)", border: "1px solid rgba(201,162,39,0.25)" }}>
-                    {getRewardIcon(reward.type)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-foreground">{getRewardLabel(reward.type)}</div>
-                    <div className="text-xs text-muted-foreground truncate">{reward.description || ""}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(reward.createdAt).toLocaleString()}</div>
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="font-bold text-sm" style={{ color: "#C9A227" }}>+{parseFloat(reward.amount).toFixed(4)}</div>
-                  <div className="text-xs text-muted-foreground">USDT</div>
-                </div>
-              </div>
-            ))
           )}
         </div>
       )}

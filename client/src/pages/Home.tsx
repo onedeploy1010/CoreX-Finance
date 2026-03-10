@@ -3,11 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useActiveAccount } from "thirdweb/react";
+import { useSendTransaction } from "thirdweb/react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, Clock, DollarSign, Shield } from "lucide-react";
 import { PRODUCTS } from "@shared/schema";
+import {
+  prepareApproveUSDT,
+  prepareInvest,
+  getUSDTAllowance,
+  parseUSDT,
+  COREX_INVESTMENT_ADDRESS,
+} from "@/lib/contracts";
 
 interface Product {
   id: number;
@@ -21,11 +29,15 @@ interface Product {
 
 const COLORS = ["#C9A227", "#E8C547", "#D4A832", "#C9A227", "#E8C547"];
 
+const isContractConfigured = COREX_INVESTMENT_ADDRESS !== "0x0000000000000000000000000000000000000000";
+
 function InvestDialog({ product, open, onClose, color }: { product: Product | null; open: boolean; onClose: () => void; color: string }) {
   const [amount, setAmount] = useState("");
   const account = useActiveAccount();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<"idle" | "approving" | "investing" | "confirming">("idle");
+  const { mutateAsync: sendTransaction } = useSendTransaction();
 
   if (!product) return null;
 
@@ -42,23 +54,70 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
       return;
     }
     setLoading(true);
+
     try {
+      let txHash: string | undefined;
+
+      if (isContractConfigured) {
+        const amountWei = parseUSDT(amount);
+
+        setStep("approving");
+        const allowance = await getUSDTAllowance(account.address);
+        if (allowance < amountWei) {
+          const approveTx = prepareApproveUSDT(amountWei);
+          await sendTransaction(approveTx);
+        }
+
+        setStep("investing");
+        const investTx = prepareInvest(product.id, amountWei);
+        const result = await sendTransaction(investTx);
+        txHash = result.transactionHash;
+
+        if (!txHash) {
+          toast({ title: "Transaction failed", variant: "destructive" });
+          return;
+        }
+      }
+
+      setStep("confirming");
+
       await apiRequest("POST", "/api/orders", {
         walletAddress: account.address,
         productId: product.id,
         amount: amount,
+        txHash: txHash || null,
       });
+
       queryClient.invalidateQueries({ queryKey: ["/api/orders", account.address.toLowerCase()] });
       queryClient.invalidateQueries({ queryKey: ["/api/earnings", account.address.toLowerCase()] });
       queryClient.invalidateQueries({ queryKey: ["/api/members", account.address.toLowerCase()] });
       queryClient.invalidateQueries({ queryKey: ["/api/members", account.address.toLowerCase(), "team-stats"] });
-      toast({ title: "投资成功", description: `已质押 ${amount} USDT 到 ${product.name}` });
+
+      toast({
+        title: "Investment Successful",
+        description: `${amount} USDT invested in ${product.nameEn}`,
+      });
       onClose();
       setAmount("");
     } catch (err: any) {
-      toast({ title: "投资失败", description: err.message, variant: "destructive" });
+      const msg = err?.message || "";
+      if (msg.includes("user rejected") || msg.includes("User denied")) {
+        toast({ title: "Transaction Cancelled", variant: "destructive" });
+      } else {
+        toast({ title: "Investment Failed", description: msg, variant: "destructive" });
+      }
     } finally {
       setLoading(false);
+      setStep("idle");
+    }
+  };
+
+  const getButtonText = () => {
+    switch (step) {
+      case "approving": return "Approving USDT...";
+      case "investing": return "Confirming Transaction...";
+      case "confirming": return "Creating Order...";
+      default: return loading ? "Processing..." : "确认投资";
     }
   };
 
@@ -147,7 +206,7 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
             style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
             onClick={handleInvest}
           >
-            {loading ? "处理中..." : "确认投资"}
+            {getButtonText()}
           </Button>
         </div>
       </DialogContent>

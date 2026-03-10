@@ -12,7 +12,7 @@ export async function registerRoutes(
     try {
       const { walletAddress, referrerAddress } = req.body;
       if (!walletAddress) {
-        return res.status(400).json({ message: "钱包地址必填" });
+        return res.status(400).json({ success: false, message: "Wallet address required" });
       }
 
       const existing = await storage.getMember(walletAddress);
@@ -32,7 +32,7 @@ export async function registerRoutes(
       return res.json(member);
     } catch (err: any) {
       console.error("Register error:", err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -40,11 +40,11 @@ export async function registerRoutes(
     try {
       const member = await storage.getMember(req.params.address);
       if (!member) {
-        return res.status(404).json({ message: "会员未找到" });
+        return res.status(404).json({ success: false, message: "Member not found" });
       }
       return res.json(member);
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -66,7 +66,7 @@ export async function registerRoutes(
       }
       return res.json(result);
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -80,7 +80,7 @@ export async function registerRoutes(
       }
       return res.json(result);
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -90,7 +90,7 @@ export async function registerRoutes(
       const member = await storage.getMember(req.params.address);
       return res.json({ ...stats, level: member?.level || 0 });
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -99,7 +99,7 @@ export async function registerRoutes(
       const tree = await storage.getTeamTree(req.params.address);
       return res.json(tree);
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -107,18 +107,29 @@ export async function registerRoutes(
     try {
       const { walletAddress, productId, amount, txHash } = req.body;
 
+      if (!walletAddress) {
+        return res.status(400).json({ success: false, message: "Wallet address required" });
+      }
+
       const product = PRODUCTS.find(p => p.id === productId);
       if (!product) {
-        return res.status(400).json({ message: "产品不存在" });
+        return res.status(400).json({ success: false, message: "Product not found" });
       }
 
       if (parseFloat(amount) < product.minAmount) {
-        return res.status(400).json({ message: `最低投入 ${product.minAmount} USDT` });
+        return res.status(400).json({ success: false, message: `Minimum investment ${product.minAmount} USDT` });
       }
 
       const member = await storage.getMember(walletAddress);
       if (!member) {
-        return res.status(400).json({ message: "请先注册会员" });
+        return res.status(400).json({ success: false, message: "Please register first" });
+      }
+
+      if (txHash) {
+        const existingOrder = await storage.getOrderByTxHash(txHash);
+        if (existingOrder) {
+          return res.status(400).json({ success: false, message: "Transaction already processed" });
+        }
       }
 
       const endDate = new Date();
@@ -145,10 +156,14 @@ export async function registerRoutes(
         }
       }
 
-      return res.json(order);
+      return res.json({
+        success: true,
+        data: order,
+        message: "Investment successful, earnings calculation started",
+      });
     } catch (err: any) {
       console.error("Order error:", err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -158,7 +173,7 @@ export async function registerRoutes(
       const orderList = await storage.getOrdersByWallet(req.params.address);
       return res.json(orderList);
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -168,7 +183,7 @@ export async function registerRoutes(
       const rewardList = await storage.getRewardsByWallet(req.params.address);
       return res.json(rewardList);
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -194,7 +209,7 @@ export async function registerRoutes(
         totalWithdrawn,
       });
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -202,29 +217,29 @@ export async function registerRoutes(
     try {
       const { walletAddress, amount } = req.body;
       if (!walletAddress) {
-        return res.status(400).json({ message: "钱包地址必填" });
+        return res.status(400).json({ success: false, message: "Wallet address required" });
       }
 
       const withdrawAmount = parseFloat(amount);
       if (isNaN(withdrawAmount) || withdrawAmount < WITHDRAW_MIN) {
-        return res.status(400).json({ message: `最低提现金额 ${WITHDRAW_MIN} USDT` });
+        return res.status(400).json({ success: false, message: `Minimum withdrawal ${WITHDRAW_MIN} USDT` });
       }
 
       const member = await storage.getMember(walletAddress);
       if (!member) {
-        return res.status(400).json({ message: "会员不存在" });
+        return res.status(400).json({ success: false, message: "Member not found" });
       }
 
       const available = await storage.getAvailableBalance(walletAddress);
       if (withdrawAmount > available) {
-        return res.status(400).json({ message: `可提现余额不足，当前可提 ${available.toFixed(2)} USDT` });
+        return res.status(400).json({ success: false, message: `Insufficient balance, available: ${available.toFixed(2)} USDT` });
       }
 
       const withdrawal = await storage.createWithdrawal(walletAddress, withdrawAmount, WITHDRAW_FEE);
-      return res.json(withdrawal);
+      return res.json({ success: true, data: withdrawal });
     } catch (err: any) {
       console.error("Withdraw error:", err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -233,7 +248,7 @@ export async function registerRoutes(
       const list = await storage.getWithdrawalsByWallet(req.params.address);
       return res.json(list);
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -241,13 +256,13 @@ export async function registerRoutes(
     try {
       const secret = req.headers["x-cron-secret"] || req.body?.secret;
       if (secret !== process.env.SESSION_SECRET) {
-        return res.status(403).json({ message: "未授权" });
+        return res.status(403).json({ success: false, message: "Unauthorized" });
       }
       await storage.processDaily();
-      return res.json({ message: "每日结算完成" });
+      return res.json({ success: true, message: "Daily settlement completed" });
     } catch (err: any) {
       console.error("Daily process error:", err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
   });
 

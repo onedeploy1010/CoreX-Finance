@@ -194,6 +194,31 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  app.get("/api/admin/members/:address/team-tree", requireAdmin, async (req, res) => {
+    try {
+      const addr = req.params.address.toLowerCase();
+      const directs = await db.select().from(members).where(eq(members.referrerAddress, addr)).orderBy(desc(members.createdAt));
+
+      const result = [];
+      for (const d of directs) {
+        const activeOrders = await db.select().from(orders).where(and(eq(orders.walletAddress, d.walletAddress), eq(orders.status, "active")));
+        const stakingAmount = activeOrders.reduce((sum, o) => sum + parseFloat(o.amount), 0);
+        const children = await db.select().from(members).where(eq(members.referrerAddress, d.walletAddress));
+
+        result.push({
+          ...d,
+          stakingAmount,
+          childrenCount: children.length,
+          hasChildren: children.length > 0,
+        });
+      }
+
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/admin/orders", requireAdmin, async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
