@@ -4,13 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import {
   LayoutDashboard, Users, ShoppingCart, ArrowDownToLine,
-  MessageSquare, DollarSign, LogOut, Menu, X, ChevronRight
+  MessageSquare, DollarSign, LogOut, Menu, X, ChevronRight, Network
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const NAV_ITEMS = [
   { path: "/admin/dashboard", label: "统计台", icon: LayoutDashboard },
   { path: "/admin/members", label: "会员管理", icon: Users },
+  { path: "/admin/referrals", label: "推荐管理", icon: Network },
   { path: "/admin/orders", label: "订单管理", icon: ShoppingCart },
   { path: "/admin/withdrawals", label: "提现管理", icon: ArrowDownToLine },
   { path: "/admin/messages", label: "消息管理", icon: MessageSquare },

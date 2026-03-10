@@ -219,6 +219,112 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // 推荐管理 - 获取全局推荐树（根节点 = 无推荐人的会员）
+  app.get("/api/admin/referrals/tree", requireAdmin, async (req, res) => {
+    try {
+      const search = (req.query.search as string) || "";
+      const parentAddr = (req.query.parent as string) || "";
+
+      // If parent specified, return children of that parent
+      if (parentAddr) {
+        const children = await db.select().from(members)
+          .where(eq(members.referrerAddress, parentAddr.toLowerCase()))
+          .orderBy(desc(members.createdAt));
+
+        const enriched = [];
+        for (const m of children) {
+          const [staking] = await db.select({
+            total: sql<string>`COALESCE(SUM(amount::numeric), 0)::text`
+          }).from(orders).where(and(eq(orders.walletAddress, m.walletAddress), eq(orders.status, "active")));
+          const [childCount] = await db.select({ count: sql<number>`count(*)::int` })
+            .from(members).where(eq(members.referrerAddress, m.walletAddress));
+          // recursive team count
+          const [teamCount] = await db.select({ count: sql<number>`count(*)::int` })
+            .from(members).where(sql`wallet_address IN (
+              WITH RECURSIVE team AS (
+                SELECT wallet_address FROM members WHERE referrer_address = ${m.walletAddress}
+                UNION ALL
+                SELECT m2.wallet_address FROM members m2 INNER JOIN team t ON m2.referrer_address = t.wallet_address
+              ) SELECT wallet_address FROM team
+            )`);
+          enriched.push({
+            ...m,
+            stakingAmount: staking.total,
+            directCount: childCount.count,
+            teamCount: teamCount.count,
+            hasChildren: childCount.count > 0,
+          });
+        }
+        return res.json({ members: enriched });
+      }
+
+      // Root members (no referrer) or search
+      let rootMembers;
+      if (search) {
+        // Search across all members
+        rootMembers = await db.select().from(members)
+          .where(sql`${members.walletAddress} ILIKE ${'%' + search + '%'}`)
+          .orderBy(desc(members.createdAt)).limit(50);
+      } else {
+        rootMembers = await db.select().from(members)
+          .where(sql`${members.referrerAddress} IS NULL`)
+          .orderBy(desc(members.createdAt));
+      }
+
+      const enriched = [];
+      for (const m of rootMembers) {
+        const [staking] = await db.select({
+          total: sql<string>`COALESCE(SUM(amount::numeric), 0)::text`
+        }).from(orders).where(and(eq(orders.walletAddress, m.walletAddress), eq(orders.status, "active")));
+        const [childCount] = await db.select({ count: sql<number>`count(*)::int` })
+          .from(members).where(eq(members.referrerAddress, m.walletAddress));
+        const [teamCount] = await db.select({ count: sql<number>`count(*)::int` })
+          .from(members).where(sql`wallet_address IN (
+            WITH RECURSIVE team AS (
+              SELECT wallet_address FROM members WHERE referrer_address = ${m.walletAddress}
+              UNION ALL
+              SELECT m2.wallet_address FROM members m2 INNER JOIN team t ON m2.referrer_address = t.wallet_address
+            ) SELECT wallet_address FROM team
+          )`);
+        enriched.push({
+          ...m,
+          stakingAmount: staking.total,
+          directCount: childCount.count,
+          teamCount: teamCount.count,
+          hasChildren: childCount.count > 0,
+        });
+      }
+
+      // Stats
+      const [totalMembers] = await db.select({ count: sql<number>`count(*)::int` }).from(members);
+      const [withReferrer] = await db.select({ count: sql<number>`count(*)::int` })
+        .from(members).where(sql`${members.referrerAddress} IS NOT NULL`);
+      const [rootCount] = await db.select({ count: sql<number>`count(*)::int` })
+        .from(members).where(sql`${members.referrerAddress} IS NULL`);
+      // Max depth via recursive CTE
+      const maxDepthResult = await db.execute(sql`
+        WITH RECURSIVE tree AS (
+          SELECT wallet_address, 0 as depth FROM members WHERE referrer_address IS NULL
+          UNION ALL
+          SELECT m.wallet_address, t.depth + 1 FROM members m INNER JOIN tree t ON m.referrer_address = t.wallet_address
+        ) SELECT COALESCE(MAX(depth), 0) as max_depth FROM tree
+      `);
+      const maxDepth = (maxDepthResult as any).rows?.[0]?.max_depth || 0;
+
+      return res.json({
+        members: enriched,
+        stats: {
+          totalMembers: totalMembers.count,
+          withReferrer: withReferrer.count,
+          rootCount: rootCount.count,
+          maxDepth: Number(maxDepth),
+        }
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/admin/orders", requireAdmin, async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;

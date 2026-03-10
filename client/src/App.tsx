@@ -18,6 +18,7 @@ import AdminOrders from "@/pages/admin/Orders";
 import AdminWithdrawals from "@/pages/admin/Withdrawals";
 import AdminMessages from "@/pages/admin/Messages";
 import AdminFinance from "@/pages/admin/Finance";
+import AdminReferrals from "@/pages/admin/Referrals";
 
 function FrontendRoutes() {
   return (
@@ -39,6 +40,7 @@ function AdminRoutes() {
       <Switch>
         <Route path="/admin/dashboard" component={Dashboard} />
         <Route path="/admin/members" component={Members} />
+        <Route path="/admin/referrals" component={AdminReferrals} />
         <Route path="/admin/orders" component={AdminOrders} />
         <Route path="/admin/withdrawals" component={AdminWithdrawals} />
         <Route path="/admin/messages" component={AdminMessages} />
