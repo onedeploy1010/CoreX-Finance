@@ -1,76 +1,60 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+// Pure types and constants - no server dependencies
 
-export const members = pgTable("members", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  walletAddress: text("wallet_address").notNull().unique(),
-  referrerAddress: text("referrer_address"),
-  level: integer("level").notNull().default(0),
-  lifetimeLock: boolean("lifetime_lock").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export interface Member {
+  id: number;
+  walletAddress: string;
+  referrerAddress: string | null;
+  level: number;
+  lifetimeLock: boolean;
+  createdAt: string;
+}
 
-export const orders = pgTable("orders", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  walletAddress: text("wallet_address").notNull(),
-  productId: integer("product_id").notNull(),
-  productName: text("product_name").notNull(),
-  amount: decimal("amount", { precision: 18, scale: 6 }).notNull(),
-  dailyRate: decimal("daily_rate", { precision: 10, scale: 4 }).notNull(),
-  days: integer("days").notNull(),
-  startDate: timestamp("start_date").notNull().defaultNow(),
-  endDate: timestamp("end_date").notNull(),
-  status: text("status").notNull().default("active"),
-  totalEarned: decimal("total_earned", { precision: 18, scale: 6 }).notNull().default("0"),
-  lastEarningDate: timestamp("last_earning_date"),
-  txHash: text("tx_hash"),
-});
+export interface Order {
+  id: number;
+  walletAddress: string;
+  productId: number;
+  productName: string;
+  amount: string;
+  dailyRate: string;
+  days: number;
+  startDate: string;
+  endDate: string;
+  status: string;
+  totalEarned: string;
+  lastEarningDate: string | null;
+  txHash: string | null;
+}
 
-export const rewards = pgTable("rewards", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  walletAddress: text("wallet_address").notNull(),
-  type: text("type").notNull(),
-  amount: decimal("amount", { precision: 18, scale: 6 }).notNull(),
-  fromAddress: text("from_address"),
-  fromOrderId: integer("from_order_id"),
-  description: text("description"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export interface Reward {
+  id: number;
+  walletAddress: string;
+  type: string;
+  amount: string;
+  fromAddress: string | null;
+  fromOrderId: number | null;
+  description: string | null;
+  createdAt: string;
+}
 
-export const withdrawals = pgTable("withdrawals", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  walletAddress: text("wallet_address").notNull(),
-  amount: decimal("amount", { precision: 18, scale: 6 }).notNull(),
-  fee: decimal("fee", { precision: 18, scale: 6 }).notNull().default("1"),
-  actualAmount: decimal("actual_amount", { precision: 18, scale: 6 }).notNull(),
-  status: text("status").notNull().default("pending"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export interface Withdrawal {
+  id: number;
+  walletAddress: string;
+  amount: string;
+  fee: string;
+  actualAmount: string;
+  status: string;
+  createdAt: string;
+}
 
-export const insertMemberSchema = createInsertSchema(members).pick({
-  walletAddress: true,
-  referrerAddress: true,
-});
-
-export const insertOrderSchema = createInsertSchema(orders).pick({
-  walletAddress: true,
-  productId: true,
-  productName: true,
-  amount: true,
-  dailyRate: true,
-  days: true,
-  endDate: true,
-  txHash: true,
-});
-
-export type Member = typeof members.$inferSelect;
-export type InsertMember = z.infer<typeof insertMemberSchema>;
-export type Order = typeof orders.$inferSelect;
-export type InsertOrder = z.infer<typeof insertOrderSchema>;
-export type Reward = typeof rewards.$inferSelect;
-export type Withdrawal = typeof withdrawals.$inferSelect;
+export interface Message {
+  id: number;
+  title: string;
+  content: string;
+  type: string;
+  targetAddress: string | null;
+  isPublished: boolean;
+  createdAt: string;
+}
 
 export const PRODUCTS = [
   { id: 1, name: "芯未来", nameEn: "CX Peak 01", days: 30, dailyRate: 0.3, minAmount: 200, description: "入门级稳健理财" },
@@ -91,27 +75,6 @@ export const LEVEL_CONFIG = [
   { level: 7, name: "V7", people: 1000, amount: 10000000, bonus: 33, subLevel: 6, subCount: 2, lifetimeLock: true },
 ];
 
-export const adminUsers = pgTable("admin_users", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  username: text("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const messages = pgTable("messages", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  type: text("type").notNull().default("system"),
-  targetAddress: text("target_address"),
-  isPublished: boolean("is_published").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export type AdminUser = typeof adminUsers.$inferSelect;
-export type Message = typeof messages.$inferSelect;
-
 export const EQUAL_LEVEL_BONUS = 10;
-
 export const WITHDRAW_MIN = 50;
 export const WITHDRAW_FEE = 1;
