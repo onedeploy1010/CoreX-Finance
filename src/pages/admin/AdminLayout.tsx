@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import { getAdminSession, adminLogout } from "@/lib/api";
 import {
   LayoutDashboard, Users, ShoppingCart, ArrowDownToLine,
@@ -24,31 +23,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: admin, isLoading } = useQuery({
-    queryKey: ["/api/admin/me"],
-    queryFn: () => getAdminSession(),
-    retry: false,
-  });
+  const admin = getAdminSession();
 
   useEffect(() => {
-    if (!isLoading && !admin) {
+    if (!admin) {
       setLocation("/admin");
     }
-  }, [admin, isLoading]);
+  }, [admin]);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     adminLogout();
     toast({ title: "已退出登录" });
     setLocation("/admin");
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0c0a08" }}>
-        <div className="text-muted-foreground">加载中...</div>
-      </div>
-    );
-  }
 
   if (!admin) return null;
 
@@ -70,7 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div>
             <div className="font-bold text-sm" style={{ color: "#C9A227" }}>CoreX Admin</div>
-            <div className="text-xs text-muted-foreground">{(admin as any)?.username}</div>
+            <div className="text-xs text-muted-foreground">{admin.username}</div>
           </div>
           <button className="lg:hidden ml-auto p-1" onClick={() => setSidebarOpen(false)}>
             <X size={18} className="text-muted-foreground" />
