@@ -33,16 +33,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!admin) {
       setLocation("/admin");
-      return;
     }
-    // Redirect to first allowed page if current page is not allowed
+  }, [admin]);
+
+  // Redirect unauthorized routes on initial load only
+  useEffect(() => {
+    if (!admin) return;
     const role = (admin.role || "superadmin") as AdminRole;
     const allowed = NAV_ITEMS.filter(item => item.roles.includes(role));
     const isAllowed = allowed.some(item => location === item.path);
-    if (!isAllowed && location !== "/admin" && allowed.length > 0) {
+    if (!isAllowed && allowed.length > 0) {
       setLocation(allowed[0].path);
     }
-  }, [admin, location]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogout = () => {
     adminLogout();
