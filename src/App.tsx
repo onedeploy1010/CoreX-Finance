@@ -20,6 +20,8 @@ import AdminMessages from "@/pages/admin/Messages";
 import AdminFinance from "@/pages/admin/Finance";
 import AdminReferrals from "@/pages/admin/Referrals";
 import AdminSettings from "@/pages/admin/Settings";
+import AdminManagement from "@/pages/admin/Admins";
+import AdminLogs from "@/pages/admin/Logs";
 
 function FrontendRoutes() {
   return (
@@ -47,6 +49,8 @@ function AdminRoutes() {
         <Route path="/admin/messages" component={AdminMessages} />
         <Route path="/admin/finance" component={AdminFinance} />
         <Route path="/admin/settings" component={AdminSettings} />
+        <Route path="/admin/admins" component={AdminManagement} />
+        <Route path="/admin/logs" component={AdminLogs} />
         <Route>{() => { window.location.href = "/admin/dashboard"; return null; }}</Route>
       </Switch>
     </AdminLayout>

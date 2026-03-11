@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree } from "@/lib/api";
+import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, getAdminSession } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 function shortAddr(addr: string) {
   if (!addr) return "";
@@ -70,9 +73,26 @@ function TeamTree({ rootAddress }: { rootAddress: string }) {
   );
 }
 
-function MemberDetail({ data }: { data: any }) {
+function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: () => void }) {
   const [showTree, setShowTree] = useState(false);
+  const [editLevel, setEditLevel] = useState<number | null>(null);
+  const { toast } = useToast();
   const m = data.member;
+  const session = getAdminSession();
+  const isSuperAdmin = session?.role === "superadmin";
+
+  const levelMutation = useMutation({
+    mutationFn: async (newLevel: number) => {
+      await updateMemberLevel(m.walletAddress, newLevel);
+      await adminAddLog("调整会员等级", "member", m.walletAddress, { oldLevel: m.level, newLevel });
+    },
+    onSuccess: () => {
+      toast({ title: "等级已更新" });
+      setEditLevel(null);
+      onLevelChanged?.();
+    },
+    onError: (err: any) => toast({ title: "更新失败", description: err.message, variant: "destructive" }),
+  });
 
   return (
     <div className="space-y-4 text-sm">
@@ -83,7 +103,30 @@ function MemberDetail({ data }: { data: any }) {
         </div>
         <div className="p-2 rounded" style={{ background: "rgba(201,162,39,0.04)" }}>
           <div className="text-[10px] text-muted-foreground">等级</div>
-          <div className="text-xs font-semibold" style={{ color: "#C9A227" }}>{m.level === 0 ? "普通" : `V${m.level}`}</div>
+          {isSuperAdmin ? (
+            <div className="flex items-center gap-2">
+              <select
+                value={editLevel ?? m.level}
+                onChange={e => setEditLevel(parseInt(e.target.value))}
+                className="text-xs font-semibold rounded px-1.5 py-0.5 appearance-none cursor-pointer"
+                style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
+              >
+                <option value={0}>普通</option>
+                {[1,2,3,4,5,6,7].map(v => <option key={v} value={v}>V{v}</option>)}
+              </select>
+              {editLevel !== null && editLevel !== m.level && (
+                <button
+                  onClick={() => levelMutation.mutate(editLevel)}
+                  className="p-1 rounded flex items-center justify-center"
+                  style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", minWidth: "28px", minHeight: "28px" }}
+                >
+                  <Save size={12} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="text-xs font-semibold" style={{ color: "#C9A227" }}>{m.level === 0 ? "普通" : `V${m.level}`}</div>
+          )}
         </div>
         <div className="p-2 rounded" style={{ background: "rgba(201,162,39,0.04)" }}>
           <div className="text-[10px] text-muted-foreground">推荐人</div>
@@ -269,7 +312,10 @@ export default function Members() {
           <DialogHeader>
             <DialogTitle style={{ color: "#C9A227" }}>会员详情</DialogTitle>
           </DialogHeader>
-          {detail ? <MemberDetail data={detail as any} /> : <div className="text-center text-muted-foreground py-4">加载中...</div>}
+          {detail ? <MemberDetail data={detail as any} onLevelChanged={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/members", detailAddr] });
+          }} /> : <div className="text-center text-muted-foreground py-4">加载中...</div>}
         </DialogContent>
       </Dialog>
     </div>

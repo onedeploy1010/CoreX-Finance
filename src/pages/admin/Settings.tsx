@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { getSettlementConfig, updateSettlementTime } from "@/lib/api";
+import { getSettlementConfig, updateSettlementTime, adminAddLog } from "@/lib/api";
 import { Settings, Clock, Save, Loader2 } from "lucide-react";
 
 export default function AdminSettings() {
@@ -25,6 +25,7 @@ export default function AdminSettings() {
     setSaving(true);
     try {
       await updateSettlementTime(displayHour, displayMinute);
+      await adminAddLog("修改结算时间", "settings", "settlement_time", { sgtHour: displayHour, sgtMinute: displayMinute });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement-config"] });
       toast({ title: "结算时间已更新", description: `新加坡时间 ${String(displayHour).padStart(2, "0")}:${String(displayMinute).padStart(2, "0")}` });
       setHour(null);

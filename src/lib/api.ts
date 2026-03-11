@@ -300,7 +300,7 @@ export async function adminLogin(username: string, password: string) {
   if (!data) throw new Error("用户名或密码错误");
 
   // Store admin session in localStorage
-  const session = { id: data.id, username: data.username, token: data.token, timestamp: Date.now() };
+  const session = { id: data.id, username: data.username, role: data.role, token: data.token, timestamp: Date.now() };
   localStorage.setItem("corex_admin", JSON.stringify(session));
   return session;
 }
@@ -606,4 +606,68 @@ export async function getAdminReferralTree(search?: string, parentAddr?: string)
       maxDepth: 0,
     },
   };
+}
+
+// ============ Admin Role Management ============
+
+export async function adminAddLog(action: string, targetType?: string, targetId?: string, detail?: any) {
+  const session = getAdminSession();
+  if (!session) return;
+  try {
+    await supabase.rpc("admin_add_log", {
+      p_admin_id: session.id,
+      p_admin_username: session.username,
+      p_admin_role: session.role || "superadmin",
+      p_action: action,
+      p_target_type: targetType || null,
+      p_target_id: targetId || null,
+      p_detail: detail ? JSON.stringify(detail) : null,
+    });
+  } catch {};
+}
+
+export async function getAdminLogs(page: number, limit: number) {
+  const { data, error } = await supabase.rpc("admin_get_logs", { p_page: page, p_limit: limit });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getAdminUsers() {
+  const { data, error } = await supabase.rpc("admin_list_admins");
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function createAdminUser(username: string, password: string, role: string) {
+  const { data, error } = await supabase.rpc("admin_create_user", {
+    p_username: username, p_password: password, p_role: role,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function updateAdminUser(id: number, role: string, password?: string) {
+  const { data, error } = await supabase.rpc("admin_update_user", {
+    p_id: id, p_role: role, p_password: password || null,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function deleteAdminUser(id: number) {
+  const session = getAdminSession();
+  if (!session) throw new Error("未登录");
+  const { data, error } = await supabase.rpc("admin_delete_user", {
+    p_id: id, p_caller_id: session.id,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function updateMemberLevel(walletAddress: string, level: number) {
+  const { data, error } = await supabase.rpc("admin_update_member_level", {
+    p_wallet_address: walletAddress, p_level: level,
+  });
+  if (error) throw new Error(error.message);
+  return data;
 }

@@ -3,19 +3,24 @@ import { useLocation, Link } from "wouter";
 import { getAdminSession, adminLogout } from "@/lib/api";
 import {
   LayoutDashboard, Users, ShoppingCart, ArrowDownToLine,
-  MessageSquare, DollarSign, LogOut, Menu, X, ChevronRight, Network, Settings
+  MessageSquare, DollarSign, LogOut, Menu, X, ChevronRight, Network, Settings,
+  Shield, ScrollText
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const NAV_ITEMS = [
-  { path: "/admin/dashboard", label: "统计台", icon: LayoutDashboard },
-  { path: "/admin/members", label: "会员管理", icon: Users },
-  { path: "/admin/referrals", label: "推荐管理", icon: Network },
-  { path: "/admin/orders", label: "订单管理", icon: ShoppingCart },
-  { path: "/admin/withdrawals", label: "提现管理", icon: ArrowDownToLine },
-  { path: "/admin/messages", label: "消息管理", icon: MessageSquare },
-  { path: "/admin/finance", label: "财务管理", icon: DollarSign },
-  { path: "/admin/settings", label: "系统设置", icon: Settings },
+type AdminRole = "superadmin" | "finance" | "customer_service";
+
+const NAV_ITEMS: { path: string; label: string; icon: any; roles: AdminRole[] }[] = [
+  { path: "/admin/dashboard", label: "统计台", icon: LayoutDashboard, roles: ["superadmin"] },
+  { path: "/admin/members", label: "会员管理", icon: Users, roles: ["superadmin", "finance", "customer_service"] },
+  { path: "/admin/referrals", label: "推荐管理", icon: Network, roles: ["superadmin", "finance", "customer_service"] },
+  { path: "/admin/orders", label: "订单管理", icon: ShoppingCart, roles: ["superadmin", "finance"] },
+  { path: "/admin/withdrawals", label: "提现管理", icon: ArrowDownToLine, roles: ["superadmin", "finance"] },
+  { path: "/admin/messages", label: "消息管理", icon: MessageSquare, roles: ["superadmin"] },
+  { path: "/admin/finance", label: "财务管理", icon: DollarSign, roles: ["superadmin", "finance"] },
+  { path: "/admin/settings", label: "系统设置", icon: Settings, roles: ["superadmin"] },
+  { path: "/admin/admins", label: "管理员", icon: Shield, roles: ["superadmin"] },
+  { path: "/admin/logs", label: "操作日志", icon: ScrollText, roles: ["superadmin"] },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -28,14 +33,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!admin) {
       setLocation("/admin");
+      return;
     }
-  }, [admin]);
+    // Redirect to first allowed page if current page is not allowed
+    const role = (admin.role || "superadmin") as AdminRole;
+    const allowed = NAV_ITEMS.filter(item => item.roles.includes(role));
+    const isAllowed = allowed.some(item => location === item.path);
+    if (!isAllowed && location !== "/admin" && allowed.length > 0) {
+      setLocation(allowed[0].path);
+    }
+  }, [admin, location]);
 
   const handleLogout = () => {
     adminLogout();
     toast({ title: "已退出登录" });
     setLocation("/admin");
   };
+
+  const adminRole = (admin?.role || "superadmin") as AdminRole;
+  const filteredNav = NAV_ITEMS.filter(item => item.roles.includes(adminRole));
+  const roleLabels: Record<AdminRole, string> = { superadmin: "超级管理员", finance: "财务", customer_service: "客服" };
 
   if (!admin) return null;
 
@@ -57,7 +74,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div>
             <div className="font-bold text-sm" style={{ color: "#C9A227" }}>CoreX Admin</div>
-            <div className="text-xs text-muted-foreground">{admin.username}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">{admin.username}</span>
+              <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>{roleLabels[adminRole]}</span>
+            </div>
           </div>
           <button className="lg:hidden ml-auto p-1" onClick={() => setSidebarOpen(false)}>
             <X size={18} className="text-muted-foreground" />
@@ -65,7 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map(item => {
+          {filteredNav.map(item => {
             const active = location === item.path;
             return (
               <Link key={item.path} href={item.path}>

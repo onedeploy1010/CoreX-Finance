@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
-import { getAdminWithdrawals, updateWithdrawalStatus } from "@/lib/api";
+import { getAdminWithdrawals, updateWithdrawalStatus, adminAddLog } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 
@@ -87,6 +87,7 @@ export default function AdminWithdrawals() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
       await updateWithdrawalStatus(id, status);
+      await adminAddLog(status === "approved" ? "批准提现" : "拒绝提现", "withdrawal", id.toString());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawals"] });

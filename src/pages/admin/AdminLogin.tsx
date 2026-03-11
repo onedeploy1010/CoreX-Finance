@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { adminLogin } from "@/lib/api";
+import { adminLogin, adminAddLog, getAdminSession } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Lock, User } from "lucide-react";
 
@@ -20,9 +20,19 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       await adminLogin(username, password);
+      await adminAddLog("管理员登录", "auth", username);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
       toast({ title: "登录成功" });
-      setLocation("/admin/dashboard");
+      const session = getAdminSession();
+      const role = session?.role || "superadmin";
+      // Redirect based on role
+      if (role === "customer_service") {
+        setLocation("/admin/members");
+      } else if (role === "finance") {
+        setLocation("/admin/members");
+      } else {
+        setLocation("/admin/dashboard");
+      }
     } catch (err: any) {
       toast({ title: "登录失败", description: err.message, variant: "destructive" });
     } finally {

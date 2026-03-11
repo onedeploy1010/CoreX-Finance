@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient } from "@/lib/queryClient";
-import { getAdminMessages, createAdminMessage, updateAdminMessage, deleteAdminMessage } from "@/lib/api";
+import { getAdminMessages, createAdminMessage, updateAdminMessage, deleteAdminMessage, adminAddLog } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Edit, Send } from "lucide-react";
 
@@ -21,7 +21,10 @@ export default function AdminMessages() {
   const { data: messageList = [], isLoading } = useQuery({ queryKey: ["/api/admin/messages"], queryFn: getAdminMessages });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => { await createAdminMessage(data); },
+    mutationFn: async (data: any) => {
+      await createAdminMessage(data);
+      await adminAddLog("创建消息", "message", data.title);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/messages"] });
       setCreating(false);
@@ -32,7 +35,10 @@ export default function AdminMessages() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...data }: any) => { await updateAdminMessage(id, data); },
+    mutationFn: async ({ id, ...data }: any) => {
+      await updateAdminMessage(id, data);
+      await adminAddLog("更新消息", "message", id.toString(), data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/messages"] });
       setEditing(null);
@@ -42,7 +48,10 @@ export default function AdminMessages() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => { await deleteAdminMessage(id); },
+    mutationFn: async (id: number) => {
+      await deleteAdminMessage(id);
+      await adminAddLog("删除消息", "message", id.toString());
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/messages"] });
       toast({ title: "消息已删除" });
