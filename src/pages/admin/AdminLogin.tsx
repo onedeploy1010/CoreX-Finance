@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { adminLogin } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 import { Lock, User } from "lucide-react";
 
 export default function AdminLogin() {
@@ -19,6 +20,7 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       await adminLogin(username, password);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
       toast({ title: "登录成功" });
       setLocation("/admin/dashboard");
     } catch (err: any) {
