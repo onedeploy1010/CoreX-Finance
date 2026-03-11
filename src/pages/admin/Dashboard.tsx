@@ -98,17 +98,21 @@ export default function Dashboard() {
         <div className="rounded-xl p-4" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
           <div className="text-sm font-semibold text-foreground mb-3">最新注册</div>
           <div className="space-y-2">
-            {(d.recentMembers || []).map((m: any) => (
-              <div key={m.id} className="flex items-center justify-between py-1.5" style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
-                <span className="text-xs font-mono text-muted-foreground">{m.walletAddress.slice(0, 8)}...{m.walletAddress.slice(-6)}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227" }}>
-                    {m.level === 0 ? "普通" : `V${m.level}`}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleDateString()}</span>
+            {(d.recentMembers || []).map((m: any) => {
+              const addr = m.wallet_address || m.walletAddress || "";
+              const created = m.created_at || m.createdAt || "";
+              return (
+                <div key={m.id} className="flex items-center justify-between py-1.5" style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
+                  <span className="text-xs font-mono text-muted-foreground">{addr.slice(0, 8)}...{addr.slice(-6)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227" }}>
+                      {m.level === 0 ? "普通" : `V${m.level}`}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{new Date(created).toLocaleDateString()}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
