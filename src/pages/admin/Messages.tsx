@@ -75,7 +75,7 @@ export default function AdminMessages() {
         <Button
           data-testid="button-create-message"
           className="text-sm"
-          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "40px" }}
           onClick={() => { setForm({ title: "", content: "", type: "system", targetAddress: "", isPublished: false }); setCreating(true); }}
         >
           <Plus size={14} className="mr-1" /> 新建消息
@@ -112,25 +112,25 @@ export default function AdminMessages() {
                     {msg.targetAddress && <span className="text-[10px] text-muted-foreground font-mono">目标: {msg.targetAddress.slice(0, 10)}...</span>}
                   </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button data-testid={`button-edit-msg-${msg.id}`} onClick={() => openEdit(msg)} className="p-1.5 rounded" style={{ color: "#C9A227" }}>
-                    <Edit size={14} />
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button data-testid={`button-edit-msg-${msg.id}`} onClick={() => openEdit(msg)} className="p-2 rounded-lg flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227", minWidth: "36px", minHeight: "36px" }}>
+                    <Edit size={16} />
                   </button>
                   {!msg.isPublished && (
                     <button
                       data-testid={`button-publish-msg-${msg.id}`}
                       onClick={() => updateMutation.mutate({ id: msg.id, isPublished: true })}
-                      className="p-1.5 rounded" style={{ color: "#22c55e" }}
+                      className="p-2 rounded-lg flex items-center justify-center" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", minWidth: "36px", minHeight: "36px" }}
                     >
-                      <Send size={14} />
+                      <Send size={16} />
                     </button>
                   )}
                   <button
                     data-testid={`button-delete-msg-${msg.id}`}
                     onClick={() => { if (confirm("确定删除此消息？")) deleteMutation.mutate(msg.id); }}
-                    className="p-1.5 rounded" style={{ color: "#ef4444" }}
+                    className="p-2 rounded-lg flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", minWidth: "36px", minHeight: "36px" }}
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
@@ -140,7 +140,7 @@ export default function AdminMessages() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={() => { setCreating(false); setEditing(null); }}>
-        <DialogContent className="max-w-md" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto mx-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}>
           <DialogHeader>
             <DialogTitle style={{ color: "#C9A227" }}>{editing ? "编辑消息" : "新建消息"}</DialogTitle>
           </DialogHeader>

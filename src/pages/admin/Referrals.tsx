@@ -191,15 +191,15 @@ export default function AdminReferrals() {
             onKeyDown={e => e.key === "Enter" && handleSearch()}
             placeholder="Search wallet address..."
             className="pl-9 text-sm"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)" }}
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "40px" }}
           />
         </div>
-        <Button onClick={handleSearch} className="text-sm" style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}>
+        <Button onClick={handleSearch} className="text-sm" style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "40px" }}>
           Search
         </Button>
         {search && (
           <Button variant="outline" onClick={handleClear} className="text-sm"
-            style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}>
+            style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "40px" }}>
             Clear
           </Button>
         )}

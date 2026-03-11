@@ -13,6 +13,69 @@ const STATUS_TABS = [
   { value: "rejected", label: "已拒绝" },
 ];
 
+function shortAddr(addr: string) {
+  if (!addr) return "";
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
+
+function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => void; onReject: () => void }) {
+  const statusLabel = w.status === "pending" ? "待审核" : w.status === "approved" ? "已通过" : "已拒绝";
+  const statusColor = w.status === "pending" ? "#eab308" : w.status === "approved" ? "#22c55e" : "#ef4444";
+  const statusBg = w.status === "pending" ? "rgba(234,179,8,0.1)" : w.status === "approved" ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)";
+
+  return (
+    <div className="rounded-xl p-3 space-y-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.12)" }}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">#{w.id}</span>
+          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: statusBg, color: statusColor }}>
+            {statusLabel}
+          </span>
+        </div>
+        {w.status === "pending" && (
+          <div className="flex items-center gap-2">
+            <button
+              data-testid={`button-approve-${w.id}`}
+              className="p-2 rounded-lg flex items-center justify-center"
+              style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", minWidth: "36px", minHeight: "36px" }}
+              onClick={onApprove}
+            >
+              <Check size={16} />
+            </button>
+            <button
+              data-testid={`button-reject-${w.id}`}
+              className="p-2 rounded-lg flex items-center justify-center"
+              style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", minWidth: "36px", minHeight: "36px" }}
+              onClick={onReject}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="text-xs font-mono text-muted-foreground">{shortAddr(w.walletAddress)}</div>
+      <div className="grid grid-cols-4 gap-2">
+        <div className="text-center">
+          <div className="text-[10px] text-muted-foreground">金额</div>
+          <div className="text-xs font-bold">{parseFloat(w.amount).toFixed(2)}U</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] text-muted-foreground">手续费</div>
+          <div className="text-xs font-semibold text-muted-foreground">{parseFloat(w.fee).toFixed(2)}U</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] text-muted-foreground">实际</div>
+          <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(2)}U</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] text-muted-foreground">时间</div>
+          <div className="text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleDateString()}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminWithdrawals() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
@@ -44,16 +107,17 @@ export default function AdminWithdrawals() {
         <span className="text-xs text-muted-foreground ml-2">共 {d?.total || 0} 条</span>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {STATUS_TABS.map(tab => (
           <button
             key={tab.value}
             data-testid={`tab-withdrawal-${tab.value}`}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            className="px-4 py-2 rounded-lg text-xs font-medium transition-all"
             style={{
               background: status === tab.value ? "rgba(201,162,39,0.15)" : "rgba(255,255,255,0.03)",
               color: status === tab.value ? "#C9A227" : "rgba(255,255,255,0.5)",
               border: status === tab.value ? "1px solid rgba(201,162,39,0.3)" : "1px solid rgba(255,255,255,0.06)",
+              minHeight: "36px",
             }}
             onClick={() => { setStatus(tab.value); setPage(1); }}
           >
@@ -65,78 +129,25 @@ export default function AdminWithdrawals() {
       {isLoading ? (
         <div className="text-center text-muted-foreground py-10">加载中...</div>
       ) : (
-        <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(201,162,39,0.15)" }}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ background: "rgba(201,162,39,0.08)" }}>
-                  <th className="text-left px-3 py-2.5 text-xs text-muted-foreground font-medium">ID</th>
-                  <th className="text-left px-3 py-2.5 text-xs text-muted-foreground font-medium">地址</th>
-                  <th className="text-right px-3 py-2.5 text-xs text-muted-foreground font-medium">金额(U)</th>
-                  <th className="text-right px-3 py-2.5 text-xs text-muted-foreground font-medium">手续费</th>
-                  <th className="text-right px-3 py-2.5 text-xs text-muted-foreground font-medium">实际(U)</th>
-                  <th className="text-center px-3 py-2.5 text-xs text-muted-foreground font-medium">时间</th>
-                  <th className="text-center px-3 py-2.5 text-xs text-muted-foreground font-medium">状态</th>
-                  <th className="text-center px-3 py-2.5 text-xs text-muted-foreground font-medium">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(d?.withdrawals || []).map((w: any) => (
-                  <tr key={w.id} style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
-                    <td className="px-3 py-2.5 text-xs">#{w.id}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs">{w.walletAddress.slice(0, 8)}...{w.walletAddress.slice(-4)}</td>
-                    <td className="px-3 py-2.5 text-right text-xs font-semibold">{parseFloat(w.amount).toFixed(2)}</td>
-                    <td className="px-3 py-2.5 text-right text-xs text-muted-foreground">{parseFloat(w.fee).toFixed(2)}</td>
-                    <td className="px-3 py-2.5 text-right text-xs">{parseFloat(w.actualAmount).toFixed(2)}</td>
-                    <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleString()}</td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className="text-xs px-1.5 py-0.5 rounded"
-                        style={{
-                          background: w.status === "pending" ? "rgba(234,179,8,0.1)" : w.status === "approved" ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
-                          color: w.status === "pending" ? "#eab308" : w.status === "approved" ? "#22c55e" : "#ef4444",
-                        }}>
-                        {w.status === "pending" ? "待审核" : w.status === "approved" ? "已通过" : "已拒绝"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {w.status === "pending" ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            data-testid={`button-approve-${w.id}`}
-                            className="p-1 rounded transition-all"
-                            style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}
-                            onClick={() => updateMutation.mutate({ id: w.id, status: "approved" })}
-                          >
-                            <Check size={14} />
-                          </button>
-                          <button
-                            data-testid={`button-reject-${w.id}`}
-                            className="p-1 rounded transition-all"
-                            style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}
-                            onClick={() => updateMutation.mutate({ id: w.id, status: "rejected" })}
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="space-y-2">
+          {(d?.withdrawals || []).map((w: any) => (
+            <WithdrawalCard
+              key={w.id}
+              w={w}
+              onApprove={() => updateMutation.mutate({ id: w.id, status: "approved" })}
+              onReject={() => updateMutation.mutate({ id: w.id, status: "rejected" })}
+            />
+          ))}
         </div>
       )}
 
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">第 {page}/{totalPages} 页</span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="text-xs">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="text-xs" style={{ minHeight: "36px" }}>
             <ChevronLeft size={14} /> 上一页
           </Button>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="text-xs">
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="text-xs" style={{ minHeight: "36px" }}>
             下一页 <ChevronRight size={14} />
           </Button>
         </div>

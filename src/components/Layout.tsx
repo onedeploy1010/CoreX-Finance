@@ -12,9 +12,9 @@ const NAV_ITEMS = [
 
 export function AppHeader() {
   return (
-    <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3"
+    <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-2.5"
       style={{ background: "linear-gradient(180deg, #0d0b07 0%, rgba(13,11,7,0.95) 100%)", borderBottom: "1px solid rgba(201,162,39,0.15)" }}>
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
         <div className="w-8 h-8 rounded-full flex items-center justify-center"
           style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", boxShadow: "0 0 12px rgba(201,162,39,0.4)" }}>
           <span className="text-black font-black text-sm">C</span>
@@ -25,17 +25,22 @@ export function AppHeader() {
         client={client}
         chain={bscChain}
         wallets={wallets}
+        connectModal={{
+          size: "compact",
+          showThirdwebBranding: false,
+        }}
         connectButton={{
           label: "连接钱包",
           style: {
             background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
             color: "#0c0a08",
             fontWeight: "700",
-            fontSize: "13px",
-            padding: "6px 14px",
-            borderRadius: "8px",
+            fontSize: "14px",
+            padding: "8px 18px",
+            borderRadius: "10px",
             border: "none",
             cursor: "pointer",
+            minHeight: "40px",
           }
         }}
         detailsButton={{
@@ -44,9 +49,10 @@ export function AppHeader() {
             border: "1px solid rgba(201,162,39,0.35)",
             color: "#C9A227",
             fontWeight: "600",
-            fontSize: "12px",
-            padding: "5px 12px",
-            borderRadius: "8px",
+            fontSize: "13px",
+            padding: "6px 14px",
+            borderRadius: "10px",
+            minHeight: "40px",
           }
         }}
         theme="dark"
@@ -66,15 +72,16 @@ export function BottomNav() {
           <Link key={path} href={path}>
             <div
               data-testid={`nav-${label}`}
-              className="flex flex-col items-center gap-1 px-4 py-1 cursor-pointer transition-all duration-200"
+              className="flex flex-col items-center gap-0.5 px-5 py-1.5 cursor-pointer transition-all duration-200"
+              style={{ minWidth: "56px", minHeight: "44px" }}
             >
               <Icon
-                size={20}
+                size={22}
                 className="transition-all duration-200"
                 style={{ color: isActive ? "#C9A227" : "rgba(255,255,255,0.4)" }}
               />
               <span
-                className="text-xs font-medium transition-all duration-200"
+                className="text-[11px] font-medium transition-all duration-200"
                 style={{ color: isActive ? "#C9A227" : "rgba(255,255,255,0.4)" }}
               >
                 {label}
