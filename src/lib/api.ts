@@ -767,6 +767,22 @@ export async function setAutoApproveWithdrawal(enabled: boolean) {
   if (error) throw new Error(error.message);
 }
 
+export async function getAutoWithdrawLimit(): Promise<number> {
+  const { data } = await supabase.from("system_settings").select("value").eq("key", "auto_withdraw_limit").single();
+  return parseFloat(data?.value || "0");
+}
+
+export async function setAutoWithdrawLimit(limit: number) {
+  const { error } = await supabase.from("system_settings").update({ value: limit.toString() }).eq("key", "auto_withdraw_limit");
+  if (error) throw new Error(error.message);
+}
+
+export async function triggerAutoWithdraw() {
+  const { data, error } = await supabase.functions.invoke("auto-withdraw", { body: {} });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function deleteAdminUser(id: number) {
   const session = getAdminSession();
   if (!session) throw new Error("未登录");

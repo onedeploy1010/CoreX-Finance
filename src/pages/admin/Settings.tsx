@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { getSettlementConfig, updateSettlementTime, adminAddLog, getAutoApproveWithdrawal, setAutoApproveWithdrawal } from "@/lib/api";
-import { Settings, Clock, Save, Loader2, ShieldCheck, Zap, AlertTriangle } from "lucide-react";
+import { getSettlementConfig, updateSettlementTime, adminAddLog, getAutoApproveWithdrawal, setAutoApproveWithdrawal, getAutoWithdrawLimit, setAutoWithdrawLimit, triggerAutoWithdraw } from "@/lib/api";
+import { Settings, Clock, Save, Loader2, ShieldCheck, Zap, AlertTriangle, Send, DollarSign } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const TIMEZONES = [
@@ -26,6 +26,11 @@ export default function AdminSettings() {
   // Debug settlement
   const [debugRunning, setDebugRunning] = useState(false);
 
+  // Auto-withdraw limit
+  const [withdrawLimit, setWithdrawLimit] = useState<string>("");
+  const [savingLimit, setSavingLimit] = useState(false);
+  const [autoWithdrawRunning, setAutoWithdrawRunning] = useState(false);
+
   const { data: config, isLoading } = useQuery({
     queryKey: ["/api/admin/settlement-config"],
     queryFn: getSettlementConfig,
@@ -34,6 +39,11 @@ export default function AdminSettings() {
   const { data: autoApprove, isLoading: loadingAuto } = useQuery({
     queryKey: ["/api/admin/auto-approve-withdrawal"],
     queryFn: getAutoApproveWithdrawal,
+  });
+
+  const { data: currentLimit } = useQuery({
+    queryKey: ["/api/admin/auto-withdraw-limit"],
+    queryFn: getAutoWithdrawLimit,
   });
 
   const handleToggleAutoApprove = async () => {
@@ -278,6 +288,136 @@ export default function AdminSettings() {
           <div className="text-xs font-semibold" style={{ color: "#ef4444" }}>注意</div>
           <div className="text-xs text-muted-foreground">
             开启自动审批后，所有新的提现申请将直接标记为已通过，不再需要手动审核。请谨慎使用。
+          </div>
+        </div>
+      </div>
+
+      {/* Auto-Withdraw Limit */}
+      <div
+        className="rounded-xl p-5 space-y-4"
+        style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}
+      >
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)" }}>
+            <DollarSign size={16} style={{ color: "#C9A227" }} />
+          </div>
+          <div>
+            <div className="font-semibold text-sm">自动提现额度</div>
+            <div className="text-xs text-muted-foreground">低于设定金额的提现将自动审批并上链执行</div>
+          </div>
+        </div>
+
+        <div className="rounded-lg p-4 space-y-3" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.12)" }}>
+          <div className="text-xs text-muted-foreground">当前额度: <span className="font-bold" style={{ color: "#C9A227" }}>{(currentLimit || 0) > 0 ? `${currentLimit} USDT` : "未设置 (关闭)"}</span></div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              placeholder="输入金额 (0=关闭)"
+              value={withdrawLimit}
+              onChange={e => setWithdrawLimit(e.target.value)}
+              className="flex-1 rounded-lg px-3 py-2 text-sm"
+              style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
+            />
+            <span className="text-xs text-muted-foreground">USDT</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground space-y-0.5">
+            <div>设为 0 = 关闭自动提现</div>
+            <div>例: 设为 500，则 500U 以下的提现将自动审批+上链</div>
+          </div>
+        </div>
+
+        <Button
+          className="w-full font-bold text-sm"
+          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+          disabled={savingLimit || withdrawLimit === ""}
+          onClick={async () => {
+            setSavingLimit(true);
+            try {
+              const val = parseFloat(withdrawLimit);
+              if (isNaN(val) || val < 0) throw new Error("请输入有效金额");
+              await setAutoWithdrawLimit(val);
+              await adminAddLog("修改自动提现额度", "settings", "auto_withdraw_limit", { limit: val });
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/auto-withdraw-limit"] });
+              toast({ title: "自动提现额度已更新", description: val > 0 ? `${val} USDT 以下自动处理` : "已关闭自动提现" });
+              setWithdrawLimit("");
+            } catch (err: any) {
+              toast({ title: "更新失败", description: err.message, variant: "destructive" });
+            } finally {
+              setSavingLimit(false);
+            }
+          }}
+        >
+          {savingLimit ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
+          保存额度
+        </Button>
+      </div>
+
+      {/* Manual Trigger Auto-Withdraw */}
+      <div
+        className="rounded-xl p-5 space-y-4"
+        style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}
+      >
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)" }}>
+            <Send size={16} style={{ color: "#C9A227" }} />
+          </div>
+          <div>
+            <div className="font-semibold text-sm">手动触发链上提现</div>
+            <div className="text-xs text-muted-foreground">立即处理所有已审批的提现，通过服务端私钥执行链上转账</div>
+          </div>
+        </div>
+
+        <div className="rounded-lg p-3 space-y-2" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.08)" }}>
+          <div className="text-xs font-semibold" style={{ color: "#C9A227" }}>执行说明</div>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <div>1. 获取所有已审批且未上链的提现记录</div>
+            <div>2. 使用服务端配置的操作员钱包私钥签名交易</div>
+            <div>3. 调用提现合约 batchWithdraw 执行批量转账</div>
+            <div>4. 自动更新数据库记录 (tx_hash, batch_id, 上链时间)</div>
+          </div>
+        </div>
+
+        <Button
+          className="w-full font-bold text-sm"
+          variant="outline"
+          style={{ border: "1px solid rgba(201,162,39,0.3)", color: "#C9A227", background: "rgba(201,162,39,0.06)" }}
+          disabled={autoWithdrawRunning}
+          onClick={async () => {
+            setAutoWithdrawRunning(true);
+            try {
+              const result = await triggerAutoWithdraw();
+              await adminAddLog("手动触发链上提现", "settings", "auto_withdraw", result);
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawals"] });
+              if (result?.processed === 0) {
+                toast({ title: "没有待处理的提现" });
+              } else {
+                toast({
+                  title: `链上提现成功`,
+                  description: `${result.processed} 笔提现已上链 | TX: ${(result.txHash || "").slice(0, 14)}...`,
+                });
+              }
+            } catch (err: any) {
+              toast({ title: "链上提现失败", description: err.message, variant: "destructive" });
+            } finally {
+              setAutoWithdrawRunning(false);
+            }
+          }}
+        >
+          {autoWithdrawRunning ? (
+            <><Loader2 size={14} className="mr-2 animate-spin" />处理中...</>
+          ) : (
+            <><Send size={14} className="mr-2" />立即执行链上提现</>
+          )}
+        </Button>
+
+        <div className="rounded-lg p-3 space-y-1" style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.1)" }}>
+          <div className="text-xs font-semibold" style={{ color: "#ef4444" }}>重要配置</div>
+          <div className="text-xs text-muted-foreground">
+            需要在 Supabase Edge Function 环境变量中配置:
+          </div>
+          <div className="text-[10px] font-mono text-muted-foreground mt-1 space-y-0.5">
+            <div>WITHDRAWAL_PRIVATE_KEY = 操作员钱包私钥</div>
+            <div>BSC_RPC_URL = BSC节点RPC地址 (可选)</div>
           </div>
         </div>
       </div>
