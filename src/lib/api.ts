@@ -633,6 +633,12 @@ export async function getAdminFinance() {
   return data;
 }
 
+export async function getAdminFinanceMonthly() {
+  const { data, error } = await supabase.rpc("admin_finance_monthly");
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // ============ Settlement Settings ============
 
 export async function getSettlementConfig() {

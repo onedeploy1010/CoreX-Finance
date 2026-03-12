@@ -81,17 +81,31 @@ function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => v
           <div className="text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleDateString()}</div>
         </div>
       </div>
-      {w.txHash && (
-        <a
-          href={`https://bscscan.com/tx/${w.txHash}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-xs"
-          style={{ color: "#C9A227" }}
-        >
-          <ExternalLink size={10} />
-          <span>View on BscScan: {shortAddr(w.txHash)}</span>
-        </a>
+      {(w.txHash || w.batchId || w.processedAt) && (
+        <div className="space-y-1 pt-1 border-t" style={{ borderColor: "rgba(201,162,39,0.1)" }}>
+          {w.txHash && (
+            <a
+              href={`https://bscscan.com/tx/${w.txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs"
+              style={{ color: "#C9A227" }}
+            >
+              <ExternalLink size={10} />
+              <span>TX: {shortAddr(w.txHash)}</span>
+            </a>
+          )}
+          {w.batchId && (
+            <div className="text-[10px] text-muted-foreground">
+              批次: {shortAddr(w.batchId)}
+            </div>
+          )}
+          {w.processedAt && (
+            <div className="text-[10px] text-muted-foreground">
+              上链时间: {new Date(w.processedAt).toLocaleString()}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

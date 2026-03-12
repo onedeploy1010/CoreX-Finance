@@ -8,6 +8,7 @@ import { t, getLang } from "@/lib/i18n";
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<"orders" | "earnings">("orders");
+  const [orderFilter, setOrderFilter] = useState<"all" | "active" | "completed">("all");
   const account = useActiveAccount();
   const address = account?.address?.toLowerCase();
   const lang = getLang();
@@ -105,6 +106,24 @@ export default function OrdersPage() {
       {/* Orders Tab */}
       {activeTab === "orders" && (
         <div className="space-y-3">
+          {/* Order status filter */}
+          <div className="flex rounded-lg p-1 gap-1" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
+            {([
+              { key: "all" as const, label: "全部" },
+              { key: "active" as const, label: "进行中" },
+              { key: "completed" as const, label: "已完成" },
+            ]).map(({ key, label }) => (
+              <button key={key}
+                className="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all"
+                style={orderFilter === key
+                  ? { background: "rgba(201,162,39,0.12)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
+                  : { color: "rgba(255,255,255,0.4)", border: "1px solid transparent" }}
+                onClick={() => setOrderFilter(key)}>
+                {label}
+              </button>
+            ))}
+          </div>
+
           {ordersLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 size={24} className="animate-spin" style={{ color: "#C9A227" }} />
@@ -115,7 +134,19 @@ export default function OrdersPage() {
               <p>{t("orders.no_orders")}</p>
             </div>
           ) : (
-            (orderList as any[]).map((order: any) => {
+            (orderList as any[]).filter((order: any) => {
+              if (orderFilter === "all") return true;
+              return order.status === orderFilter;
+            }).length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <ClipboardList size={40} className="mx-auto mb-3 opacity-30" />
+              <p>没有{orderFilter === "active" ? "进行中" : "已完成"}的订单</p>
+            </div>
+          ) : (
+            (orderList as any[]).filter((order: any) => {
+              if (orderFilter === "all") return true;
+              return order.status === orderFilter;
+            }).map((order: any) => {
               const endDate = new Date(order.endDate);
               const now = new Date();
               const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
@@ -197,7 +228,7 @@ export default function OrdersPage() {
                 </div>
               );
             })
-          )}
+          ))}
         </div>
       )}
 
