@@ -270,10 +270,12 @@ export async function getRewardsByWallet(walletAddress: string) {
 
   const orderCache: Record<number, string> = {};
   const orderAmountCache: Record<number, string> = {};
+  const memberLevelCache: Record<string, number> = {};
   const enriched = [];
   for (const r of data || []) {
     let productName = "";
     let orderAmount = "";
+    let fromLevel = 0;
     if (r.from_order_id) {
       const cacheKey = r.from_order_id;
       if (orderCache[cacheKey] !== undefined) {
@@ -291,11 +293,25 @@ export async function getRewardsByWallet(walletAddress: string) {
         orderAmountCache[cacheKey] = orderAmount;
       }
     }
+    if (r.from_address) {
+      if (memberLevelCache[r.from_address] !== undefined) {
+        fromLevel = memberLevelCache[r.from_address];
+      } else {
+        const { data: member } = await supabase
+          .from("members")
+          .select("level")
+          .eq("wallet_address", r.from_address)
+          .single();
+        fromLevel = member?.level ?? 0;
+        memberLevelCache[r.from_address] = fromLevel;
+      }
+    }
     enriched.push({
       id: r.id,
       type: r.type,
       amount: r.amount,
       fromAddress: r.from_address || "",
+      fromLevel,
       productName,
       orderAmount,
       description: r.description,

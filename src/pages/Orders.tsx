@@ -309,7 +309,15 @@ export default function OrdersPage() {
                     {r.fromAddress && (
                       <>
                         <span className="text-muted-foreground">{t("reward.from_account")}</span>
-                        <span className="font-mono text-right">{shortAddr(r.fromAddress)}</span>
+                        <span className="font-mono text-right">
+                          {shortAddr(r.fromAddress)}
+                          {r.fromLevel > 0 && (
+                            <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-semibold" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>V{r.fromLevel}</span>
+                          )}
+                          {r.fromLevel === 0 && (
+                            <span className="ml-1 px-1 py-0.5 rounded text-[9px]" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.4)" }}>{t("reward.level_normal")}</span>
+                          )}
+                        </span>
                       </>
                     )}
                     {r.productName && (

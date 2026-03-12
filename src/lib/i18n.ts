@@ -44,6 +44,9 @@ const translations: Record<string, Record<Lang, string>> = {
   "reward.order_amount": {
     zh: "配套金额", en: "Order Amount", ja: "注文額", ko: "주문 금액", vi: "Số tiền đơn hàng",
   },
+  "reward.level_normal": {
+    zh: "普通", en: "Normal", ja: "普通", ko: "일반", vi: "Thường",
+  },
   "reward.time": {
     zh: "时间", en: "Time", ja: "時間", ko: "시간", vi: "Thời gian",
   },
