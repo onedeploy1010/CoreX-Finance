@@ -538,51 +538,31 @@ export default function InvitePage() {
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="product-card rounded-xl p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                      style={{ background: "rgba(201,162,39,0.12)", border: "1px solid rgba(201,162,39,0.25)" }}>
-                      <Award size={16} style={{ color: "#FFD700" }} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-semibold" style={{ color: "#C9A227" }}>团队奖励总计</div>
-                      <div className="text-[10px] text-muted-foreground">团队总业绩 x 个人最高日利率 x 等级%</div>
-                    </div>
-                  </div>
-                  <div className="text-center py-2">
-                    <div className="font-black text-2xl" style={{ color: "#FFD700" }}>{teamRewards.toFixed(2)} U</div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t" style={{ borderColor: "rgba(201,162,39,0.12)" }}>
-                    <div className="text-center">
-                      <div className="text-[10px] text-muted-foreground">团队总业绩</div>
-                      <div className="text-xs font-bold" style={{ color: "#E8C547" }}>{parseFloat((teamStats as any)?.totalStaking || "0").toLocaleString()} U</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-[10px] text-muted-foreground">当前等级</div>
-                      <div className="text-xs font-bold" style={{ color: getLevelColor((memberData as any)?.level ?? 0) }}>
-                        {getLevelName((memberData as any)?.level ?? 0)}
-                        {(memberData as any)?.level >= 1 && (
-                          <span className="text-muted-foreground font-normal"> ({LEVEL_CONFIG[(memberData as any)?.level]?.bonus}%)</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                {/* Table header */}
+                <div className="grid grid-cols-4 gap-1 px-3 py-2 text-[10px] text-muted-foreground font-semibold"
+                  style={{ background: "rgba(201,162,39,0.06)", borderRadius: "8px" }}>
+                  <span>日期</span>
+                  <span className="text-right">业绩</span>
+                  <span className="text-right">最高利率</span>
+                  <span className="text-right">奖励金额</span>
                 </div>
-                {/* Show daily records without per-member breakdown */}
-                {filteredRewards.map((reward: any) => (
-                  <div key={reward.id} className="product-card rounded-xl p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Award size={13} style={{ color: "#FFD700" }} />
-                        <span className="text-xs text-muted-foreground">{new Date(reward.createdAt).toLocaleString()}</span>
-                      </div>
-                      <span className="font-bold text-sm" style={{ color: "#C9A227" }}>+{parseFloat(reward.amount).toFixed(2)} U</span>
+                {/* Daily records */}
+                {filteredRewards.map((reward: any) => {
+                  // Parse description: "业绩:33400|利率:0.5|比例:13"
+                  const desc = reward.description || "";
+                  const perfMatch = desc.match(/业绩:(\d+)/);
+                  const rateMatch = desc.match(/利率:([\d.]+)/);
+                  const perf = perfMatch ? parseFloat(perfMatch[1]).toLocaleString() : "-";
+                  const rate = rateMatch ? rateMatch[1] + "%" : "-";
+                  return (
+                    <div key={reward.id} className="grid grid-cols-4 gap-1 px-3 py-2.5 product-card rounded-lg items-center">
+                      <span className="text-[11px] text-muted-foreground">{new Date(reward.createdAt).toLocaleDateString()}</span>
+                      <span className="text-[11px] font-semibold text-right" style={{ color: "#E8C547" }}>{perf}</span>
+                      <span className="text-[11px] font-semibold text-right" style={{ color: "#C9A227" }}>{rate}</span>
+                      <span className="text-[11px] font-bold text-right" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(2)}</span>
                     </div>
-                    {reward.description && (
-                      <div className="text-[10px] text-muted-foreground mt-1 pl-5">{reward.description}</div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )
           ) : filteredRewards.length === 0 ? (
