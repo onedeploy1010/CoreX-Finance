@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+
 import { useActiveAccount } from "thirdweb/react";
 import { useSendTransaction } from "thirdweb/react";
 import { useToast } from "@/hooks/use-toast";
@@ -46,8 +46,13 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
       toast({ title: "请先连接钱包", variant: "destructive" });
       return;
     }
-    if (!amount || parseFloat(amount) < product.minAmount) {
+    const amt = parseFloat(amount);
+    if (!amount || amt < product.minAmount) {
       toast({ title: `最低投入 ${product.minAmount} USDT`, variant: "destructive" });
+      return;
+    }
+    if (amt % product.minAmount !== 0) {
+      toast({ title: `投资金额必须是 ${product.minAmount} USDT 的倍数`, variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -159,18 +164,30 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
           </div>
 
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">投资金额 (USDT)</label>
-            <div className="relative">
-              <Input
-                data-testid="input-invest-amount"
-                type="number"
-                placeholder={`最低 ${product.minAmount} USDT`}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="pr-16"
-                style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.25)", color: "#f5e6b8" }}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium" style={{ color: "#C9A227" }}>USDT</span>
+            <label className="text-sm text-muted-foreground mb-2 block">选择投资金额 (USDT)</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3, 5, 10, 20].map(multiplier => {
+                const val = product.minAmount * multiplier;
+                const isSelected = amount === val.toString();
+                return (
+                  <button
+                    key={multiplier}
+                    data-testid={`amount-${multiplier}x`}
+                    className="rounded-lg py-2.5 text-center transition-all font-semibold text-sm"
+                    style={{
+                      background: isSelected ? "linear-gradient(135deg, #C9A227, #9A7A1A)" : "rgba(201,162,39,0.06)",
+                      border: isSelected ? "1px solid #C9A227" : "1px solid rgba(201,162,39,0.2)",
+                      color: isSelected ? "#0c0a08" : "#f5e6b8",
+                    }}
+                    onClick={() => setAmount(val.toString())}
+                  >
+                    {val.toLocaleString()} U
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2 text-center">
+              按 {product.minAmount} USDT 的倍数投资
             </div>
           </div>
 
@@ -198,7 +215,7 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Shield size={12} style={{ color: "#C9A227" }} />
-              <span>日利润可提现 · 每笔最低50U · 手续费1U</span>
+              <span>日利润可提现 · 每笔最低30U · 手续费1U</span>
             </div>
           </div>
 
