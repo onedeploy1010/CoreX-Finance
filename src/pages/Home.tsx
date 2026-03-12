@@ -7,9 +7,9 @@ import { useSendTransaction } from "thirdweb/react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { registerMember, createOrder, getMember } from "@/lib/api";
-import { TrendingUp, Clock, DollarSign, Shield, UserPlus, Loader2 } from "lucide-react";
+import { TrendingUp, Clock, DollarSign, Shield, UserPlus, Loader2, Globe } from "lucide-react";
 import { PRODUCTS } from "@shared/schema";
-import { t } from "@/lib/i18n";
+import { t, getLang } from "@/lib/i18n";
 import {
   prepareApproveUSDT,
   prepareInvest,
@@ -277,8 +277,19 @@ export default function HomePage() {
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
   const [referrerInfo, setReferrerInfo] = useState<{ address: string; level: number } | null>(null);
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
+  const [currentLang, setCurrentLang] = useState(() => { try { return localStorage.getItem("corex_lang") || "zh"; } catch { return "zh"; } });
   const account = useActiveAccount();
   const { toast } = useToast();
+
+  const LANGUAGES = [
+    { code: "zh", label: "中文", flag: "🇨🇳" },
+    { code: "en", label: "English", flag: "🇺🇸" },
+    { code: "ja", label: "日本語", flag: "🇯🇵" },
+    { code: "ko", label: "한국어", flag: "🇰🇷" },
+    { code: "vi", label: "Tiếng Việt", flag: "🇻🇳" },
+  ];
+  const currentLangObj = LANGUAGES.find(l => l.code === currentLang) || LANGUAGES[0];
 
   useEffect(() => {
     if (!account?.address) return;
@@ -345,9 +356,19 @@ export default function HomePage() {
 
   return (
     <div className="px-4 py-4 space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-        <h2 className="font-bold text-base text-foreground">正式产品</h2>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
+          <h2 className="font-bold text-base text-foreground">CoreX投资产品</h2>
+        </div>
+        <button
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          style={{ background: "rgba(201,162,39,0.1)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
+          onClick={() => setLangOpen(true)}
+        >
+          <Globe size={12} />
+          <span>{currentLangObj.flag} {currentLangObj.label}</span>
+        </button>
       </div>
 
       {PRODUCTS.map((product, index) => {
@@ -430,6 +451,45 @@ export default function HomePage() {
         onClose={() => setDialogOpen(false)}
         color={selectedProduct ? COLORS[PRODUCTS.indexOf(selectedProduct) % COLORS.length] : "#C9A227"}
       />
+
+      {/* Language Dialog */}
+      <Dialog open={langOpen} onOpenChange={setLangOpen}>
+        <DialogContent
+          className="max-w-sm mx-auto"
+          style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-center" style={{ color: "#C9A227" }}>语言设置</DialogTitle>
+            <DialogDescription className="text-center text-xs text-muted-foreground">选择您的界面语言</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1 py-2">
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang.code}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200"
+                style={{
+                  background: lang.code === currentLang ? "rgba(201,162,39,0.12)" : "transparent",
+                  border: lang.code === currentLang ? "1px solid rgba(201,162,39,0.3)" : "1px solid transparent",
+                }}
+                onClick={() => {
+                  setCurrentLang(lang.code);
+                  try { localStorage.setItem("corex_lang", lang.code); } catch {}
+                  toast({ title: `语言已切换为 ${lang.label}` });
+                  setLangOpen(false);
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">{lang.flag}</span>
+                  <span className="text-sm font-semibold" style={{ color: lang.code === currentLang ? "#C9A227" : "rgba(255,255,255,0.7)" }}>
+                    {lang.label}
+                  </span>
+                </div>
+                {lang.code === currentLang && <span style={{ color: "#C9A227" }}>✓</span>}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Registration Confirmation Dialog */}
       <Dialog open={registerDialogOpen} onOpenChange={(open) => { if (!registerLoading) setRegisterDialogOpen(open); }}>

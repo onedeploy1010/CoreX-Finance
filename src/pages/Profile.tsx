@@ -343,19 +343,19 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-2 gap-2">
             <div className="stat-card rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-muted-foreground">收益总金额</div>
+              <div className="text-[10px] text-muted-foreground">投资收益金额</div>
               <div className="font-bold text-sm" style={{ color: "#E8C547" }}>{totalDailyEarnings.toFixed(2)} U</div>
             </div>
             <div className="stat-card rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-muted-foreground">推荐总金额</div>
+              <div className="text-[10px] text-muted-foreground">推荐收益金额</div>
               <div className="font-bold text-sm" style={{ color: "#3b82f6" }}>{totalReferralRewards.toFixed(2)} U</div>
             </div>
             <div className="stat-card rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-muted-foreground">总收益金额</div>
+              <div className="text-[10px] text-muted-foreground">合计收益金额</div>
               <div className="font-bold text-sm" style={{ color: "#C9A227" }}>{totalIncome.toFixed(2)} U</div>
             </div>
             <div className="stat-card rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-muted-foreground">总提现金额</div>
+              <div className="text-[10px] text-muted-foreground">累计提现金额</div>
               <div className="font-bold text-sm" style={{ color: "#6bc46b" }}>{totalWithdrawn.toFixed(2)} U</div>
             </div>
           </div>
