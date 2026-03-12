@@ -14,7 +14,6 @@ import {
   prepareInvest,
   getUSDTAllowance,
   parseUSDT,
-  COREX_INVESTMENT_ADDRESS,
 } from "@/lib/contracts";
 
 interface Product {
@@ -28,8 +27,6 @@ interface Product {
 }
 
 const COLORS = ["#C9A227", "#E8C547", "#D4A832", "#C9A227", "#E8C547"];
-
-const isContractConfigured = COREX_INVESTMENT_ADDRESS !== "0x0000000000000000000000000000000000000000";
 
 function InvestDialog({ product, open, onClose, color }: { product: Product | null; open: boolean; onClose: () => void; color: string }) {
   const [amount, setAmount] = useState("");
@@ -56,29 +53,28 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
     setLoading(true);
 
     try {
-      let txHash: string | undefined;
+      const amountWei = parseUSDT(amount);
 
-      if (isContractConfigured) {
-        const amountWei = parseUSDT(amount);
-
-        setStep("approving");
-        const allowance = await getUSDTAllowance(account.address);
-        if (allowance < amountWei) {
-          const approveTx = prepareApproveUSDT(amountWei);
-          await sendTransaction(approveTx);
-        }
-
-        setStep("investing");
-        const investTx = prepareInvest(product.id, amountWei);
-        const result = await sendTransaction(investTx);
-        txHash = result.transactionHash;
-
-        if (!txHash) {
-          toast({ title: "Transaction failed", variant: "destructive" });
-          return;
-        }
+      // Step 1: Approve USDT
+      setStep("approving");
+      const allowance = await getUSDTAllowance(account.address);
+      if (allowance < amountWei) {
+        const approveTx = prepareApproveUSDT(amountWei);
+        await sendTransaction(approveTx);
       }
 
+      // Step 2: Call invest on smart contract
+      setStep("investing");
+      const investTx = prepareInvest(product.id, amountWei);
+      const result = await sendTransaction(investTx);
+      const txHash = result.transactionHash;
+
+      if (!txHash) {
+        toast({ title: "Transaction failed", variant: "destructive" });
+        return;
+      }
+
+      // Step 3: Create order in database via callback
       setStep("confirming");
 
       const endDate = new Date();
@@ -88,7 +84,7 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
         walletAddress: account.address,
         productId: product.id,
         amount: amount,
-        txHash: txHash || null,
+        txHash: txHash,
         productName: product.nameEn,
         dailyRate: product.dailyRate.toString(),
         days: product.days,

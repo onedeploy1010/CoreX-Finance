@@ -179,6 +179,8 @@ export default function ProfilePage() {
     switch (status) {
       case "pending":
         return <Badge style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }}>{t("withdraw.pending")}</Badge>;
+      case "approved":
+        return <Badge style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", border: "1px solid rgba(59,130,246,0.2)" }}>Processing</Badge>;
       case "completed":
         return <Badge style={{ background: "rgba(100,200,100,0.1)", color: "#6bc46b", border: "1px solid rgba(100,200,100,0.2)" }}>{t("withdraw.completed")}</Badge>;
       case "rejected":
@@ -536,6 +538,11 @@ export default function ProfilePage() {
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleString()}</div>
+                  {w.txHash && (
+                    <div className="text-xs text-muted-foreground truncate">
+                      TX: {w.txHash.slice(0, 10)}...{w.txHash.slice(-6)}
+                    </div>
+                  )}
                 </div>
               ))
             )}

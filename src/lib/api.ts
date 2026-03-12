@@ -130,14 +130,21 @@ export async function createOrder(params: {
   endDate: Date;
 }) {
   if (params.txHash) {
-    const { data: existing } = await supabase
-      .from("orders")
-      .select("id")
-      .eq("tx_hash", params.txHash)
-      .single();
-    if (existing) throw new Error("Transaction already processed");
+    // Use RPC function for atomic duplicate check + insert + settlement
+    const { data, error } = await supabase.rpc("create_order_from_tx", {
+      p_wallet_address: params.walletAddress,
+      p_product_id: params.productId,
+      p_amount: params.amount,
+      p_tx_hash: params.txHash,
+      p_product_name: params.productName,
+      p_daily_rate: params.dailyRate,
+      p_days: params.days,
+    });
+    if (error) throw new Error(error.message);
+    return { id: data };
   }
 
+  // Fallback for non-contract orders
   const { data, error } = await supabase
     .from("orders")
     .insert({
@@ -148,13 +155,12 @@ export async function createOrder(params: {
       daily_rate: params.dailyRate,
       days: params.days,
       end_date: params.endDate.toISOString(),
-      tx_hash: params.txHash || null,
+      tx_hash: null,
     })
     .select()
     .single();
   if (error) throw new Error(error.message);
 
-  // Trigger settlement and level check via RPC
   await supabase.rpc("process_wallet_orders", { p_wallet_address: params.walletAddress.toLowerCase() }).then(() => {});
   await supabase.rpc("check_and_upgrade_level", { p_wallet_address: params.walletAddress.toLowerCase() }).then(() => {});
 
@@ -332,6 +338,7 @@ export async function getWithdrawalsByWallet(walletAddress: string) {
     walletAddress: w.wallet_address,
     actualAmount: w.actual_amount,
     createdAt: w.created_at,
+    txHash: w.tx_hash,
   }));
 }
 
@@ -522,6 +529,9 @@ export async function getAdminWithdrawals(page: number, limit: number, status: s
       walletAddress: w.wallet_address,
       actualAmount: w.actual_amount,
       createdAt: w.created_at,
+      txHash: w.tx_hash,
+      batchId: w.batch_id,
+      processedAt: w.processed_at,
     })),
     total: count || 0,
     page,
@@ -536,6 +546,22 @@ export async function updateWithdrawalStatus(id: number, status: string) {
     .eq("id", id)
     .select()
     .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getPendingWithdrawals(limit: number = 100) {
+  const { data, error } = await supabase.rpc("get_pending_withdrawals", { p_limit: limit });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function markWithdrawalsProcessed(ids: number[], batchId: string, txHash: string) {
+  const { data, error } = await supabase.rpc("mark_withdrawals_processed", {
+    p_ids: ids,
+    p_batch_id: batchId,
+    p_tx_hash: txHash,
+  });
   if (error) throw new Error(error.message);
   return data;
 }

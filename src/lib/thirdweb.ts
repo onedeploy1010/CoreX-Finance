@@ -17,4 +17,4 @@ export const wallets = [
   createWallet("com.okex.wallet"),
 ];
 
-export const USDT_ADDRESS_BSC = "0x55d398326f99059fF775485246999027B3197955";
+export const USDT_ADDRESS_BSC = "0x03669CDaf714890588664829D19D4EC77F488736";
