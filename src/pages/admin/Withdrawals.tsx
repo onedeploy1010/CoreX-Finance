@@ -108,8 +108,6 @@ export default function AdminWithdrawals() {
   const [status, setStatus] = useState("all");
   const [batchProcessing, setBatchProcessing] = useState(false);
   const { toast } = useToast();
-  const account = useActiveAccount();
-  const { mutateAsync: sendTransaction } = useSendTransaction();
 
   const qk = ["/api/admin/withdrawals", `?page=${page}&limit=20&status=${status}`];
   const { data, isLoading } = useQuery({ queryKey: qk, queryFn: () => getAdminWithdrawals(page, 20, status) });
@@ -128,65 +126,35 @@ export default function AdminWithdrawals() {
   });
 
   const handleBatchWithdraw = async () => {
-    if (!account) {
-      toast({ title: "请先连接管理员钱包", variant: "destructive" });
-      return;
-    }
-
     setBatchProcessing(true);
     try {
-      // 1. Get all approved withdrawals
-      const pending = await getPendingWithdrawals(100);
-      if (!pending.length) {
+      const result = await triggerAutoWithdraw();
+
+      if (!result.success) {
+        toast({ title: "批量提现失败", description: result.message, variant: "destructive" });
+        return;
+      }
+
+      if (result.processed === 0) {
         toast({ title: "没有待处理的提现", variant: "destructive" });
         return;
       }
 
-      // 2. Prepare batch data
-      const recipients = pending.map((w: any) => w.wallet_address);
-      const amounts = pending.map((w: any) => parseUSDT(w.amount.toString()));
-      const ids = pending.map((w: any) => w.id);
-
-      // 3. Generate batch ID
-      const batchId = "0x" + Array.from(
-        new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(Date.now().toString() + JSON.stringify(ids))))
-      ).map(b => b.toString(16).padStart(2, "0")).join("");
-      const batchIdBytes32 = batchId.slice(0, 66);
-
-      // 4. Call smart contract batchWithdraw
-      const contract = getWithdrawalContract();
-      const tx = prepareContractCall({
-        contract,
-        method: "batchWithdraw",
-        params: [batchIdBytes32 as `0x${string}`, recipients, amounts],
+      await adminAddLog("批量提现上链", "withdrawal_batch", result.batchId, {
+        count: result.processed,
+        txHash: result.txHash,
+        totalAmount: result.totalAmount,
       });
-
-      const result = await sendTransaction(tx);
-      const txHash = result.transactionHash;
-
-      if (!txHash) {
-        toast({ title: "Transaction failed", variant: "destructive" });
-        return;
-      }
-
-      // 5. Update database records
-      await markWithdrawalsProcessed(ids, batchIdBytes32, txHash);
-      await adminAddLog("批量提现上链", "withdrawal_batch", batchIdBytes32, { count: ids.length, txHash });
 
       queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
 
       toast({
         title: "批量提现成功",
-        description: `${pending.length} 笔提现已上链 TX: ${txHash.slice(0, 10)}...`,
+        description: `${result.processed} 笔提现已上链 TX: ${result.txHash?.slice(0, 10)}...`,
       });
     } catch (err: any) {
-      const msg = err?.message || "";
-      if (msg.includes("user rejected") || msg.includes("User denied")) {
-        toast({ title: "交易已取消", variant: "destructive" });
-      } else {
-        toast({ title: "批量提现失败", description: msg, variant: "destructive" });
-      }
+      toast({ title: "批量提现失败", description: err.message, variant: "destructive" });
     } finally {
       setBatchProcessing(false);
     }
