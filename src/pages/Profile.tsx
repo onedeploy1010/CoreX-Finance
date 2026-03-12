@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useActiveAccount, useDisconnect, useActiveWallet } from "thirdweb/react";
@@ -365,7 +364,7 @@ export default function ProfilePage() {
             data-testid="button-withdraw-now"
             className="w-full font-bold text-sm"
             style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
-            onClick={() => setWithdrawDialogOpen(true)}
+            onClick={() => { setWithdrawAmount(WITHDRAW_MIN.toString()); setWithdrawDialogOpen(true); }}
           >
             <ArrowDownToLine size={14} className="mr-1.5" />
             {t("orders.withdraw_now")}
@@ -448,27 +447,88 @@ export default function ProfilePage() {
 
             <div>
               <label className="text-sm text-muted-foreground mb-2 block">{t("withdraw.amount")}</label>
-              <div className="relative">
-                <Input
-                  data-testid="input-withdraw-amount"
-                  type="number"
-                  placeholder={`${t("withdraw.min")} ${WITHDRAW_MIN} USDT`}
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="pr-16"
-                  style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.25)", color: "#f5e6b8" }}
-                />
+              <div className="flex items-center gap-3">
                 <button
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold px-2 py-0.5 rounded"
-                  style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227" }}
-                  onClick={() => setWithdrawAmount(availableBalance.toFixed(2))}
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shrink-0 transition-all active:scale-95"
+                  style={{
+                    background: "rgba(201,162,39,0.1)",
+                    border: "1px solid rgba(201,162,39,0.3)",
+                    color: "#C9A227",
+                  }}
+                  onClick={() => {
+                    const cur = parseFloat(withdrawAmount || "0");
+                    const next = Math.max(cur - WITHDRAW_MULTIPLE, WITHDRAW_MIN);
+                    setWithdrawAmount(next.toString());
+                  }}
+                >
+                  −
+                </button>
+                <div
+                  className="flex-1 rounded-xl py-3 text-center"
+                  style={{
+                    background: "rgba(201,162,39,0.08)",
+                    border: "1px solid rgba(201,162,39,0.3)",
+                  }}
+                >
+                  <div className="font-black text-2xl" style={{ color: "#f5e6b8" }}>
+                    {(parseFloat(withdrawAmount || "0") || WITHDRAW_MIN).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-muted-foreground">USDT</div>
+                </div>
+                <button
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shrink-0 transition-all active:scale-95"
+                  style={{
+                    background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
+                    border: "1px solid #C9A227",
+                    color: "#0c0a08",
+                  }}
+                  onClick={() => {
+                    const cur = parseFloat(withdrawAmount || "0");
+                    const next = cur < WITHDRAW_MIN ? WITHDRAW_MIN : Math.min(cur + WITHDRAW_MULTIPLE, Math.floor(availableBalance / WITHDRAW_MULTIPLE) * WITHDRAW_MULTIPLE);
+                    setWithdrawAmount(next.toString());
+                  }}
+                >
+                  +
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                {[10, 100, 1000].map(inc => (
+                  <button
+                    key={inc}
+                    className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+                    style={{
+                      background: "rgba(201,162,39,0.1)",
+                      border: "1px solid rgba(201,162,39,0.25)",
+                      color: "#C9A227",
+                    }}
+                    onClick={() => {
+                      const cur = parseFloat(withdrawAmount || "0");
+                      const base = cur < WITHDRAW_MIN ? WITHDRAW_MIN : cur;
+                      const next = Math.min(base + inc, Math.floor(availableBalance / WITHDRAW_MULTIPLE) * WITHDRAW_MULTIPLE);
+                      setWithdrawAmount(Math.max(next, WITHDRAW_MIN).toString());
+                    }}
+                  >
+                    +{inc}
+                  </button>
+                ))}
+                <button
+                  className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+                  style={{
+                    background: "rgba(201,162,39,0.15)",
+                    border: "1px solid rgba(201,162,39,0.3)",
+                    color: "#C9A227",
+                  }}
+                  onClick={() => {
+                    const max = Math.floor(availableBalance / WITHDRAW_MULTIPLE) * WITHDRAW_MULTIPLE;
+                    setWithdrawAmount(Math.max(max, WITHDRAW_MIN).toString());
+                  }}
                 >
                   {t("withdraw.all")}
                 </button>
               </div>
             </div>
 
-            {parseFloat(withdrawAmount) > 0 && (
+            {parseFloat(withdrawAmount) >= WITHDRAW_MIN && (
               <div className="rounded-lg p-3 space-y-1.5" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t("withdraw.amount_label")}</span>
@@ -485,18 +545,14 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <AlertCircle size={11} style={{ color: "#C9A227" }} />
-                <span>{t("withdraw.min")}: {WITHDRAW_MIN} USDT</span>
+                <span>{t("withdraw.min")}: {WITHDRAW_MIN} USDT · {WITHDRAW_MULTIPLE}的倍数</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <AlertCircle size={11} style={{ color: "#C9A227" }} />
                 <span>{t("withdraw.fee_per")} {WITHDRAW_FEE} USDT</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <AlertCircle size={11} style={{ color: "#C9A227" }} />
-                <span>Multiple of {WITHDRAW_MULTIPLE} USDT</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield size={11} style={{ color: "#C9A227" }} />
