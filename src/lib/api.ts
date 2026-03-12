@@ -74,6 +74,8 @@ export async function getDirectReferrals(walletAddress: string) {
     result.push({
       ...d,
       walletAddress: d.wallet_address,
+      createdAt: d.created_at,
+      level: d.level,
       stakingAmount: staking,
       teamPerformance: parseFloat(teamStats.totalStaking),
       teamAccounts: teamStats.totalAccounts,
@@ -96,7 +98,7 @@ export async function getIndirectReferrals(walletAddress: string) {
       .eq("referrer_address", d.wallet_address);
     for (const s of subs || []) {
       const staking = await getMemberStaking(s.wallet_address);
-      indirects.push({ ...s, walletAddress: s.wallet_address, stakingAmount: staking });
+      indirects.push({ ...s, walletAddress: s.wallet_address, createdAt: s.created_at, level: s.level, stakingAmount: staking });
     }
   }
   return indirects;
