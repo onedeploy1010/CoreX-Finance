@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useActiveAccount, useDisconnect, useActiveWallet } from "thirdweb/react";
@@ -7,10 +9,14 @@ import { ConnectButton } from "thirdweb/react";
 import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { registerMember, getMember, getTeamStats, getEarnings, getOrdersByWallet } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
+import { registerMember, getMember, getTeamStats, getEarnings, getOrdersByWallet, getRewardsByWallet, getWithdrawalsByWallet, createWithdrawal } from "@/lib/api";
+import { WITHDRAW_MIN, WITHDRAW_FEE, WITHDRAW_MULTIPLE } from "@shared/schema";
+import { t, getLang, shortAddr } from "@/lib/i18n";
 import {
   User, Bell, Globe, ChevronRight, Check,
-  LogOut, Copy, Wallet, Crown, Award, BellRing, BellOff
+  LogOut, Copy, Wallet, Crown, Award, BellRing, BellOff,
+  ArrowDownToLine, AlertCircle, Shield, TrendingUp, Gift, Loader2
 } from "lucide-react";
 
 function getLevelName(level: number) {
@@ -48,9 +54,13 @@ export default function ProfilePage() {
   const wallet = useActiveWallet();
   const { toast } = useToast();
   const address = account?.address?.toLowerCase();
+  const lang = getLang();
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [currentLang, setCurrentLang] = useState(getStoredLang);
   const [notifications, setNotifications] = useState(getStoredNotifications);
 
@@ -85,9 +95,39 @@ export default function ProfilePage() {
     enabled: !!address,
   });
 
+  const { data: rewardList = [], isLoading: rewardsLoading } = useQuery({
+    queryKey: ["/api/rewards", address],
+    queryFn: () => getRewardsByWallet(address!),
+    enabled: !!address,
+  });
+
+  const { data: withdrawalList = [], isLoading: withdrawalsLoading } = useQuery({
+    queryKey: ["/api/withdrawals", address],
+    queryFn: () => getWithdrawalsByWallet(address!),
+    enabled: !!address,
+  });
+
   const shortAddress = account?.address
     ? `${account.address.slice(0, 6)}****${account.address.slice(-4)}`
     : null;
+
+  const availableBalance = parseFloat((earningsData as any)?.availableBalance || "0");
+  const totalWithdrawn = parseFloat((earningsData as any)?.totalWithdrawn || "0");
+  const totalDailyEarnings = parseFloat((earningsData as any)?.dailyRewards || "0");
+  const directRewards = parseFloat((earningsData as any)?.directRewards || "0");
+  const indirectRewards = parseFloat((earningsData as any)?.indirectRewards || "0");
+  const teamRewards = parseFloat((earningsData as any)?.teamRewards || "0");
+  const totalReferralRewards = directRewards + indirectRewards + teamRewards;
+  const totalIncome = totalDailyEarnings + totalReferralRewards;
+
+  const activeOrders = (orderList as any[]).filter((o: any) => o.status === "active").length;
+  const level = (memberData as any)?.level ?? 0;
+  const currentLangObj = LANGUAGES.find(l => l.code === currentLang) || LANGUAGES[0];
+  const enabledNotifCount = Object.values(notifications).filter(Boolean).length;
+
+  // History: all rewards (referral, team, equal-level) + withdrawals, sorted by time desc
+  const allRewards = (rewardList as any[]).filter((r: any) => r.type !== "daily");
+  const [historyTab, setHistoryTab] = useState<"rewards" | "withdrawals">("rewards");
 
   const handleCopyAddress = () => {
     if (account?.address) {
@@ -114,14 +154,57 @@ export default function ProfilePage() {
   const handleNotifToggle = (key: keyof typeof notifications) => {
     const updated = { ...notifications, [key]: !notifications[key] };
     setNotifications(updated);
-    try { localStorage.setItem("corex_notifications", JSON.stringify(updated)); } catch {}
+    try { localStorage.setItem("corex_notifications", JSON.stringify(updated)); } catch {};
   };
 
-  const activeOrders = (orderList as any[]).filter((o: any) => o.status === "active").length;
-  const totalEarned = parseFloat(earningsData?.totalEarnings || "0") + parseFloat(earningsData?.totalRewards || "0");
-  const level = (memberData as any)?.level ?? 0;
-  const currentLangObj = LANGUAGES.find(l => l.code === currentLang) || LANGUAGES[0];
-  const enabledNotifCount = Object.values(notifications).filter(Boolean).length;
+  const handleWithdraw = async () => {
+    if (!account) return;
+    const amt = parseFloat(withdrawAmount);
+    if (isNaN(amt) || amt < WITHDRAW_MIN) {
+      toast({ title: `${t("withdraw.min")} ${WITHDRAW_MIN} USDT`, variant: "destructive" });
+      return;
+    }
+    if (amt % WITHDRAW_MULTIPLE !== 0) {
+      toast({ title: `Amount must be a multiple of ${WITHDRAW_MULTIPLE} USDT`, variant: "destructive" });
+      return;
+    }
+    if (amt > availableBalance) {
+      toast({ title: t("orders.available") + " insufficient", variant: "destructive" });
+      return;
+    }
+    setWithdrawLoading(true);
+    try {
+      await createWithdrawal(account.address, amt, WITHDRAW_FEE);
+      queryClient.invalidateQueries({ queryKey: ["/api/earnings", address] });
+      queryClient.invalidateQueries({ queryKey: ["/api/withdrawals", address] });
+      toast({ title: "OK", description: `${amt} USDT - ${WITHDRAW_FEE} = ${(amt - WITHDRAW_FEE).toFixed(2)} USDT` });
+      setWithdrawOpen(false);
+      setWithdrawAmount("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
+  const getWithdrawStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Badge style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }}>{t("withdraw.pending")}</Badge>;
+      case "completed":
+        return <Badge style={{ background: "rgba(100,200,100,0.1)", color: "#6bc46b", border: "1px solid rgba(100,200,100,0.2)" }}>{t("withdraw.completed")}</Badge>;
+      case "rejected":
+        return <Badge style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}>{t("withdraw.rejected")}</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  const rewardTypeColor: Record<string, string> = {
+    direct_referral: "#3b82f6",
+    indirect_referral: "#8b5cf6",
+    team_bonus: "#22c55e",
+  };
 
   const MENU_ITEMS = [
     {
@@ -222,22 +305,193 @@ export default function ProfilePage() {
       </div>
 
       {account && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="stat-card rounded-xl p-3 text-center">
-            <div className="font-black text-lg" style={{ color: "#C9A227" }}>{teamStats?.directCount || 0}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">直推人数</div>
+        <>
+          {/* Financial Overview */}
+          <div
+            className="rounded-xl p-4 space-y-3"
+            style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.25)" }}
+          >
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground mb-1">{t("withdraw.balance")}</div>
+              <div className="font-black text-3xl" style={{ color: "#C9A227" }}>{availableBalance.toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground">USDT</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="stat-card rounded-lg p-2.5 text-center">
+                <div className="text-[10px] text-muted-foreground">收益总金额</div>
+                <div className="font-bold text-sm" style={{ color: "#E8C547" }}>{totalDailyEarnings.toFixed(2)} U</div>
+              </div>
+              <div className="stat-card rounded-lg p-2.5 text-center">
+                <div className="text-[10px] text-muted-foreground">推荐总金额</div>
+                <div className="font-bold text-sm" style={{ color: "#3b82f6" }}>{totalReferralRewards.toFixed(2)} U</div>
+              </div>
+              <div className="stat-card rounded-lg p-2.5 text-center">
+                <div className="text-[10px] text-muted-foreground">总收益金额</div>
+                <div className="font-bold text-sm" style={{ color: "#C9A227" }}>{totalIncome.toFixed(2)} U</div>
+              </div>
+              <div className="stat-card rounded-lg p-2.5 text-center">
+                <div className="text-[10px] text-muted-foreground">总提现金额</div>
+                <div className="font-bold text-sm" style={{ color: "#6bc46b" }}>{totalWithdrawn.toFixed(2)} U</div>
+              </div>
+            </div>
+
+            <Button
+              data-testid="button-withdraw-now"
+              className="w-full font-bold text-sm"
+              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+              onClick={() => setWithdrawOpen(true)}
+            >
+              <ArrowDownToLine size={14} className="mr-1.5" />
+              {t("orders.withdraw_now")}
+            </Button>
           </div>
-          <div className="stat-card rounded-xl p-3 text-center">
-            <div className="font-black text-lg" style={{ color: "#C9A227" }}>{totalEarned.toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">累计收益(U)</div>
+
+          {/* History Section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
+              <span className="font-bold text-sm">历史明细</span>
+            </div>
+
+            <div className="flex rounded-lg p-0.5 gap-0.5" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
+              <button
+                className="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200"
+                style={historyTab === "rewards"
+                  ? { background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
+                  : { color: "rgba(255,255,255,0.4)", border: "1px solid transparent" }}
+                onClick={() => setHistoryTab("rewards")}
+              >
+                奖励明细
+              </button>
+              <button
+                className="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200"
+                style={historyTab === "withdrawals"
+                  ? { background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
+                  : { color: "rgba(255,255,255,0.4)", border: "1px solid transparent" }}
+                onClick={() => setHistoryTab("withdrawals")}
+              >
+                提现记录
+              </button>
+            </div>
+
+            {historyTab === "rewards" && (
+              <div className="space-y-2">
+                {rewardsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={20} className="animate-spin" style={{ color: "#C9A227" }} />
+                  </div>
+                ) : allRewards.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <Gift size={32} className="mx-auto mb-2 opacity-20" />
+                    <p>{t("reward.no_records")}</p>
+                  </div>
+                ) : (
+                  allRewards.map((r: any) => {
+                    const isEqualLevel = r.type === "team_bonus" && r.description?.includes("equal-level");
+                    const typeColor = isEqualLevel ? "#f97316" : (rewardTypeColor[r.type] || "#C9A227");
+                    const typeName = isEqualLevel
+                      ? t("reward.equal_level_bonus")
+                      : t(`reward.${r.type}` as any);
+                    return (
+                      <div
+                        key={r.id}
+                        className="product-card rounded-xl p-3 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ background: typeColor }} />
+                            <span className="text-sm font-semibold" style={{ color: typeColor }}>
+                              {typeName}
+                            </span>
+                          </div>
+                          <span className="text-sm font-bold" style={{ color: "#C9A227" }}>
+                            +{parseFloat(r.amount).toFixed(2)} U
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                          {r.fromAddress && (
+                            <>
+                              <span className="text-muted-foreground">{t("reward.from_account")}</span>
+                              <span className="font-mono text-right">
+                                {shortAddr(r.fromAddress)}
+                                {r.fromLevel > 0 && (
+                                  <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-semibold" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>V{r.fromLevel}</span>
+                                )}
+                                {r.fromLevel === 0 && (
+                                  <span className="ml-1 px-1 py-0.5 rounded text-[9px]" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.4)" }}>{t("reward.level_normal")}</span>
+                                )}
+                              </span>
+                            </>
+                          )}
+                          {r.productName && (
+                            <>
+                              <span className="text-muted-foreground">{t("reward.product")}</span>
+                              <span className="text-right">{r.productName}</span>
+                            </>
+                          )}
+                          {r.orderAmount && (
+                            <>
+                              <span className="text-muted-foreground">{t("reward.order_amount")}</span>
+                              <span className="text-right">{parseFloat(r.orderAmount).toFixed(0)} U</span>
+                            </>
+                          )}
+                          <span className="text-muted-foreground">{t("reward.time")}</span>
+                          <span className="text-right">{new Date(r.createdAt).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {historyTab === "withdrawals" && (
+              <div className="space-y-2">
+                {withdrawalsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={20} className="animate-spin" style={{ color: "#C9A227" }} />
+                  </div>
+                ) : (withdrawalList as any[]).length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <ArrowDownToLine size={32} className="mx-auto mb-2 opacity-20" />
+                    <p>{t("orders.no_withdrawals")}</p>
+                  </div>
+                ) : (
+                  (withdrawalList as any[]).map((w: any) => (
+                    <div
+                      key={w.id}
+                      className="product-card rounded-xl p-3 space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-semibold text-foreground">{t("withdraw.title")} #{w.id}</div>
+                        {getWithdrawStatusBadge(w.status)}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center">
+                          <div className="text-[10px] text-muted-foreground">{t("withdraw.amount_label")}</div>
+                          <div className="text-xs font-bold text-foreground">{parseFloat(w.amount).toFixed(2)} U</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[10px] text-muted-foreground">{t("withdraw.fee")}</div>
+                          <div className="text-xs font-bold" style={{ color: "#ef4444" }}>-{parseFloat(w.fee).toFixed(2)} U</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[10px] text-muted-foreground">{t("withdraw.actual")}</div>
+                          <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(2)} U</div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleString()}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
-          <div className="stat-card rounded-xl p-3 text-center">
-            <div className="font-black text-lg" style={{ color: "#C9A227" }}>{activeOrders}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">活跃订单</div>
-          </div>
-        </div>
+        </>
       )}
 
+      {/* Menu */}
       <div
         className="rounded-xl overflow-hidden"
         style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}
@@ -289,6 +543,99 @@ export default function ProfilePage() {
         </Button>
       )}
 
+      {/* Withdraw Dialog */}
+      <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+        <DialogContent
+          className="max-w-sm mx-auto"
+          style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-center" style={{ color: "#C9A227" }}>
+              {t("withdraw.title")}
+            </DialogTitle>
+            <DialogDescription className="text-center text-xs text-muted-foreground">
+              {t("withdraw.desc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg p-3 text-center" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
+              <div className="text-xs text-muted-foreground mb-1">{t("withdraw.balance")}</div>
+              <div className="font-black text-2xl" style={{ color: "#C9A227" }}>{availableBalance.toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground">USDT</div>
+            </div>
+
+            <div>
+              <label className="text-sm text-muted-foreground mb-2 block">{t("withdraw.amount")}</label>
+              <div className="relative">
+                <Input
+                  data-testid="input-withdraw-amount"
+                  type="number"
+                  placeholder={`${t("withdraw.min")} ${WITHDRAW_MIN} USDT`}
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="pr-16"
+                  style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.25)", color: "#f5e6b8" }}
+                />
+                <button
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold px-2 py-0.5 rounded"
+                  style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227" }}
+                  onClick={() => setWithdrawAmount(availableBalance.toFixed(2))}
+                >
+                  {t("withdraw.all")}
+                </button>
+              </div>
+            </div>
+
+            {parseFloat(withdrawAmount) > 0 && (
+              <div className="rounded-lg p-3 space-y-1.5" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{t("withdraw.amount_label")}</span>
+                  <span className="text-foreground">{parseFloat(withdrawAmount).toFixed(2)} USDT</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{t("withdraw.fee")}</span>
+                  <span style={{ color: "#ef4444" }}>-{WITHDRAW_FEE} USDT</span>
+                </div>
+                <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: "rgba(201,162,39,0.15)" }}>
+                  <span className="text-muted-foreground">{t("withdraw.actual")}</span>
+                  <span style={{ color: "#C9A227" }}>{(parseFloat(withdrawAmount) - WITHDRAW_FEE).toFixed(2)} USDT</span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <AlertCircle size={11} style={{ color: "#C9A227" }} />
+                <span>{t("withdraw.min")}: {WITHDRAW_MIN} USDT</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <AlertCircle size={11} style={{ color: "#C9A227" }} />
+                <span>{t("withdraw.fee_per")} {WITHDRAW_FEE} USDT</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <AlertCircle size={11} style={{ color: "#C9A227" }} />
+                <span>Multiple of {WITHDRAW_MULTIPLE} USDT</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Shield size={11} style={{ color: "#C9A227" }} />
+                <span>{t("withdraw.only_profit")}</span>
+              </div>
+            </div>
+
+            <Button
+              data-testid="button-confirm-withdraw"
+              className="w-full font-bold text-sm"
+              disabled={withdrawLoading || parseFloat(withdrawAmount || "0") < WITHDRAW_MIN}
+              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+              onClick={handleWithdraw}
+            >
+              {withdrawLoading ? t("withdraw.processing") : t("withdraw.confirm")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notification Dialog */}
       <Dialog open={notifOpen} onOpenChange={setNotifOpen}>
         <DialogContent
           className="max-w-sm mx-auto"
@@ -341,6 +688,7 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Language Dialog */}
       <Dialog open={langOpen} onOpenChange={setLangOpen}>
         <DialogContent
           className="max-w-sm mx-auto"
