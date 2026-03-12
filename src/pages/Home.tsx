@@ -6,8 +6,8 @@ import { useActiveAccount } from "thirdweb/react";
 import { useSendTransaction } from "thirdweb/react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { registerMember, createOrder } from "@/lib/api";
-import { TrendingUp, Clock, DollarSign, Shield } from "lucide-react";
+import { registerMember, createOrder, getMember } from "@/lib/api";
+import { TrendingUp, Clock, DollarSign, Shield, UserPlus, Loader2 } from "lucide-react";
 import { PRODUCTS } from "@shared/schema";
 import {
   prepareApproveUSDT,
@@ -35,6 +35,12 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"idle" | "approving" | "investing" | "confirming">("idle");
   const { mutateAsync: sendTransaction } = useSendTransaction();
+
+  useEffect(() => {
+    if (open && product) {
+      setAmount(product.minAmount.toString());
+    }
+  }, [open, product]);
 
   if (!product) return null;
 
@@ -164,30 +170,60 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
           </div>
 
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">选择投资金额 (USDT)</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3, 5, 10, 20].map(multiplier => {
-                const val = product.minAmount * multiplier;
-                const isSelected = amount === val.toString();
-                return (
-                  <button
-                    key={multiplier}
-                    data-testid={`amount-${multiplier}x`}
-                    className="rounded-lg py-2.5 text-center transition-all font-semibold text-sm"
-                    style={{
-                      background: isSelected ? "linear-gradient(135deg, #C9A227, #9A7A1A)" : "rgba(201,162,39,0.06)",
-                      border: isSelected ? "1px solid #C9A227" : "1px solid rgba(201,162,39,0.2)",
-                      color: isSelected ? "#0c0a08" : "#f5e6b8",
-                    }}
-                    onClick={() => setAmount(val.toString())}
-                  >
-                    {val.toLocaleString()} U
-                  </button>
-                );
-              })}
+            <label className="text-sm text-muted-foreground mb-2 block">投资金额 (USDT)</label>
+            <div className="flex items-center gap-3">
+              <button
+                data-testid="button-amount-minus"
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shrink-0 transition-all active:scale-95"
+                style={{
+                  background: "rgba(201,162,39,0.1)",
+                  border: "1px solid rgba(201,162,39,0.3)",
+                  color: "#C9A227",
+                }}
+                onClick={() => {
+                  const cur = parseFloat(amount || "0");
+                  const next = Math.max(cur - product.minAmount, product.minAmount);
+                  setAmount(next.toString());
+                }}
+              >
+                −
+              </button>
+              <div
+                className="flex-1 rounded-xl py-3 text-center"
+                style={{
+                  background: "rgba(201,162,39,0.08)",
+                  border: "1px solid rgba(201,162,39,0.3)",
+                }}
+              >
+                <div className="font-black text-2xl" style={{ color: "#f5e6b8" }}>
+                  {(parseFloat(amount || "0") || product.minAmount).toLocaleString()}
+                </div>
+                <div className="text-xs text-muted-foreground">USDT</div>
+              </div>
+              <button
+                data-testid="button-amount-plus"
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shrink-0 transition-all active:scale-95"
+                style={{
+                  background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
+                  border: "1px solid #C9A227",
+                  color: "#0c0a08",
+                }}
+                onClick={() => {
+                  const cur = parseFloat(amount || "0");
+                  const next = cur < product.minAmount ? product.minAmount : cur + product.minAmount;
+                  setAmount(next.toString());
+                }}
+              >
+                +
+              </button>
             </div>
-            <div className="text-xs text-muted-foreground mt-2 text-center">
-              按 {product.minAmount} USDT 的倍数投资
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-xs text-muted-foreground">
+                每次 ±{product.minAmount} USDT
+              </span>
+              <span className="text-xs" style={{ color: "rgba(201,162,39,0.6)" }}>
+                {Math.max(1, Math.round(parseFloat(amount || "0") / product.minAmount))}x 倍
+              </span>
             </div>
           </div>
 
@@ -237,16 +273,71 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
 export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
+  const [referrerInfo, setReferrerInfo] = useState<{ address: string; level: number } | null>(null);
+  const [registerLoading, setRegisterLoading] = useState(false);
   const account = useActiveAccount();
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (account?.address) {
+    if (!account?.address) return;
+    const addr = account.address.toLowerCase();
+
+    (async () => {
+      // Already registered?
+      const existing = await getMember(addr);
+      if (existing) return;
+
+      // Need ref param
       const ref = new URLSearchParams(window.location.search).get("ref");
-      registerMember(account.address, ref || null).catch(() => {});
-    }
+      if (!ref) {
+        toast({ title: "需要邀请链接", description: "请通过邀请链接注册", variant: "destructive" });
+        return;
+      }
+
+      // Check referrer exists and has invested
+      const refAddr = ref.toLowerCase();
+      if (refAddr === addr) return;
+      const referrer = await getMember(refAddr);
+      if (!referrer) {
+        toast({ title: "邀请人不存在", variant: "destructive" });
+        return;
+      }
+
+      // Show confirmation dialog
+      setReferrerInfo({ address: ref, level: referrer.level ?? 0 });
+      setRegisterDialogOpen(true);
+    })().catch(() => {});
   }, [account?.address]);
 
-  const handleInvest = (product: Product) => {
+  const handleConfirmRegister = async () => {
+    if (!account?.address || !referrerInfo) return;
+    setRegisterLoading(true);
+    try {
+      await registerMember(account.address, referrerInfo.address);
+      toast({ title: "注册成功", description: "已绑定推荐关系" });
+      setRegisterDialogOpen(false);
+      setReferrerInfo(null);
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg === "REFERRER_NOT_INVESTED") {
+        toast({ title: "邀请人尚未投资", description: "邀请人需要先投资才能邀请他人", variant: "destructive" });
+      } else {
+        toast({ title: "注册失败", description: msg, variant: "destructive" });
+      }
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleInvest = async (product: Product) => {
+    if (account?.address) {
+      const member = await getMember(account.address.toLowerCase());
+      if (!member) {
+        toast({ title: "需要邀请链接", description: "请通过邀请链接注册后投资", variant: "destructive" });
+        return;
+      }
+    }
     setSelectedProduct(product);
     setDialogOpen(true);
   };
@@ -338,6 +429,84 @@ export default function HomePage() {
         onClose={() => setDialogOpen(false)}
         color={selectedProduct ? COLORS[PRODUCTS.indexOf(selectedProduct) % COLORS.length] : "#C9A227"}
       />
+
+      {/* Registration Confirmation Dialog */}
+      <Dialog open={registerDialogOpen} onOpenChange={(open) => { if (!registerLoading) setRegisterDialogOpen(open); }}>
+        <DialogContent
+          className="max-w-sm mx-auto"
+          style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-center" style={{ color: "#C9A227" }}>
+              确认注册
+            </DialogTitle>
+            <DialogDescription className="text-center text-xs text-muted-foreground">
+              确认绑定推荐关系
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex flex-col items-center gap-3">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", boxShadow: "0 0 20px rgba(201,162,39,0.3)" }}
+              >
+                <UserPlus size={28} className="text-black" />
+              </div>
+            </div>
+
+            {referrerInfo && (
+              <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
+                <div className="text-xs text-muted-foreground text-center mb-2">您的推荐人</div>
+                <div className="text-center">
+                  <div className="font-mono font-bold text-sm" style={{ color: "#f5e6b8" }}>
+                    {referrerInfo.address.slice(0, 6)}****{referrerInfo.address.slice(-4)}
+                  </div>
+                  <div className="mt-1">
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                      background: referrerInfo.level > 0 ? "rgba(201,162,39,0.15)" : "rgba(255,255,255,0.06)",
+                      color: referrerInfo.level > 0 ? "#C9A227" : "rgba(255,255,255,0.5)",
+                      border: referrerInfo.level > 0 ? "1px solid rgba(201,162,39,0.3)" : "1px solid rgba(255,255,255,0.1)",
+                    }}>
+                      {referrerInfo.level > 0 ? `V${referrerInfo.level}` : "普通"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Shield size={12} style={{ color: "#C9A227" }} />
+                <span>绑定后推荐关系不可更改</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Shield size={12} style={{ color: "#C9A227" }} />
+                <span>注册后即可开始投资理财</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 text-sm"
+                style={{ border: "1px solid rgba(201,162,39,0.25)", color: "rgba(255,255,255,0.6)" }}
+                onClick={() => setRegisterDialogOpen(false)}
+                disabled={registerLoading}
+              >
+                取消
+              </Button>
+              <Button
+                className="flex-1 font-bold text-sm"
+                style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+                onClick={handleConfirmRegister}
+                disabled={registerLoading}
+              >
+                {registerLoading ? <><Loader2 size={14} className="mr-1 animate-spin" />注册中...</> : "确认注册"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

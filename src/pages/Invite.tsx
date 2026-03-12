@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useActiveAccount } from "thirdweb/react";
 import { useQuery } from "@tanstack/react-query";
-import { getTeamStats, getEarnings, getRewardsByWallet, getDirectReferrals, getIndirectReferrals, getTeamTree, getMember } from "@/lib/api";
+import { getTeamStats, getEarnings, getRewardsByWallet, getDirectReferrals, getIndirectReferrals, getTeamTree, getMember, getOrdersByWallet } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Copy, Users, UserPlus, Crown, ChevronRight, ChevronDown, Star, ArrowLeft, TrendingUp, BarChart3, Loader2, Wallet, Award } from "lucide-react";
 import { LEVEL_CONFIG } from "@shared/schema";
@@ -119,6 +119,14 @@ export default function InvitePage() {
     enabled: !!address,
   });
 
+  const { data: orderList = [] } = useQuery({
+    queryKey: ["/api/orders", address],
+    queryFn: () => getOrdersByWallet(address!),
+    enabled: !!address,
+  });
+
+  const hasInvested = (orderList as any[]).length > 0;
+
   const { data: teamStats } = useQuery({
     queryKey: ["/api/members", address, "team-stats"],
     queryFn: () => getTeamStats(address!),
@@ -176,12 +184,16 @@ export default function InvitePage() {
   });
 
   const referralLink = account?.address
-    ? `${window.location.origin}/?ref=${account.address}`
+    ? (hasInvested ? `${window.location.origin}/?ref=${account.address}` : "需要先投资才能邀请")
     : "请先连接钱包";
 
   const handleCopy = () => {
     if (!account) {
       toast({ title: "请先连接钱包", variant: "destructive" });
+      return;
+    }
+    if (!hasInvested) {
+      toast({ title: "需要先投资", description: "投资后才能生成邀请链接", variant: "destructive" });
       return;
     }
     navigator.clipboard.writeText(referralLink);

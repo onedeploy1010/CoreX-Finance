@@ -11,14 +11,29 @@ export async function registerMember(walletAddress: string, referrerAddress?: st
     .single();
   if (existing) return existing;
 
+  // Must have a valid referral link to register
   let refAddr = referrerAddress?.toLowerCase() || null;
-  if (refAddr) {
-    const { data: referrer } = await supabase
-      .from("members")
-      .select("id")
-      .eq("wallet_address", refAddr)
-      .single();
-    if (!referrer) refAddr = null;
+  if (!refAddr) {
+    throw new Error("REFERRAL_REQUIRED");
+  }
+
+  // Check referrer exists
+  const { data: referrer } = await supabase
+    .from("members")
+    .select("id, wallet_address")
+    .eq("wallet_address", refAddr)
+    .single();
+  if (!referrer) {
+    throw new Error("REFERRAL_REQUIRED");
+  }
+
+  // Referrer must have at least one order (invested) to invite others
+  const { count: orderCount } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("wallet_address", refAddr);
+  if (!orderCount || orderCount === 0) {
+    throw new Error("REFERRER_NOT_INVESTED");
   }
 
   const { data, error } = await supabase

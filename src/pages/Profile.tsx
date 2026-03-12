@@ -10,7 +10,7 @@ import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { registerMember, getMember, getEarnings, getRewardsByWallet, getWithdrawalsByWallet, createWithdrawal } from "@/lib/api";
+import { getMember, getEarnings, getRewardsByWallet, getWithdrawalsByWallet, getOrdersByWallet, createWithdrawal } from "@/lib/api";
 import { WITHDRAW_MIN, WITHDRAW_FEE, WITHDRAW_MULTIPLE } from "@shared/schema";
 import { t, getLang, shortAddr } from "@/lib/i18n";
 import {
@@ -66,12 +66,7 @@ export default function ProfilePage() {
   const [currentLang, setCurrentLang] = useState(getStoredLang);
   const [notifications, setNotifications] = useState(getStoredNotifications);
 
-  useEffect(() => {
-    if (account?.address) {
-      const ref = new URLSearchParams(window.location.search).get("ref");
-      registerMember(account.address, ref || null).catch(() => {});
-    }
-  }, [account?.address]);
+  // Registration is handled via Home.tsx confirmation dialog
 
   const { data: memberData } = useQuery({
     queryKey: ["/api/members", address],
@@ -97,6 +92,12 @@ export default function ProfilePage() {
     enabled: !!address,
   });
 
+  const { data: orderList = [] } = useQuery({
+    queryKey: ["/api/orders", address],
+    queryFn: () => getOrdersByWallet(address!),
+    enabled: !!address,
+  });
+
   const shortAddress = account?.address
     ? `${account.address.slice(0, 6)}****${account.address.slice(-4)}`
     : null;
@@ -114,8 +115,36 @@ export default function ProfilePage() {
   const currentLangObj = LANGUAGES.find(l => l.code === currentLang) || LANGUAGES[0];
   const enabledNotifCount = Object.values(notifications).filter(Boolean).length;
 
-  // History: only daily/product earnings (referral rewards go to Invite page)
-  const dailyRewards = (rewardList as any[]).filter((r: any) => r.type === "daily");
+  // History: combine orders, all rewards, and withdrawals into one timeline
+  const historyItems: any[] = [
+    ...(orderList as any[]).map((o: any) => ({
+      id: `order-${o.id}`,
+      type: "order" as const,
+      label: "投资",
+      amount: `−${parseFloat(o.amount).toFixed(2)}`,
+      amountColor: "#ef4444",
+      detail: o.productName || o.product_name,
+      date: o.startDate || o.start_date,
+    })),
+    ...(rewardList as any[]).map((r: any) => ({
+      id: `reward-${r.id}`,
+      type: "reward" as const,
+      label: r.type === "daily" ? "日收益" : r.type === "direct_referral" ? "直推奖励" : r.type === "indirect_referral" ? "间推奖励" : r.type === "team_bonus" ? "团队奖励" : "奖励",
+      amount: `+${parseFloat(r.amount).toFixed(2)}`,
+      amountColor: "#C9A227",
+      detail: r.productName || r.description || "",
+      date: r.createdAt,
+    })),
+    ...(withdrawalList as any[]).map((w: any) => ({
+      id: `withdraw-${w.id}`,
+      type: "withdrawal" as const,
+      label: w.status === "completed" ? "提现成功" : w.status === "rejected" ? "提现拒绝" : "提现申请",
+      amount: `−${parseFloat(w.amount).toFixed(2)}`,
+      amountColor: w.status === "rejected" ? "rgba(255,255,255,0.4)" : "#6bc46b",
+      detail: w.status === "completed" ? `实到 ${parseFloat(w.actualAmount).toFixed(2)} U` : w.status === "rejected" ? "已退回" : "处理中",
+      date: w.createdAt,
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const handleCopyAddress = () => {
     if (account?.address) {
@@ -559,7 +588,7 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
 
-      {/* History Dialog - daily/product earnings only */}
+      {/* History Dialog - all records (orders, rewards, withdrawals) */}
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent
           className="max-w-md mx-auto max-h-[80vh] overflow-y-auto"
@@ -570,7 +599,7 @@ export default function ProfilePage() {
               历史明细
             </DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground">
-              产品收益记录
+              投资·收益·提现记录
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -578,44 +607,36 @@ export default function ProfilePage() {
               <div className="flex items-center justify-center py-8">
                 <Loader2 size={20} className="animate-spin" style={{ color: "#C9A227" }} />
               </div>
-            ) : dailyRewards.length === 0 ? (
+            ) : historyItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 <Gift size={32} className="mx-auto mb-2 opacity-20" />
                 <p>{t("reward.no_records")}</p>
               </div>
             ) : (
-              dailyRewards.map((r: any) => (
+              historyItems.map((item: any) => (
                 <div
-                  key={r.id}
-                  className="rounded-xl p-3 space-y-2"
+                  key={item.id}
+                  className="rounded-xl p-3"
                   style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ background: "#E8C547" }} />
-                      <span className="text-sm font-semibold" style={{ color: "#E8C547" }}>
-                        {t("reward.daily")}
+                      <div className="w-2 h-2 rounded-full" style={{
+                        background: item.type === "order" ? "#3b82f6" : item.type === "withdrawal" ? "#6bc46b" : "#E8C547"
+                      }} />
+                      <span className="text-sm font-semibold" style={{
+                        color: item.type === "order" ? "#3b82f6" : item.type === "withdrawal" ? "#6bc46b" : "#E8C547"
+                      }}>
+                        {item.label}
                       </span>
                     </div>
-                    <span className="text-sm font-bold" style={{ color: "#C9A227" }}>
-                      +{parseFloat(r.amount).toFixed(2)} U
+                    <span className="text-sm font-bold" style={{ color: item.amountColor }}>
+                      {item.amount} U
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    {r.productName && (
-                      <>
-                        <span className="text-muted-foreground">{t("reward.product")}</span>
-                        <span className="text-right">{r.productName}</span>
-                      </>
-                    )}
-                    {r.orderAmount && (
-                      <>
-                        <span className="text-muted-foreground">{t("reward.order_amount")}</span>
-                        <span className="text-right">{parseFloat(r.orderAmount).toFixed(0)} U</span>
-                      </>
-                    )}
-                    <span className="text-muted-foreground">{t("reward.time")}</span>
-                    <span className="text-right">{new Date(r.createdAt).toLocaleString()}</span>
+                  <div className="flex items-center justify-between mt-1.5 text-xs">
+                    <span className="text-muted-foreground">{item.detail}</span>
+                    <span className="text-muted-foreground">{new Date(item.date).toLocaleString()}</span>
                   </div>
                 </div>
               ))
