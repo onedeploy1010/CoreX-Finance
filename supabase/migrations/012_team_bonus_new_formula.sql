@@ -103,6 +103,17 @@ BEGIN
     WHERE m.level >= 1
       AND EXISTS (SELECT 1 FROM orders o WHERE o.wallet_address = m.wallet_address AND o.status = 'active')
   LOOP
+    -- Skip if team_bonus already calculated today for this wallet (prevent duplicates)
+    IF EXISTS (
+      SELECT 1 FROM rewards
+      WHERE wallet_address = v_leader.wallet_address
+        AND type = 'team_bonus'
+        AND description NOT LIKE 'equal-level%'
+        AND created_at::DATE = CURRENT_DATE
+    ) THEN
+      CONTINUE;
+    END IF;
+
     SELECT MAX(daily_rate) INTO v_highest_rate
     FROM orders
     WHERE wallet_address = v_leader.wallet_address AND status = 'active';
@@ -128,7 +139,6 @@ BEGIN
     v_team_reward := v_team_staking * (v_highest_rate / 100) * (v_bonus_rate / 100.0);
 
     IF v_team_reward > 0 THEN
-      -- Team bonus with parseable description: 业绩|利率|比例
       INSERT INTO rewards (wallet_address, type, amount, description)
       VALUES (v_leader.wallet_address, 'team_bonus', v_team_reward,
               '业绩:' || TRIM(TO_CHAR(v_team_staking, '999999999999')) || '|利率:' || v_highest_rate || '|比例:' || v_bonus_rate);
@@ -211,7 +221,16 @@ BEGIN
   END LOOP;
 
   SELECT * INTO v_member FROM members WHERE wallet_address = p_wallet_address;
-  IF FOUND AND v_member.level >= 1 THEN
+  -- Skip if team_bonus already calculated today (prevent duplicates)
+  IF FOUND AND v_member.level >= 1
+    AND NOT EXISTS (
+      SELECT 1 FROM rewards
+      WHERE wallet_address = p_wallet_address
+        AND type = 'team_bonus'
+        AND description NOT LIKE 'equal-level%'
+        AND created_at::DATE = CURRENT_DATE
+    )
+  THEN
     SELECT MAX(daily_rate) INTO v_highest_rate
     FROM orders WHERE wallet_address = p_wallet_address AND status = 'active';
 

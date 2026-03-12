@@ -344,10 +344,6 @@ export default function InvitePage() {
             <span className="text-muted-foreground">团队奖励</span>
             <span className="font-semibold" style={{ color: "#E8C547" }}>团队总业绩 x 个人最高日利率 x 等级%</span>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">同级奖励</span>
-            <span className="font-semibold" style={{ color: "#E8C547" }}>同级下线团队奖励 x 10%</span>
-          </div>
         </div>
       </div>
 
@@ -671,8 +667,17 @@ export default function InvitePage() {
               </div>
             );
           })}
-          <div className="text-xs text-muted-foreground text-center pt-1 pb-2">
-            * 团队奖励 = 团队总业绩 x 个人最高日利率 x 等级% · 同级奖励 = 同级下线团队奖励 x 10%
+          <div className="rounded-xl p-3 space-y-2 mt-2"
+            style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
+            <div className="text-xs font-semibold" style={{ color: "#C9A227" }}>团队奖励公式</div>
+            <div className="text-xs text-muted-foreground">团队总业绩 x 个人最高日利率 x 等级%</div>
+            <div className="text-xs font-semibold mt-2" style={{ color: "#f97316" }}>同级奖励</div>
+            <div className="text-xs text-muted-foreground">
+              推荐线上遇到同等级领导，可拿其团队奖励的10%，逐层递减，最多5层。
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>
+              例: A(V2)团队奖励21.71 → 同级B拿2.171 → 同级C拿0.217 → ...最多5层
+            </div>
           </div>
         </div>
       )}
