@@ -61,21 +61,21 @@ export default function OrdersPage() {
       <div className="grid grid-cols-2 gap-3">
         <div className="stat-card rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
-            <TrendingUp size={12} style={{ color: "#C9A227" }} />
-            <span className="text-[10px] text-muted-foreground">{t("orders.total_earned")}</span>
+            <Clock size={12} style={{ color: "#E8C547" }} />
+            <span className="text-[10px] text-muted-foreground">日收益</span>
           </div>
-          <div className="font-black text-lg" style={{ color: "#C9A227" }}>
-            {totalEarnings.toFixed(2)}
+          <div className="font-black text-lg" style={{ color: "#E8C547" }}>
+            {totalDailyEarnings.toFixed(2)}
           </div>
           <div className="text-[10px] text-muted-foreground">USDT</div>
         </div>
         <div className="stat-card rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
-            <Clock size={12} style={{ color: "#E8C547" }} />
-            <span className="text-[10px] text-muted-foreground">{t("orders.daily_earnings")}</span>
+            <TrendingUp size={12} style={{ color: "#C9A227" }} />
+            <span className="text-[10px] text-muted-foreground">总收益</span>
           </div>
-          <div className="font-black text-lg" style={{ color: "#E8C547" }}>
-            {totalDailyEarnings.toFixed(2)}
+          <div className="font-black text-lg" style={{ color: "#C9A227" }}>
+            {totalEarnings.toFixed(2)}
           </div>
           <div className="text-[10px] text-muted-foreground">USDT</div>
         </div>

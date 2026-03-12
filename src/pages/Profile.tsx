@@ -14,7 +14,7 @@ import { registerMember, getMember, getTeamStats, getEarnings, getOrdersByWallet
 import { WITHDRAW_MIN, WITHDRAW_FEE, WITHDRAW_MULTIPLE } from "@shared/schema";
 import { t, getLang, shortAddr } from "@/lib/i18n";
 import {
-  User, Bell, Globe, ChevronRight, Check,
+  User, Bell, Globe, ChevronRight, Check, Clock,
   LogOut, Copy, Wallet, Crown, Award, BellRing, BellOff,
   ArrowDownToLine, AlertCircle, Shield, TrendingUp, Gift, Loader2
 } from "lucide-react";
@@ -58,6 +58,7 @@ export default function ProfilePage() {
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
@@ -208,6 +209,12 @@ export default function ProfilePage() {
 
   const MENU_ITEMS = [
     {
+      icon: Clock,
+      label: "历史记录",
+      desc: "奖励明细与提现记录",
+      onClick: () => setHistoryOpen(true),
+    },
+    {
       icon: Bell,
       label: "消息通知",
       desc: enabledNotifCount === 4 ? "全部开启" : `${enabledNotifCount}/4 项已开启`,
@@ -347,147 +354,6 @@ export default function ProfilePage() {
             </Button>
           </div>
 
-          {/* History Section */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-              <span className="font-bold text-sm">历史明细</span>
-            </div>
-
-            <div className="flex rounded-lg p-0.5 gap-0.5" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
-              <button
-                className="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200"
-                style={historyTab === "rewards"
-                  ? { background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
-                  : { color: "rgba(255,255,255,0.4)", border: "1px solid transparent" }}
-                onClick={() => setHistoryTab("rewards")}
-              >
-                奖励明细
-              </button>
-              <button
-                className="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200"
-                style={historyTab === "withdrawals"
-                  ? { background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
-                  : { color: "rgba(255,255,255,0.4)", border: "1px solid transparent" }}
-                onClick={() => setHistoryTab("withdrawals")}
-              >
-                提现记录
-              </button>
-            </div>
-
-            {historyTab === "rewards" && (
-              <div className="space-y-2">
-                {rewardsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 size={20} className="animate-spin" style={{ color: "#C9A227" }} />
-                  </div>
-                ) : allRewards.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    <Gift size={32} className="mx-auto mb-2 opacity-20" />
-                    <p>{t("reward.no_records")}</p>
-                  </div>
-                ) : (
-                  allRewards.map((r: any) => {
-                    const isEqualLevel = r.type === "team_bonus" && r.description?.includes("equal-level");
-                    const typeColor = isEqualLevel ? "#f97316" : (rewardTypeColor[r.type] || "#C9A227");
-                    const typeName = isEqualLevel
-                      ? t("reward.equal_level_bonus")
-                      : t(`reward.${r.type}` as any);
-                    return (
-                      <div
-                        key={r.id}
-                        className="product-card rounded-xl p-3 space-y-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ background: typeColor }} />
-                            <span className="text-sm font-semibold" style={{ color: typeColor }}>
-                              {typeName}
-                            </span>
-                          </div>
-                          <span className="text-sm font-bold" style={{ color: "#C9A227" }}>
-                            +{parseFloat(r.amount).toFixed(2)} U
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                          {r.fromAddress && (
-                            <>
-                              <span className="text-muted-foreground">{t("reward.from_account")}</span>
-                              <span className="font-mono text-right">
-                                {shortAddr(r.fromAddress)}
-                                {r.fromLevel > 0 && (
-                                  <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-semibold" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>V{r.fromLevel}</span>
-                                )}
-                                {r.fromLevel === 0 && (
-                                  <span className="ml-1 px-1 py-0.5 rounded text-[9px]" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.4)" }}>{t("reward.level_normal")}</span>
-                                )}
-                              </span>
-                            </>
-                          )}
-                          {r.productName && (
-                            <>
-                              <span className="text-muted-foreground">{t("reward.product")}</span>
-                              <span className="text-right">{r.productName}</span>
-                            </>
-                          )}
-                          {r.orderAmount && (
-                            <>
-                              <span className="text-muted-foreground">{t("reward.order_amount")}</span>
-                              <span className="text-right">{parseFloat(r.orderAmount).toFixed(0)} U</span>
-                            </>
-                          )}
-                          <span className="text-muted-foreground">{t("reward.time")}</span>
-                          <span className="text-right">{new Date(r.createdAt).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-
-            {historyTab === "withdrawals" && (
-              <div className="space-y-2">
-                {withdrawalsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 size={20} className="animate-spin" style={{ color: "#C9A227" }} />
-                  </div>
-                ) : (withdrawalList as any[]).length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    <ArrowDownToLine size={32} className="mx-auto mb-2 opacity-20" />
-                    <p>{t("orders.no_withdrawals")}</p>
-                  </div>
-                ) : (
-                  (withdrawalList as any[]).map((w: any) => (
-                    <div
-                      key={w.id}
-                      className="product-card rounded-xl p-3 space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-foreground">{t("withdraw.title")} #{w.id}</div>
-                        {getWithdrawStatusBadge(w.status)}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="text-center">
-                          <div className="text-[10px] text-muted-foreground">{t("withdraw.amount_label")}</div>
-                          <div className="text-xs font-bold text-foreground">{parseFloat(w.amount).toFixed(2)} U</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[10px] text-muted-foreground">{t("withdraw.fee")}</div>
-                          <div className="text-xs font-bold" style={{ color: "#ef4444" }}>-{parseFloat(w.fee).toFixed(2)} U</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[10px] text-muted-foreground">{t("withdraw.actual")}</div>
-                          <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(2)} U</div>
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleString()}</div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
         </>
       )}
 
@@ -685,6 +551,159 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* History Dialog */}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent
+          className="max-w-md mx-auto max-h-[80vh] overflow-y-auto"
+          style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-center" style={{ color: "#C9A227" }}>
+              历史记录
+            </DialogTitle>
+            <DialogDescription className="text-center text-xs text-muted-foreground">
+              奖励明细与提现记录
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex rounded-lg p-0.5 gap-0.5" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
+            <button
+              className="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200"
+              style={historyTab === "rewards"
+                ? { background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
+                : { color: "rgba(255,255,255,0.4)", border: "1px solid transparent" }}
+              onClick={() => setHistoryTab("rewards")}
+            >
+              奖励明细
+            </button>
+            <button
+              className="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200"
+              style={historyTab === "withdrawals"
+                ? { background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
+                : { color: "rgba(255,255,255,0.4)", border: "1px solid transparent" }}
+              onClick={() => setHistoryTab("withdrawals")}
+            >
+              提现记录
+            </button>
+          </div>
+
+          {historyTab === "rewards" && (
+            <div className="space-y-2">
+              {rewardsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={20} className="animate-spin" style={{ color: "#C9A227" }} />
+                </div>
+              ) : allRewards.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  <Gift size={32} className="mx-auto mb-2 opacity-20" />
+                  <p>{t("reward.no_records")}</p>
+                </div>
+              ) : (
+                allRewards.map((r: any) => {
+                  const isEqualLevel = r.type === "team_bonus" && r.description?.includes("equal-level");
+                  const typeColor = isEqualLevel ? "#f97316" : (rewardTypeColor[r.type] || "#C9A227");
+                  const typeName = isEqualLevel
+                    ? t("reward.equal_level_bonus")
+                    : t(`reward.${r.type}` as any);
+                  return (
+                    <div
+                      key={r.id}
+                      className="rounded-xl p-3 space-y-2"
+                      style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ background: typeColor }} />
+                          <span className="text-sm font-semibold" style={{ color: typeColor }}>
+                            {typeName}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold" style={{ color: "#C9A227" }}>
+                          +{parseFloat(r.amount).toFixed(2)} U
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        {r.fromAddress && (
+                          <>
+                            <span className="text-muted-foreground">{t("reward.from_account")}</span>
+                            <span className="font-mono text-right">
+                              {shortAddr(r.fromAddress)}
+                              {r.fromLevel > 0 && (
+                                <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-semibold" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>V{r.fromLevel}</span>
+                              )}
+                              {r.fromLevel === 0 && (
+                                <span className="ml-1 px-1 py-0.5 rounded text-[9px]" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.4)" }}>{t("reward.level_normal")}</span>
+                              )}
+                            </span>
+                          </>
+                        )}
+                        {r.productName && (
+                          <>
+                            <span className="text-muted-foreground">{t("reward.product")}</span>
+                            <span className="text-right">{r.productName}</span>
+                          </>
+                        )}
+                        {r.orderAmount && (
+                          <>
+                            <span className="text-muted-foreground">{t("reward.order_amount")}</span>
+                            <span className="text-right">{parseFloat(r.orderAmount).toFixed(0)} U</span>
+                          </>
+                        )}
+                        <span className="text-muted-foreground">{t("reward.time")}</span>
+                        <span className="text-right">{new Date(r.createdAt).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {historyTab === "withdrawals" && (
+            <div className="space-y-2">
+              {withdrawalsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={20} className="animate-spin" style={{ color: "#C9A227" }} />
+                </div>
+              ) : (withdrawalList as any[]).length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  <ArrowDownToLine size={32} className="mx-auto mb-2 opacity-20" />
+                  <p>{t("orders.no_withdrawals")}</p>
+                </div>
+              ) : (
+                (withdrawalList as any[]).map((w: any) => (
+                  <div
+                    key={w.id}
+                    className="rounded-xl p-3 space-y-2"
+                    style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold text-foreground">{t("withdraw.title")} #{w.id}</div>
+                      {getWithdrawStatusBadge(w.status)}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="text-center">
+                        <div className="text-[10px] text-muted-foreground">{t("withdraw.amount_label")}</div>
+                        <div className="text-xs font-bold text-foreground">{parseFloat(w.amount).toFixed(2)} U</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[10px] text-muted-foreground">{t("withdraw.fee")}</div>
+                        <div className="text-xs font-bold" style={{ color: "#ef4444" }}>-{parseFloat(w.fee).toFixed(2)} U</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[10px] text-muted-foreground">{t("withdraw.actual")}</div>
+                        <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(2)} U</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleString()}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
