@@ -7,11 +7,7 @@ import {
   Search, Users, Network, ChevronRight, ChevronDown, Crown,
   GitBranch, UserPlus, Layers, ArrowLeft
 } from "lucide-react";
-
-function shortAddr(addr: string) {
-  if (!addr) return "";
-  return `${addr.slice(0, 8)}...${addr.slice(-4)}`;
-}
+import { CopyableAddress } from "@/components/CopyableAddress";
 
 function TreeNode({ member, depth = 0 }: { member: any; depth?: number }) {
   const [expanded, setExpanded] = useState(false);
@@ -53,9 +49,7 @@ function TreeNode({ member, depth = 0 }: { member: any; depth?: number }) {
         </div>
 
         {/* Address */}
-        <span className="text-xs font-mono text-foreground/80 min-w-0 truncate">
-          {shortAddr(member.walletAddress)}
-        </span>
+        <CopyableAddress address={member.walletAddress} className="text-foreground/80 min-w-0" />
 
         {/* Level badge */}
         <span
@@ -66,7 +60,7 @@ function TreeNode({ member, depth = 0 }: { member: any; depth?: number }) {
             border: member.level > 0 ? "1px solid rgba(201,162,39,0.25)" : "1px solid rgba(255,255,255,0.08)",
           }}
         >
-          {member.level === 0 ? "Normal" : `V${member.level}`}
+          {member.level === 0 ? "普通" : `V${member.level}`}
         </span>
 
         {/* Direct count */}
@@ -76,25 +70,20 @@ function TreeNode({ member, depth = 0 }: { member: any; depth?: number }) {
             <UserPlus size={9} /> {member.directCount}
           </span>
         )}
+      </div>
 
-        {/* Team count */}
-        {member.teamCount > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0 flex items-center gap-0.5"
-            style={{ background: "rgba(59,130,246,0.08)", color: "#3b82f6", border: "1px solid rgba(59,130,246,0.15)" }}>
-            <Users size={9} /> {member.teamCount}
-          </span>
-        )}
-
-        {/* Staking */}
-        <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
-          {parseFloat(member.stakingAmount || "0") > 0
-            ? `${parseFloat(member.stakingAmount).toFixed(0)} U`
-            : "0 U"
-          }
+      {/* Detail row: personal staking, team staking, team active accounts */}
+      <div className="flex items-center gap-3 pl-7 mt-0.5 flex-wrap">
+        <span className="text-[10px] text-muted-foreground">
+          个人投资: <span style={{ color: "#C9A227" }}>{parseFloat(member.stakingAmount || "0").toFixed(0)}U</span>
         </span>
-
-        {/* Registered date */}
-        <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:inline">
+        <span className="text-[10px] text-muted-foreground">
+          伞下总投资: <span style={{ color: "#3b82f6" }}>{(member.teamStaking || 0).toFixed(0)}U</span>
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          有效账户: <span style={{ color: "#22c55e" }}>{member.teamActiveAccounts || 0}</span>
+        </span>
+        <span className="text-[10px] text-muted-foreground hidden sm:inline">
           {new Date(member.createdAt).toLocaleDateString()}
         </span>
       </div>

@@ -1,18 +1,15 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, hasPermission } from "@/lib/api";
+import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, hasPermission, adminCreateOrderForMember, adminCancelOrder } from "@/lib/api";
+import { PRODUCTS } from "../../../shared/schema";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save, Plus, X, Package } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-
-function shortAddr(addr: string) {
-  if (!addr) return "";
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
+import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
 
 function TeamTree({ rootAddress }: { rootAddress: string }) {
   const [drillPath, setDrillPath] = useState<string[]>([]);
@@ -35,7 +32,7 @@ function TeamTree({ rootAddress }: { rootAddress: string }) {
             <ArrowLeft size={12} /> 返回
           </button>
         )}
-        <div className="text-xs text-muted-foreground font-mono">{shortAddr(currentAddr)}</div>
+        <CopyableAddress address={currentAddr} className="text-muted-foreground" />
       </div>
 
       {isLoading ? (
@@ -48,7 +45,7 @@ function TeamTree({ rootAddress }: { rootAddress: string }) {
             <div key={m.walletAddress} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: "rgba(201,162,39,0.04)" }}>
               <div className="flex items-center gap-2">
                 <Users size={14} style={{ color: "#C9A227" }} />
-                <span className="text-xs font-mono">{shortAddr(m.walletAddress)}</span>
+                <CopyableAddress address={m.walletAddress} />
                 <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227" }}>
                   {m.level === 0 ? "普通" : `V${m.level}`}
                 </span>
@@ -76,6 +73,9 @@ function TeamTree({ rootAddress }: { rootAddress: string }) {
 function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: () => void }) {
   const [showTree, setShowTree] = useState(false);
   const [editLevel, setEditLevel] = useState<number | null>(null);
+  const [showAddOrder, setShowAddOrder] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0].id);
+  const [orderAmount, setOrderAmount] = useState("");
   const { toast } = useToast();
   const m = data.member;
   const canWrite = hasPermission("members.write");
@@ -92,6 +92,36 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
     },
     onError: (err: any) => toast({ title: "更新失败", description: err.message, variant: "destructive" }),
   });
+
+  const createOrderMutation = useMutation({
+    mutationFn: async () => {
+      const amount = parseFloat(orderAmount);
+      if (!amount || amount <= 0) throw new Error("请输入有效金额");
+      await adminCreateOrderForMember(m.walletAddress, selectedProduct, amount);
+      await adminAddLog("为会员添加配套", "member", m.walletAddress, { productId: selectedProduct, amount });
+    },
+    onSuccess: () => {
+      toast({ title: "配套添加成功" });
+      setShowAddOrder(false);
+      setOrderAmount("");
+      onLevelChanged?.();
+    },
+    onError: (err: any) => toast({ title: "添加失败", description: err.message, variant: "destructive" }),
+  });
+
+  const cancelOrderMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      await adminCancelOrder(orderId);
+      await adminAddLog("取消会员配套", "member", m.walletAddress, { orderId });
+    },
+    onSuccess: () => {
+      toast({ title: "配套已取消" });
+      onLevelChanged?.();
+    },
+    onError: (err: any) => toast({ title: "取消失败", description: err.message, variant: "destructive" }),
+  });
+
+  const currentProduct = PRODUCTS.find(p => p.id === selectedProduct);
 
   return (
     <div className="space-y-4 text-sm">
@@ -165,23 +195,121 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
         </div>
       )}
 
-      {data.orders?.length > 0 && (
-        <div>
-          <div className="font-semibold text-xs mb-2" style={{ color: "#C9A227" }}>订单 ({data.orders.length})</div>
+      {/* 投资配套管理 */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="font-semibold text-xs flex items-center gap-1" style={{ color: "#C9A227" }}>
+            <Package size={14} /> 投资配套 ({data.orders?.length || 0})
+          </div>
+          {canWrite && (
+            <button
+              onClick={() => setShowAddOrder(!showAddOrder)}
+              className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg"
+              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", fontWeight: 600, minHeight: "30px" }}
+            >
+              <Plus size={12} /> 添加配套
+            </button>
+          )}
+        </div>
+
+        {showAddOrder && (
+          <div className="p-3 rounded-lg mb-3 space-y-2.5" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.2)" }}>
+            <div>
+              <div className="text-[10px] text-muted-foreground mb-1">选择产品</div>
+              <select
+                value={selectedProduct}
+                onChange={e => { setSelectedProduct(parseInt(e.target.value)); setOrderAmount(""); }}
+                className="w-full text-xs rounded px-2 py-1.5"
+                style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
+              >
+                {PRODUCTS.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} - {p.days}天 {p.dailyRate}%/日</option>
+                ))}
+              </select>
+            </div>
+            {currentProduct && (
+              <div className="flex gap-2 text-[10px] text-muted-foreground">
+                <span>周期: {currentProduct.days}天</span>
+                <span>日利率: {currentProduct.dailyRate}%</span>
+                <span>最低: {currentProduct.minAmount}U</span>
+              </div>
+            )}
+            <div>
+              <div className="text-[10px] text-muted-foreground mb-1">投资金额 (USDT)</div>
+              <Input
+                type="number"
+                value={orderAmount}
+                onChange={e => setOrderAmount(e.target.value)}
+                placeholder={`最低 ${currentProduct?.minAmount || 200} USDT`}
+                className="text-xs"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "36px" }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1 text-xs"
+                style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "34px" }}
+                onClick={() => createOrderMutation.mutate()}
+                disabled={createOrderMutation.isPending}
+              >
+                {createOrderMutation.isPending ? "添加中..." : "确认添加"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                style={{ border: "1px solid rgba(201,162,39,0.2)", minHeight: "34px" }}
+                onClick={() => { setShowAddOrder(false); setOrderAmount(""); }}
+              >
+                取消
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {data.orders?.length > 0 ? (
           <div className="space-y-1.5">
             {data.orders.map((o: any) => (
               <div key={o.id} className="flex items-center justify-between p-2 rounded" style={{ background: "rgba(201,162,39,0.04)" }}>
-                <span className="text-xs">{o.product_name || o.productName}</span>
-                <span className="text-xs font-semibold">{parseFloat(o.amount).toFixed(2)} U</span>
-                <span className="text-xs px-1.5 py-0.5 rounded"
-                  style={{ background: o.status === "active" ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.05)", color: o.status === "active" ? "#22c55e" : "#888" }}>
-                  {o.status === "active" ? "进行中" : "已完成"}
-                </span>
+                <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium">{o.product_name || o.productName}</span>
+                    <span className="text-xs font-semibold">{parseFloat(o.amount).toFixed(0)} U</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {new Date(o.start_date || o.startDate).toLocaleDateString()} ~ {new Date(o.end_date || o.endDate).toLocaleDateString()}
+                    {o.total_earned || o.totalEarned ? ` · 已赚 ${parseFloat(o.total_earned || o.totalEarned || "0").toFixed(2)}U` : ""}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs px-1.5 py-0.5 rounded"
+                    style={{
+                      background: o.status === "active" ? "rgba(34,197,94,0.1)" : o.status === "cancelled" ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)",
+                      color: o.status === "active" ? "#22c55e" : o.status === "cancelled" ? "#ef4444" : "#888"
+                    }}>
+                    {o.status === "active" ? "进行中" : o.status === "cancelled" ? "已取消" : "已完成"}
+                  </span>
+                  {canWrite && o.status === "active" && (
+                    <button
+                      onClick={() => { if (confirm("确定要取消该配套吗？")) cancelOrderMutation.mutate(o.id); }}
+                      className="p-1 rounded flex items-center justify-center"
+                      style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", minWidth: "24px", minHeight: "24px" }}
+                      title="取消配套"
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="text-center text-muted-foreground text-xs py-3" style={{ background: "rgba(201,162,39,0.03)", borderRadius: "8px" }}>
+            暂无投资配套
+          </div>
+        )}
+      </div>
 
       {data.withdrawals?.length > 0 && (
         <div>
@@ -208,7 +336,7 @@ function MemberCard({ m, onView }: { m: any; onView: () => void }) {
     <div className="rounded-xl p-3 space-y-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.12)" }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs">{shortAddr(m.walletAddress)}</span>
+          <CopyableAddress address={m.walletAddress} />
           <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>
             {m.level === 0 ? "普通" : `V${m.level}`}
           </span>
@@ -240,11 +368,12 @@ export default function Members() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [levelFilter, setLevelFilter] = useState<number | null>(null);
   const [detailAddr, setDetailAddr] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/admin/members", `?page=${page}&limit=20&search=${search}`],
-    queryFn: () => getAdminMembers(page, 20, search),
+    queryKey: ["/api/admin/members", `?page=${page}&limit=20&search=${search}&level=${levelFilter}`],
+    queryFn: () => getAdminMembers(page, 20, search, levelFilter),
   });
 
   const { data: detail } = useQuery({
@@ -279,6 +408,20 @@ export default function Members() {
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "40px" }}
           />
         </div>
+        <select
+          value={levelFilter === null ? "all" : levelFilter.toString()}
+          onChange={e => {
+            const v = e.target.value;
+            setLevelFilter(v === "all" ? null : parseInt(v));
+            setPage(1);
+          }}
+          className="text-xs rounded px-2 shrink-0"
+          style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "40px", minWidth: "80px" }}
+        >
+          <option value="all">全部等级</option>
+          <option value="0">普通</option>
+          {[1,2,3,4,5,6,7].map(v => <option key={v} value={v}>V{v}</option>)}
+        </select>
         <Button data-testid="button-search" onClick={handleSearch} className="text-sm" style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "40px" }}>
           搜索
         </Button>

@@ -2,13 +2,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
-import { getAdminWithdrawals, updateWithdrawalStatus, getPendingWithdrawals, markWithdrawalsProcessed, adminAddLog } from "@/lib/api";
+import { getAdminWithdrawals, updateWithdrawalStatus, triggerAutoWithdraw, adminAddLog } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { useActiveAccount } from "thirdweb/react";
-import { useSendTransaction } from "thirdweb/react";
-import { prepareContractCall } from "thirdweb";
-import { getWithdrawalContract, parseUSDT } from "@/lib/contracts";
 import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink } from "lucide-react";
+import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
 
 const STATUS_TABS = [
   { value: "all", label: "全部" },
@@ -17,11 +14,6 @@ const STATUS_TABS = [
   { value: "completed", label: "已完成" },
   { value: "rejected", label: "已拒绝" },
 ];
-
-function shortAddr(addr: string) {
-  if (!addr) return "";
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
 
 function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => void; onReject: () => void }) {
   const statusMap: Record<string, { label: string; color: string; bg: string }> = {
@@ -62,7 +54,7 @@ function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => v
           </div>
         )}
       </div>
-      <div className="text-xs font-mono text-muted-foreground">{shortAddr(w.walletAddress)}</div>
+      <CopyableAddress address={w.walletAddress} className="text-muted-foreground" />
       <div className="grid grid-cols-4 gap-2">
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">金额</div>

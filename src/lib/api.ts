@@ -401,12 +401,15 @@ export async function getAdminDashboard() {
   return data;
 }
 
-export async function getAdminMembers(page: number, limit: number, search: string) {
+export async function getAdminMembers(page: number, limit: number, search: string, levelFilter?: number | null) {
   const offset = (page - 1) * limit;
 
   let query = supabase.from("members").select("*", { count: "exact" });
   if (search) {
     query = query.ilike("wallet_address", `%${search}%`);
+  }
+  if (levelFilter !== null && levelFilter !== undefined && levelFilter >= 0) {
+    query = query.eq("level", levelFilter);
   }
   const { data: memberList, count, error } = await query
     .order("created_at", { ascending: false })
@@ -473,9 +476,19 @@ export async function getAdminTeamTree(rootAddress: string) {
 
   const result = [];
   for (const d of directs || []) {
+    // Personal active staking
     const { data: activeOrders } = await supabase.from("orders").select("amount").eq("wallet_address", d.wallet_address).eq("status", "active");
     const stakingAmount = (activeOrders || []).reduce((sum, o) => sum + parseFloat(o.amount), 0);
     const { count: childrenCount } = await supabase.from("members").select("*", { count: "exact", head: true }).eq("referrer_address", d.wallet_address);
+
+    // Team stats (umbrella total staking & active accounts)
+    let teamStaking = 0;
+    let teamActiveAccounts = 0;
+    const teamData = await supabase.rpc("get_team_stats", { root_address: d.wallet_address });
+    if (teamData.data) {
+      teamStaking = parseFloat(teamData.data.totalStaking || "0");
+      teamActiveAccounts = teamData.data.totalAccounts || 0;
+    }
 
     result.push({
       ...d,
@@ -484,6 +497,8 @@ export async function getAdminTeamTree(rootAddress: string) {
       lifetimeLock: d.lifetime_lock,
       createdAt: d.created_at,
       stakingAmount,
+      teamStaking,
+      teamActiveAccounts,
       childrenCount: childrenCount || 0,
       hasChildren: (childrenCount || 0) > 0,
     });
@@ -491,12 +506,24 @@ export async function getAdminTeamTree(rootAddress: string) {
   return result;
 }
 
-export async function getAdminOrders(page: number, limit: number, status: string) {
+export async function getAdminOrders(page: number, limit: number, status: string, filters?: { search?: string; productId?: number | null; dateFrom?: string; dateTo?: string }) {
   const offset = (page - 1) * limit;
 
   let query = supabase.from("orders").select("*", { count: "exact" });
   if (status && status !== "all") {
     query = query.eq("status", status);
+  }
+  if (filters?.search) {
+    query = query.ilike("wallet_address", `%${filters.search}%`);
+  }
+  if (filters?.productId) {
+    query = query.eq("product_id", filters.productId);
+  }
+  if (filters?.dateFrom) {
+    query = query.gte("start_date", filters.dateFrom);
+  }
+  if (filters?.dateTo) {
+    query = query.lte("start_date", filters.dateTo + "T23:59:59");
   }
   const { data: orderList, count, error } = await query
     .order("start_date", { ascending: false })
@@ -676,12 +703,22 @@ export async function getAdminReferralTree(search?: string, parentAddr?: string)
     const staking = await getMemberStaking(m.wallet_address);
     const { count: directCount } = await supabase.from("members").select("*", { count: "exact", head: true }).eq("referrer_address", m.wallet_address);
 
+    let teamStaking = 0;
+    let teamActiveAccounts = 0;
+    const teamData = await supabase.rpc("get_team_stats", { root_address: m.wallet_address });
+    if (teamData.data) {
+      teamStaking = parseFloat(teamData.data.totalStaking || "0");
+      teamActiveAccounts = teamData.data.totalAccounts || 0;
+    }
+
     enriched.push({
       ...m,
       walletAddress: m.wallet_address,
       referrerAddress: m.referrer_address,
       createdAt: m.created_at,
       stakingAmount: staking.toFixed(6),
+      teamStaking,
+      teamActiveAccounts,
       directCount: directCount || 0,
       teamCount: 0,
       hasChildren: (directCount || 0) > 0,
@@ -789,6 +826,50 @@ export async function deleteAdminUser(id: number) {
   const { data, error } = await supabase.rpc("admin_delete_user", {
     p_id: id, p_caller_id: session.id,
   });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function adminCreateOrderForMember(walletAddress: string, productId: number, amount: number) {
+  const { PRODUCTS } = await import("../../shared/schema");
+  const product = PRODUCTS.find(p => p.id === productId);
+  if (!product) throw new Error("产品不存在");
+  if (amount < product.minAmount) throw new Error(`最低投资 ${product.minAmount} USDT`);
+  if (amount % product.minAmount !== 0) throw new Error(`金额必须是 ${product.minAmount} 的倍数`);
+
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + product.days);
+
+  const { data, error } = await supabase
+    .from("orders")
+    .insert({
+      wallet_address: walletAddress.toLowerCase(),
+      product_id: productId,
+      product_name: product.name,
+      amount: amount.toString(),
+      daily_rate: product.dailyRate.toString(),
+      days: product.days,
+      end_date: endDate.toISOString(),
+      tx_hash: null,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+
+  await supabase.rpc("process_wallet_orders", { p_wallet_address: walletAddress.toLowerCase() }).then(() => {});
+  await supabase.rpc("check_and_upgrade_level", { p_wallet_address: walletAddress.toLowerCase() }).then(() => {});
+
+  return data;
+}
+
+export async function adminCancelOrder(orderId: number) {
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ status: "cancelled" })
+    .eq("id", orderId)
+    .eq("status", "active")
+    .select()
+    .single();
   if (error) throw new Error(error.message);
   return data;
 }

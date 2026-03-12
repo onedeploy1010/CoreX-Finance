@@ -9,6 +9,7 @@ import { queryClient } from "@/lib/queryClient";
 import { registerMember, createOrder, getMember } from "@/lib/api";
 import { TrendingUp, Clock, DollarSign, Shield, UserPlus, Loader2 } from "lucide-react";
 import { PRODUCTS } from "@shared/schema";
+import { t } from "@/lib/i18n";
 import {
   prepareApproveUSDT,
   prepareInvest,
@@ -49,16 +50,16 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
 
   const handleInvest = async () => {
     if (!account) {
-      toast({ title: "请先连接钱包", variant: "destructive" });
+      toast({ title: t("invest.connect_wallet"), variant: "destructive" });
       return;
     }
     const amt = parseFloat(amount);
     if (!amount || amt < product.minAmount) {
-      toast({ title: `最低投入 ${product.minAmount} USDT`, variant: "destructive" });
+      toast({ title: t("invest.min_amount", undefined, { amount: product.minAmount }), variant: "destructive" });
       return;
     }
     if (amt % product.minAmount !== 0) {
-      toast({ title: `投资金额必须是 ${product.minAmount} USDT 的倍数`, variant: "destructive" });
+      toast({ title: t("invest.multiple_amount", undefined, { amount: product.minAmount }), variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -81,7 +82,7 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
       const txHash = result.transactionHash;
 
       if (!txHash) {
-        toast({ title: "Transaction failed", variant: "destructive" });
+        toast({ title: t("invest.tx_failed"), variant: "destructive" });
         return;
       }
 
@@ -108,17 +109,17 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
       queryClient.invalidateQueries({ queryKey: ["/api/members", account.address.toLowerCase(), "team-stats"] });
 
       toast({
-        title: "Investment Successful",
-        description: `${amount} USDT invested in ${product.nameEn}`,
+        title: t("invest.success"),
+        description: t("invest.success_desc", undefined, { amount, product: product.name }),
       });
       onClose();
       setAmount("");
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg.includes("user rejected") || msg.includes("User denied")) {
-        toast({ title: "Transaction Cancelled", variant: "destructive" });
+        toast({ title: t("invest.cancelled"), variant: "destructive" });
       } else {
-        toast({ title: "Investment Failed", description: msg, variant: "destructive" });
+        toast({ title: t("invest.failed"), description: msg, variant: "destructive" });
       }
     } finally {
       setLoading(false);
@@ -128,10 +129,10 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
 
   const getButtonText = () => {
     switch (step) {
-      case "approving": return "Approving USDT...";
-      case "investing": return "Confirming Transaction...";
-      case "confirming": return "Creating Order...";
-      default: return loading ? "Processing..." : "确认投资";
+      case "approving": return t("invest.approving");
+      case "investing": return t("invest.confirming_tx");
+      case "confirming": return t("invest.creating_order");
+      default: return loading ? t("invest.processing") : t("invest.confirm");
     }
   };
 
@@ -291,7 +292,7 @@ export default function HomePage() {
       // Need ref param
       const ref = new URLSearchParams(window.location.search).get("ref");
       if (!ref) {
-        toast({ title: "需要邀请链接", description: "请通过邀请链接注册", variant: "destructive" });
+        toast({ title: t("register.need_referral"), description: t("register.need_referral_desc"), variant: "destructive" });
         return;
       }
 
@@ -300,7 +301,7 @@ export default function HomePage() {
       if (refAddr === addr) return;
       const referrer = await getMember(refAddr);
       if (!referrer) {
-        toast({ title: "邀请人不存在", variant: "destructive" });
+        toast({ title: t("register.referrer_not_found"), variant: "destructive" });
         return;
       }
 
@@ -315,15 +316,15 @@ export default function HomePage() {
     setRegisterLoading(true);
     try {
       await registerMember(account.address, referrerInfo.address);
-      toast({ title: "注册成功", description: "已绑定推荐关系" });
+      toast({ title: t("register.success"), description: t("register.success_desc") });
       setRegisterDialogOpen(false);
       setReferrerInfo(null);
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg === "REFERRER_NOT_INVESTED") {
-        toast({ title: "邀请人尚未投资", description: "邀请人需要先投资才能邀请他人", variant: "destructive" });
+        toast({ title: t("register.referrer_not_invested"), description: t("register.referrer_not_invested_desc"), variant: "destructive" });
       } else {
-        toast({ title: "注册失败", description: msg, variant: "destructive" });
+        toast({ title: t("register.failed"), description: msg, variant: "destructive" });
       }
     } finally {
       setRegisterLoading(false);
@@ -334,7 +335,7 @@ export default function HomePage() {
     if (account?.address) {
       const member = await getMember(account.address.toLowerCase());
       if (!member) {
-        toast({ title: "需要邀请链接", description: "请通过邀请链接注册后投资", variant: "destructive" });
+        toast({ title: t("invest.need_referral"), description: t("invest.need_referral_desc"), variant: "destructive" });
         return;
       }
     }
@@ -438,10 +439,10 @@ export default function HomePage() {
         >
           <DialogHeader>
             <DialogTitle className="text-center" style={{ color: "#C9A227" }}>
-              确认注册
+              {t("register.confirm_title")}
             </DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground">
-              确认绑定推荐关系
+              {t("register.confirm_desc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -456,7 +457,7 @@ export default function HomePage() {
 
             {referrerInfo && (
               <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
-                <div className="text-xs text-muted-foreground text-center mb-2">您的推荐人</div>
+                <div className="text-xs text-muted-foreground text-center mb-2">{t("register.your_referrer")}</div>
                 <div className="text-center">
                   <div className="font-mono font-bold text-sm" style={{ color: "#f5e6b8" }}>
                     {referrerInfo.address.slice(0, 6)}****{referrerInfo.address.slice(-4)}
@@ -477,11 +478,11 @@ export default function HomePage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield size={12} style={{ color: "#C9A227" }} />
-                <span>绑定后推荐关系不可更改</span>
+                <span>{t("register.bind_note")}</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield size={12} style={{ color: "#C9A227" }} />
-                <span>注册后即可开始投资理财</span>
+                <span>{t("register.invest_note")}</span>
               </div>
             </div>
 
@@ -493,7 +494,7 @@ export default function HomePage() {
                 onClick={() => setRegisterDialogOpen(false)}
                 disabled={registerLoading}
               >
-                取消
+                {t("register.cancel")}
               </Button>
               <Button
                 className="flex-1 font-bold text-sm"
@@ -501,7 +502,7 @@ export default function HomePage() {
                 onClick={handleConfirmRegister}
                 disabled={registerLoading}
               >
-                {registerLoading ? <><Loader2 size={14} className="mr-1 animate-spin" />注册中...</> : "确认注册"}
+                {registerLoading ? <><Loader2 size={14} className="mr-1 animate-spin" />{t("register.registering")}</> : t("register.confirm")}
               </Button>
             </div>
           </div>

@@ -194,6 +194,103 @@ const translations: Record<string, Record<Lang, string>> = {
     zh: "全部", en: "All", ja: "全額", ko: "전액", vi: "Tất cả",
   },
 
+  // --- Invest toast ---
+  "invest.success": {
+    zh: "投资成功", en: "Investment Successful", ja: "投資成功", ko: "투자 성공", vi: "Đầu tư thành công",
+  },
+  "invest.success_desc": {
+    zh: "已投资 {amount} USDT 到 {product}", en: "{amount} USDT invested in {product}", ja: "{amount} USDT を {product} に投資しました", ko: "{amount} USDT를 {product}에 투자했습니다", vi: "Đã đầu tư {amount} USDT vào {product}",
+  },
+  "invest.connect_wallet": {
+    zh: "请先连接钱包", en: "Please connect wallet first", ja: "先にウォレットを接続してください", ko: "먼저 지갑을 연결하세요", vi: "Vui lòng kết nối ví trước",
+  },
+  "invest.min_amount": {
+    zh: "最低投入 {amount} USDT", en: "Minimum investment {amount} USDT", ja: "最低投資額 {amount} USDT", ko: "최소 투자 {amount} USDT", vi: "Đầu tư tối thiểu {amount} USDT",
+  },
+  "invest.multiple_amount": {
+    zh: "投资金额必须是 {amount} USDT 的倍数", en: "Amount must be a multiple of {amount} USDT", ja: "投資額は {amount} USDT の倍数でなければなりません", ko: "금액은 {amount} USDT의 배수여야 합니다", vi: "Số tiền phải là bội số của {amount} USDT",
+  },
+  "invest.cancelled": {
+    zh: "交易已取消", en: "Transaction Cancelled", ja: "取引キャンセル", ko: "거래 취소됨", vi: "Giao dịch đã hủy",
+  },
+  "invest.failed": {
+    zh: "投资失败", en: "Investment Failed", ja: "投資失敗", ko: "투자 실패", vi: "Đầu tư thất bại",
+  },
+  "invest.need_referral": {
+    zh: "需要邀请链接", en: "Referral link required", ja: "招待リンクが必要です", ko: "추천 링크 필요", vi: "Cần liên kết giới thiệu",
+  },
+  "invest.need_referral_desc": {
+    zh: "请通过邀请链接注册后投资", en: "Please register via referral link to invest", ja: "招待リンクから登録して投資してください", ko: "추천 링크로 등록 후 투자하세요", vi: "Vui lòng đăng ký qua liên kết giới thiệu để đầu tư",
+  },
+  "invest.approving": {
+    zh: "授权USDT中...", en: "Approving USDT...", ja: "USDT承認中...", ko: "USDT 승인 중...", vi: "Đang phê duyệt USDT...",
+  },
+  "invest.confirming_tx": {
+    zh: "确认交易中...", en: "Confirming Transaction...", ja: "取引確認中...", ko: "거래 확인 중...", vi: "Đang xác nhận giao dịch...",
+  },
+  "invest.creating_order": {
+    zh: "创建订单中...", en: "Creating Order...", ja: "注文作成中...", ko: "주문 생성 중...", vi: "Đang tạo đơn hàng...",
+  },
+  "invest.processing": {
+    zh: "处理中...", en: "Processing...", ja: "処理中...", ko: "처리 중...", vi: "Đang xử lý...",
+  },
+  "invest.confirm": {
+    zh: "确认投资", en: "Confirm Investment", ja: "投資確認", ko: "투자 확인", vi: "Xác nhận đầu tư",
+  },
+  "invest.tx_failed": {
+    zh: "交易失败", en: "Transaction Failed", ja: "取引失敗", ko: "거래 실패", vi: "Giao dịch thất bại",
+  },
+
+  // --- Register toast ---
+  "register.success": {
+    zh: "注册成功", en: "Registration Successful", ja: "登録成功", ko: "등록 성공", vi: "Đăng ký thành công",
+  },
+  "register.success_desc": {
+    zh: "已绑定推荐关系", en: "Referral relationship bound", ja: "紹介関係がバインドされました", ko: "추천 관계 연결됨", vi: "Đã liên kết quan hệ giới thiệu",
+  },
+  "register.failed": {
+    zh: "注册失败", en: "Registration Failed", ja: "登録失敗", ko: "등록 실패", vi: "Đăng ký thất bại",
+  },
+  "register.referrer_not_invested": {
+    zh: "邀请人尚未投资", en: "Referrer has not invested", ja: "招待者がまだ投資していません", ko: "추천인이 아직 투자하지 않았습니다", vi: "Người giới thiệu chưa đầu tư",
+  },
+  "register.referrer_not_invested_desc": {
+    zh: "邀请人需要先投资才能邀请他人", en: "Referrer must invest before inviting others", ja: "招待者は他の人を招待する前に投資する必要があります", ko: "추천인은 다른 사람을 초대하기 전에 투자해야 합니다", vi: "Người giới thiệu cần đầu tư trước khi mời người khác",
+  },
+  "register.need_referral": {
+    zh: "需要邀请链接", en: "Referral link required", ja: "招待リンクが必要です", ko: "추천 링크 필요", vi: "Cần liên kết giới thiệu",
+  },
+  "register.need_referral_desc": {
+    zh: "请通过邀请链接注册", en: "Please register via referral link", ja: "招待リンクから登録してください", ko: "추천 링크로 등록하세요", vi: "Vui lòng đăng ký qua liên kết giới thiệu",
+  },
+  "register.referrer_not_found": {
+    zh: "邀请人不存在", en: "Referrer not found", ja: "招待者が見つかりません", ko: "추천인을 찾을 수 없습니다", vi: "Không tìm thấy người giới thiệu",
+  },
+  "register.confirm_title": {
+    zh: "确认注册", en: "Confirm Registration", ja: "登録確認", ko: "등록 확인", vi: "Xác nhận đăng ký",
+  },
+  "register.confirm_desc": {
+    zh: "确认绑定推荐关系", en: "Confirm referral binding", ja: "紹介関係のバインドを確認", ko: "추천 관계 연결 확인", vi: "Xác nhận liên kết giới thiệu",
+  },
+  "register.your_referrer": {
+    zh: "您的推荐人", en: "Your Referrer", ja: "あなたの紹介者", ko: "추천인", vi: "Người giới thiệu của bạn",
+  },
+  "register.bind_note": {
+    zh: "绑定后推荐关系不可更改", en: "Referral binding cannot be changed", ja: "バインド後は紹介関係を変更できません", ko: "연결 후 추천 관계 변경 불가", vi: "Không thể thay đổi sau khi liên kết",
+  },
+  "register.invest_note": {
+    zh: "注册后即可开始投资理财", en: "Start investing after registration", ja: "登録後すぐに投資を開始できます", ko: "등록 후 바로 투자 시작", vi: "Bắt đầu đầu tư sau khi đăng ký",
+  },
+  "register.cancel": {
+    zh: "取消", en: "Cancel", ja: "キャンセル", ko: "취소", vi: "Hủy",
+  },
+  "register.confirm": {
+    zh: "确认注册", en: "Confirm", ja: "登録確認", ko: "등록 확인", vi: "Xác nhận",
+  },
+  "register.registering": {
+    zh: "注册中...", en: "Registering...", ja: "登録中...", ko: "등록 중...", vi: "Đang đăng ký...",
+  },
+
   // --- Common ---
   "common.days": {
     zh: "天", en: "days", ja: "日", ko: "일", vi: "ngày",
@@ -203,9 +300,15 @@ const translations: Record<string, Record<Lang, string>> = {
   },
 };
 
-export function t(key: string, lang?: Lang): string {
+export function t(key: string, lang?: Lang, vars?: Record<string, string | number>): string {
   const l = lang || getLang();
-  return translations[key]?.[l] || translations[key]?.["zh"] || key;
+  let text = translations[key]?.[l] || translations[key]?.["zh"] || key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      text = text.replace(`{${k}}`, String(v));
+    }
+  }
+  return text;
 }
 
 export function shortAddr(addr: string): string {
