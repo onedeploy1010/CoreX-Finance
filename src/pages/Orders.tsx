@@ -31,10 +31,15 @@ export default function OrdersPage() {
   });
 
   const totalEarnings = parseFloat((earningsData as any)?.totalEarnings || "0");
-  const totalDailyEarnings = parseFloat((earningsData as any)?.dailyRewards || "0");
 
   // Only product/daily earnings
   const dailyRewards = (rewardList as any[]).filter((r: any) => r.type === "daily");
+
+  // Today's daily earnings only
+  const today = new Date().toDateString();
+  const todayDailyEarnings = dailyRewards
+    .filter((r: any) => new Date(r.createdAt).toDateString() === today)
+    .reduce((s: number, r: any) => s + parseFloat(r.amount || "0"), 0);
 
   if (!account) {
     return (
@@ -65,7 +70,7 @@ export default function OrdersPage() {
             <span className="text-[10px] text-muted-foreground">日收益</span>
           </div>
           <div className="font-black text-lg" style={{ color: "#E8C547" }}>
-            {totalDailyEarnings.toFixed(2)}
+            {todayDailyEarnings.toFixed(2)}
           </div>
           <div className="text-[10px] text-muted-foreground">USDT</div>
         </div>
