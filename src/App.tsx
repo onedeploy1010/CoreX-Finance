@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -5,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThirdwebProvider } from "thirdweb/react";
 import { Layout } from "@/components/Layout";
+import LandingPage from "@/pages/Landing";
 import HomePage from "@/pages/Home";
 import OrdersPage from "@/pages/Orders";
 import InvitePage from "@/pages/Invite";
@@ -23,6 +25,7 @@ import AdminSettings from "@/pages/admin/Settings";
 import AdminManagement from "@/pages/admin/Admins";
 import AdminLogs from "@/pages/admin/Logs";
 import ContractSetup from "@/pages/admin/ContractSetup";
+import AdminMedia from "@/pages/admin/Media";
 
 function FrontendRoutes() {
   return (
@@ -53,6 +56,7 @@ function AdminRoutes() {
         <Route path="/admin/admins" component={AdminManagement} />
         <Route path="/admin/logs" component={AdminLogs} />
         <Route path="/admin/contract" component={ContractSetup} />
+        <Route path="/admin/media" component={AdminMedia} />
         <Route>{() => { window.location.href = "/admin/dashboard"; return null; }}</Route>
       </Switch>
     </AdminLayout>
@@ -61,12 +65,23 @@ function AdminRoutes() {
 
 function AppRouter() {
   const [location] = useLocation();
+  const [entered, setEntered] = useState(() => {
+    try { return sessionStorage.getItem("corex_entered") === "1"; } catch { return false; }
+  });
+
+  const handleEnter = () => {
+    setEntered(true);
+    try { sessionStorage.setItem("corex_entered", "1"); } catch {}
+  };
 
   if (location === "/admin") {
     return <AdminLogin />;
   }
   if (location.startsWith("/admin/")) {
     return <AdminRoutes />;
+  }
+  if (!entered) {
+    return <LandingPage onEnter={handleEnter} />;
   }
   return <FrontendRoutes />;
 }

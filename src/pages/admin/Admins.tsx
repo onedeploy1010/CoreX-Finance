@@ -30,13 +30,14 @@ const ROLE_PRESETS: Record<string, string[]> = {
     "orders.read", "withdrawals.read", "withdrawals.write",
     "messages.read", "messages.write", "finance.read",
     "settings.read", "settings.write", "admins.read", "admins.write", "logs.read",
+    "media.read", "media.write",
   ],
   finance: [
     "members.read", "referrals.read", "orders.read",
     "withdrawals.read", "withdrawals.write", "finance.read",
   ],
   customer_service: [
-    "members.read", "referrals.read",
+    "members.read", "referrals.read", "media.read", "media.write",
   ],
 };
 
@@ -51,6 +52,7 @@ const PERM_MODULES = [
   { key: "settings", label: "系统设置", hasWrite: true },
   { key: "admins", label: "管理员", hasWrite: true },
   { key: "logs", label: "操作日志", hasWrite: false },
+  { key: "media", label: "Landing Page", hasWrite: true },
 ];
 
 export default function AdminManagement() {
