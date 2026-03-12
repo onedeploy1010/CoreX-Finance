@@ -185,9 +185,6 @@ export async function createOrder(params: {
 }
 
 export async function getOrdersByWallet(walletAddress: string) {
-  // Trigger settlement first
-  await supabase.rpc("process_wallet_orders", { p_wallet_address: walletAddress.toLowerCase() }).then(() => {});
-
   const { data } = await supabase
     .from("orders")
     .select("*")
@@ -211,9 +208,6 @@ export async function getOrdersByWallet(walletAddress: string) {
 
 export async function getEarnings(walletAddress: string) {
   const addr = walletAddress.toLowerCase();
-
-  // Trigger settlement first
-  await supabase.rpc("process_wallet_orders", { p_wallet_address: addr }).then(() => {});
 
   const { data } = await supabase.rpc("get_earnings", { p_wallet_address: addr });
   if (data) return data;
