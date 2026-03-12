@@ -4,7 +4,7 @@ import { getAdminSession, adminLogout } from "@/lib/api";
 import {
   LayoutDashboard, Users, ShoppingCart, ArrowDownToLine,
   MessageSquare, DollarSign, LogOut, Menu, X, Network, Settings,
-  Shield, ScrollText
+  Shield, ScrollText, FileCode
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,6 +20,7 @@ const NAV_ITEMS: { path: string; label: string; icon: any; perm: string }[] = [
   { path: "/admin/settings", label: "系统设置", icon: Settings, perm: "settings.read" },
   { path: "/admin/admins", label: "管理员", icon: Shield, perm: "admins.read" },
   { path: "/admin/logs", label: "操作日志", icon: ScrollText, perm: "logs.read" },
+  { path: "/admin/contract", label: "合约配置", icon: FileCode, perm: "settings.read" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {

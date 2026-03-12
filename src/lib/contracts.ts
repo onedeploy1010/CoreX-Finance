@@ -30,6 +30,34 @@ const FUND_DISTRIBUTOR_ABI = [
     stateMutability: "view",
   },
   {
+    type: "function",
+    name: "setRecipients",
+    inputs: [
+      { type: "address[]", name: "_wallets" },
+      { type: "uint256[]", name: "_percentages" },
+      { type: "string[]", name: "_labels" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "setAuthorizedCaller",
+    inputs: [
+      { type: "address", name: "caller" },
+      { type: "bool", name: "authorized" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "authorizedCallers",
+    inputs: [{ type: "address", name: "" }],
+    outputs: [{ type: "bool" }],
+    stateMutability: "view",
+  },
+  {
     type: "event",
     name: "FundsDistributed",
     inputs: [
@@ -268,4 +296,43 @@ export function getWithdrawalContract() {
     address: COREX_WITHDRAWAL_ADDRESS,
     abi: COREX_WITHDRAWAL_ABI,
   });
+}
+
+// Contract setup helpers
+export function prepareSetRecipients(
+  wallets: string[],
+  percentages: bigint[],
+  labels: string[]
+) {
+  return prepareContractCall({
+    contract: getDistributorContract(),
+    method: "setRecipients",
+    params: [wallets, percentages, labels],
+  });
+}
+
+export function prepareSetAuthorizedCaller(caller: string, authorized: boolean) {
+  return prepareContractCall({
+    contract: getDistributorContract(),
+    method: "setAuthorizedCaller",
+    params: [caller, authorized],
+  });
+}
+
+export async function getDistributorRecipients() {
+  const result = await readContract({
+    contract: getDistributorContract(),
+    method: "getRecipients",
+    params: [],
+  });
+  return result;
+}
+
+export async function isAuthorizedCaller(address: string): Promise<boolean> {
+  const result = await readContract({
+    contract: getDistributorContract(),
+    method: "authorizedCallers",
+    params: [address],
+  });
+  return result as boolean;
 }
