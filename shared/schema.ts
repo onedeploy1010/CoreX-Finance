@@ -71,11 +71,11 @@ export const LEVEL_CONFIG = [
   { level: 3, name: "V3", people: 20, amount: 60000, bonus: 18, subLevel: 2, subCount: 2, lifetimeLock: false },
   { level: 4, name: "V4", people: 80, amount: 200000, bonus: 22, subLevel: 3, subCount: 2, lifetimeLock: false },
   { level: 5, name: "V5", people: 200, amount: 800000, bonus: 26, subLevel: 4, subCount: 2, lifetimeLock: false },
-  { level: 6, name: "V6", people: 500, amount: 3000000, bonus: 30, subLevel: 5, subCount: 2, lifetimeLock: true },
-  { level: 7, name: "V7", people: 1000, amount: 10000000, bonus: 33, subLevel: 6, subCount: 2, lifetimeLock: true },
+  { level: 6, name: "V6", people: 500, amount: 3000000, bonus: 30, subLevel: 5, subCount: 2, lifetimeLock: false },
+  { level: 7, name: "V7", people: 1000, amount: 10000000, bonus: 33, subLevel: 6, subCount: 2, lifetimeLock: false },
 ];
 
-export const EQUAL_LEVEL_BONUS = 10;
+
 export const WITHDRAW_MIN = 30;
 export const WITHDRAW_FEE = 1;
 export const WITHDRAW_MULTIPLE = 10;
