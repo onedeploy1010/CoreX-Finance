@@ -318,10 +318,16 @@ export default function OrdersPage() {
                         <span className="text-right">{r.productName}</span>
                       </>
                     )}
-                    {!r.fromAddress && r.type === "daily" && (
+                    {r.orderAmount && (
+                      <>
+                        <span className="text-muted-foreground">{t("reward.order_amount")}</span>
+                        <span className="text-right">{parseFloat(r.orderAmount).toFixed(0)} U</span>
+                      </>
+                    )}
+                    {!r.fromAddress && r.type === "daily" && !r.productName && (
                       <>
                         <span className="text-muted-foreground">{t("reward.product")}</span>
-                        <span className="text-right">{r.productName || "-"}</span>
+                        <span className="text-right">-</span>
                       </>
                     )}
                     <span className="text-muted-foreground">{t("reward.time")}</span>

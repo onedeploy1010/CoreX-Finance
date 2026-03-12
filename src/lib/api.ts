@@ -269,20 +269,26 @@ export async function getRewardsByWallet(walletAddress: string) {
     .order("created_at", { ascending: false });
 
   const orderCache: Record<number, string> = {};
+  const orderAmountCache: Record<number, string> = {};
   const enriched = [];
   for (const r of data || []) {
     let productName = "";
+    let orderAmount = "";
     if (r.from_order_id) {
-      if (orderCache[r.from_order_id] !== undefined) {
-        productName = orderCache[r.from_order_id];
+      const cacheKey = r.from_order_id;
+      if (orderCache[cacheKey] !== undefined) {
+        productName = orderCache[cacheKey];
+        orderAmount = orderAmountCache[cacheKey];
       } else {
         const { data: order } = await supabase
           .from("orders")
-          .select("product_name")
+          .select("product_name,amount")
           .eq("id", r.from_order_id)
           .single();
         productName = order?.product_name || "";
-        orderCache[r.from_order_id] = productName;
+        orderAmount = order?.amount || "";
+        orderCache[cacheKey] = productName;
+        orderAmountCache[cacheKey] = orderAmount;
       }
     }
     enriched.push({
@@ -291,6 +297,7 @@ export async function getRewardsByWallet(walletAddress: string) {
       amount: r.amount,
       fromAddress: r.from_address || "",
       productName,
+      orderAmount,
       description: r.description,
       createdAt: r.created_at,
     });

@@ -107,7 +107,7 @@ export default function InvitePage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"referral" | "team" | "rewards" | "levels">("referral");
   const [refSubTab, setRefSubTab] = useState<"direct" | "indirect">("direct");
-  const [rewardSubTab, setRewardSubTab] = useState<"direct_referral" | "indirect_referral" | "team_bonus">("direct_referral");
+  const [rewardSubTab, setRewardSubTab] = useState<"direct_referral" | "indirect_referral" | "team_bonus" | "equal_level_bonus">("direct_referral");
   const address = account?.address?.toLowerCase();
 
   const [drillPath, setDrillPath] = useState<string[]>([]);
@@ -159,7 +159,15 @@ export default function InvitePage() {
   const indirectRewards = parseFloat((earningsData as any)?.indirectRewards || "0");
   const teamRewards = parseFloat((earningsData as any)?.teamRewards || "0");
 
-  const filteredRewards = (rewardList as any[]).filter((r: any) => r.type === rewardSubTab);
+  const filteredRewards = (rewardList as any[]).filter((r: any) => {
+    if (rewardSubTab === "equal_level_bonus") {
+      return r.type === "team_bonus" && r.description?.includes("equal-level");
+    }
+    if (rewardSubTab === "team_bonus") {
+      return r.type === "team_bonus" && !r.description?.includes("equal-level");
+    }
+    return r.type === rewardSubTab;
+  });
 
   const referralLink = account?.address
     ? `${window.location.origin}/?ref=${account.address}`
@@ -479,6 +487,7 @@ export default function InvitePage() {
               { key: "direct_referral" as const, label: "直推奖励" },
               { key: "indirect_referral" as const, label: "间推奖励" },
               { key: "team_bonus" as const, label: "团队奖励" },
+              { key: "equal_level_bonus" as const, label: "同级奖励" },
             ]).map(({ key, label }) => (
               <button
                 key={key}
@@ -502,23 +511,44 @@ export default function InvitePage() {
             filteredRewards.map((reward: any) => (
               <div
                 key={reward.id}
-                className="product-card rounded-xl p-3 flex items-center justify-between gap-3"
+                className="product-card rounded-xl p-3 space-y-2"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                    style={{ background: "rgba(201,162,39,0.12)", border: "1px solid rgba(201,162,39,0.25)" }}>
-                    {rewardSubTab === "direct_referral" ? <Users size={14} style={{ color: "#E8C547" }} /> :
-                     rewardSubTab === "indirect_referral" ? <ChevronRight size={14} style={{ color: "#D4A832" }} /> :
-                     <Award size={14} style={{ color: "#FFD700" }} />}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                      style={{ background: "rgba(201,162,39,0.12)", border: "1px solid rgba(201,162,39,0.25)" }}>
+                      {rewardSubTab === "direct_referral" ? <Users size={13} style={{ color: "#E8C547" }} /> :
+                       rewardSubTab === "indirect_referral" ? <ChevronRight size={13} style={{ color: "#D4A832" }} /> :
+                       rewardSubTab === "equal_level_bonus" ? <Star size={13} style={{ color: "#f97316" }} /> :
+                       <Award size={13} style={{ color: "#FFD700" }} />}
+                    </div>
+                    <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>
+                      {rewardSubTab === "direct_referral" ? "直推奖励" : rewardSubTab === "indirect_referral" ? "间推奖励" : rewardSubTab === "equal_level_bonus" ? "同级奖励" : "团队奖励"}
+                    </span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-xs text-muted-foreground truncate">{reward.description || ""}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(reward.createdAt).toLocaleString()}</div>
-                  </div>
+                  <span className="font-bold text-sm" style={{ color: "#C9A227" }}>+{parseFloat(reward.amount).toFixed(2)} U</span>
                 </div>
-                <div className="text-right shrink-0">
-                  <div className="font-bold text-sm" style={{ color: "#C9A227" }}>+{parseFloat(reward.amount).toFixed(4)}</div>
-                  <div className="text-xs text-muted-foreground">USDT</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs pl-9">
+                  {reward.fromAddress && (
+                    <>
+                      <span className="text-muted-foreground">来源账户</span>
+                      <span className="font-mono text-right">{shortAddr(reward.fromAddress)}</span>
+                    </>
+                  )}
+                  {reward.productName && (
+                    <>
+                      <span className="text-muted-foreground">来源配套</span>
+                      <span className="text-right">{reward.productName}</span>
+                    </>
+                  )}
+                  {reward.orderAmount && (
+                    <>
+                      <span className="text-muted-foreground">配套金额</span>
+                      <span className="text-right">{parseFloat(reward.orderAmount).toFixed(0)} U</span>
+                    </>
+                  )}
+                  <span className="text-muted-foreground">时间</span>
+                  <span className="text-right">{new Date(reward.createdAt).toLocaleString()}</span>
                 </div>
               </div>
             ))
