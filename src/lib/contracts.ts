@@ -3,6 +3,7 @@ import { client, bscChain, USDT_ADDRESS_BSC } from "./thirdweb";
 
 export const FUND_DISTRIBUTOR_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const COREX_INVESTMENT_ADDRESS = "0x0000000000000000000000000000000000000000";
+export const COREX_WITHDRAWAL_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const FUND_DISTRIBUTOR_ABI = [
   {
@@ -195,4 +196,76 @@ export function formatUSDT(amount: bigint): string {
   const whole = str.slice(0, -18) || "0";
   const decimal = str.slice(-18, -12);
   return `${whole}.${decimal}`;
+}
+
+const COREX_WITHDRAWAL_ABI = [
+  {
+    type: "function",
+    name: "batchWithdraw",
+    inputs: [
+      { type: "bytes32", name: "_batchId" },
+      { type: "address[]", name: "_recipients" },
+      { type: "uint256[]", name: "_amounts" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getContractBalance",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "isBatchProcessed",
+    inputs: [{ type: "bytes32", name: "_batchId" }],
+    outputs: [{ type: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "totalWithdrawn",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "totalFeeCollected",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "WithdrawalProcessed",
+    inputs: [
+      { type: "address", name: "recipient", indexed: true },
+      { type: "uint256", name: "amount", indexed: false },
+      { type: "uint256", name: "fee", indexed: false },
+      { type: "bytes32", name: "batchId", indexed: true },
+      { type: "uint256", name: "timestamp", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "BatchProcessed",
+    inputs: [
+      { type: "bytes32", name: "batchId", indexed: true },
+      { type: "uint256", name: "count", indexed: false },
+      { type: "uint256", name: "totalAmount", indexed: false },
+      { type: "uint256", name: "totalFee", indexed: false },
+    ],
+  },
+] as const;
+
+export function getWithdrawalContract() {
+  return getContract({
+    client,
+    chain: bscChain,
+    address: COREX_WITHDRAWAL_ADDRESS,
+    abi: COREX_WITHDRAWAL_ABI,
+  });
 }

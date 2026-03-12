@@ -24,15 +24,18 @@ export default function AdminLogin() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
       toast({ title: "登录成功" });
       const session = getAdminSession();
-      const role = session?.role || "superadmin";
-      // Redirect based on role
-      if (role === "customer_service") {
-        setLocation("/admin/members");
-      } else if (role === "finance") {
-        setLocation("/admin/members");
-      } else {
-        setLocation("/admin/dashboard");
-      }
+      const perms: string[] = session?.permissions || [];
+      // Redirect to first allowed page
+      const navOrder = [
+        { path: "/admin/dashboard", perm: "dashboard.read" },
+        { path: "/admin/members", perm: "members.read" },
+        { path: "/admin/referrals", perm: "referrals.read" },
+        { path: "/admin/orders", perm: "orders.read" },
+        { path: "/admin/withdrawals", perm: "withdrawals.read" },
+        { path: "/admin/finance", perm: "finance.read" },
+      ];
+      const first = navOrder.find(n => perms.includes(n.perm));
+      setLocation(first?.path || "/admin/dashboard");
     } catch (err: any) {
       toast({ title: "登录失败", description: err.message, variant: "destructive" });
     } finally {

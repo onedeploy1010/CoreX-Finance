@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useActiveAccount } from "thirdweb/react";
 import { useQuery } from "@tanstack/react-query";
-import { getTeamStats, getEarnings, getRewardsByWallet, getDirectReferrals, getIndirectReferrals, getTeamTree } from "@/lib/api";
+import { getTeamStats, getEarnings, getRewardsByWallet, getDirectReferrals, getIndirectReferrals, getTeamTree, getMember } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Copy, Users, UserPlus, Crown, ChevronRight, ChevronDown, Star, ArrowLeft, TrendingUp, BarChart3, Loader2, Wallet, Award } from "lucide-react";
 import { LEVEL_CONFIG } from "@shared/schema";
@@ -112,6 +112,12 @@ export default function InvitePage() {
 
   const [drillPath, setDrillPath] = useState<string[]>([]);
   const currentDrillAddr = drillPath.length > 0 ? drillPath[drillPath.length - 1] : address;
+
+  const { data: memberData } = useQuery({
+    queryKey: ["/api/members", address],
+    queryFn: () => getMember(address!),
+    enabled: !!address,
+  });
 
   const { data: teamStats } = useQuery({
     queryKey: ["/api/members", address, "team-stats"],
@@ -251,7 +257,7 @@ export default function InvitePage() {
         </div>
         <div className="stat-card rounded-xl p-3 text-center">
           <Crown size={14} className="mx-auto mb-1" style={{ color: "#C9A227" }} />
-          <div className="font-black text-xl" style={{ color: getLevelColor((teamStats as any)?.level || 0) }}>{getLevelName((teamStats as any)?.level || 0)}</div>
+          <div className="font-black text-xl" style={{ color: getLevelColor((memberData as any)?.level ?? 0) }}>{getLevelName((memberData as any)?.level ?? 0)}</div>
           <div className="text-[10px] text-muted-foreground">当前等级</div>
         </div>
       </div>

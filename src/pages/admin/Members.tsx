@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, getAdminSession } from "@/lib/api";
+import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, hasPermission } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
@@ -78,8 +78,7 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
   const [editLevel, setEditLevel] = useState<number | null>(null);
   const { toast } = useToast();
   const m = data.member;
-  const session = getAdminSession();
-  const isSuperAdmin = session?.role === "superadmin";
+  const canWrite = hasPermission("members.write");
 
   const levelMutation = useMutation({
     mutationFn: async (newLevel: number) => {
@@ -103,7 +102,7 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
         </div>
         <div className="p-2 rounded" style={{ background: "rgba(201,162,39,0.04)" }}>
           <div className="text-[10px] text-muted-foreground">等级</div>
-          {isSuperAdmin ? (
+          {canWrite ? (
             <div className="flex items-center gap-2">
               <select
                 value={editLevel ?? m.level}

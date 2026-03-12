@@ -240,26 +240,11 @@ export async function getEarnings(walletAddress: string) {
 
 // ============ Rewards ============
 
-export async function getRewardsByWallet(walletAddress: string) {
-  await supabase.rpc("process_wallet_orders", { p_wallet_address: walletAddress.toLowerCase() }).then(() => {});
-
-  const { data } = await supabase
-    .from("rewards")
-    .select("*")
-    .eq("wallet_address", walletAddress.toLowerCase())
-    .order("created_at", { ascending: false });
-  return (data || []).map(r => ({
-    ...r,
-    walletAddress: r.wallet_address,
-    fromAddress: r.from_address,
-    fromOrderId: r.from_order_id,
-    createdAt: r.created_at,
-  }));
-}
-
 // ============ Withdrawals ============
 
 export async function createWithdrawal(walletAddress: string, amount: number, fee: number) {
+  if (amount < 30) throw new Error("Minimum withdrawal is 30 USDT");
+  if (amount % 10 !== 0) throw new Error("Amount must be a multiple of 10 USDT");
   const actualAmount = amount - fee;
   const { data, error } = await supabase
     .from("withdrawals")
@@ -273,6 +258,44 @@ export async function createWithdrawal(walletAddress: string, amount: number, fe
     .single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+export async function getRewardsByWallet(walletAddress: string) {
+  const addr = walletAddress.toLowerCase();
+  const { data } = await supabase
+    .from("rewards")
+    .select("*")
+    .eq("wallet_address", addr)
+    .order("created_at", { ascending: false });
+
+  const orderCache: Record<number, string> = {};
+  const enriched = [];
+  for (const r of data || []) {
+    let productName = "";
+    if (r.from_order_id) {
+      if (orderCache[r.from_order_id] !== undefined) {
+        productName = orderCache[r.from_order_id];
+      } else {
+        const { data: order } = await supabase
+          .from("orders")
+          .select("product_name")
+          .eq("id", r.from_order_id)
+          .single();
+        productName = order?.product_name || "";
+        orderCache[r.from_order_id] = productName;
+      }
+    }
+    enriched.push({
+      id: r.id,
+      type: r.type,
+      amount: r.amount,
+      fromAddress: r.from_address || "",
+      productName,
+      description: r.description,
+      createdAt: r.created_at,
+    });
+  }
+  return enriched;
 }
 
 export async function getWithdrawalsByWallet(walletAddress: string) {
@@ -300,7 +323,7 @@ export async function adminLogin(username: string, password: string) {
   if (!data) throw new Error("用户名或密码错误");
 
   // Store admin session in localStorage
-  const session = { id: data.id, username: data.username, role: data.role, token: data.token, timestamp: Date.now() };
+  const session = { id: data.id, username: data.username, role: data.role, permissions: data.permissions || [], token: data.token, timestamp: Date.now() };
   localStorage.setItem("corex_admin", JSON.stringify(session));
   return session;
 }
@@ -638,20 +661,38 @@ export async function getAdminUsers() {
   return data || [];
 }
 
-export async function createAdminUser(username: string, password: string, role: string) {
+export async function createAdminUser(username: string, password: string, role: string, permissions: string[]) {
   const { data, error } = await supabase.rpc("admin_create_user", {
-    p_username: username, p_password: password, p_role: role,
+    p_username: username, p_password: password, p_role: role, p_permissions: JSON.stringify(permissions),
   });
   if (error) throw new Error(error.message);
   return data;
 }
 
-export async function updateAdminUser(id: number, role: string, password?: string) {
+export async function updateAdminUser(id: number, role: string, password?: string, permissions?: string[]) {
   const { data, error } = await supabase.rpc("admin_update_user", {
     p_id: id, p_role: role, p_password: password || null,
+    p_permissions: permissions ? JSON.stringify(permissions) : null,
   });
   if (error) throw new Error(error.message);
   return data;
+}
+
+export function hasPermission(perm: string): boolean {
+  const session = getAdminSession();
+  if (!session) return false;
+  const perms: string[] = session.permissions || [];
+  return perms.includes(perm);
+}
+
+export async function getAutoApproveWithdrawal(): Promise<boolean> {
+  const { data } = await supabase.from("system_settings").select("value").eq("key", "auto_approve_withdrawal").single();
+  return data?.value === "true";
+}
+
+export async function setAutoApproveWithdrawal(enabled: boolean) {
+  const { error } = await supabase.from("system_settings").update({ value: enabled ? "true" : "false" }).eq("key", "auto_approve_withdrawal");
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteAdminUser(id: number) {

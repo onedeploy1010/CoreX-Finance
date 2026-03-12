@@ -3,25 +3,31 @@ import { useLocation, Link } from "wouter";
 import { getAdminSession, adminLogout } from "@/lib/api";
 import {
   LayoutDashboard, Users, ShoppingCart, ArrowDownToLine,
-  MessageSquare, DollarSign, LogOut, Menu, X, ChevronRight, Network, Settings,
+  MessageSquare, DollarSign, LogOut, Menu, X, Network, Settings,
   Shield, ScrollText
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-type AdminRole = "superadmin" | "finance" | "customer_service";
-
-const NAV_ITEMS: { path: string; label: string; icon: any; roles: AdminRole[] }[] = [
-  { path: "/admin/dashboard", label: "统计台", icon: LayoutDashboard, roles: ["superadmin"] },
-  { path: "/admin/members", label: "会员管理", icon: Users, roles: ["superadmin", "finance", "customer_service"] },
-  { path: "/admin/referrals", label: "推荐管理", icon: Network, roles: ["superadmin", "finance", "customer_service"] },
-  { path: "/admin/orders", label: "订单管理", icon: ShoppingCart, roles: ["superadmin", "finance"] },
-  { path: "/admin/withdrawals", label: "提现管理", icon: ArrowDownToLine, roles: ["superadmin", "finance"] },
-  { path: "/admin/messages", label: "消息管理", icon: MessageSquare, roles: ["superadmin"] },
-  { path: "/admin/finance", label: "财务管理", icon: DollarSign, roles: ["superadmin", "finance"] },
-  { path: "/admin/settings", label: "系统设置", icon: Settings, roles: ["superadmin"] },
-  { path: "/admin/admins", label: "管理员", icon: Shield, roles: ["superadmin"] },
-  { path: "/admin/logs", label: "操作日志", icon: ScrollText, roles: ["superadmin"] },
+// Each nav item requires a specific permission to be visible
+const NAV_ITEMS: { path: string; label: string; icon: any; perm: string }[] = [
+  { path: "/admin/dashboard", label: "统计台", icon: LayoutDashboard, perm: "dashboard.read" },
+  { path: "/admin/members", label: "会员管理", icon: Users, perm: "members.read" },
+  { path: "/admin/referrals", label: "推荐管理", icon: Network, perm: "referrals.read" },
+  { path: "/admin/orders", label: "订单管理", icon: ShoppingCart, perm: "orders.read" },
+  { path: "/admin/withdrawals", label: "提现管理", icon: ArrowDownToLine, perm: "withdrawals.read" },
+  { path: "/admin/messages", label: "消息管理", icon: MessageSquare, perm: "messages.read" },
+  { path: "/admin/finance", label: "财务管理", icon: DollarSign, perm: "finance.read" },
+  { path: "/admin/settings", label: "系统设置", icon: Settings, perm: "settings.read" },
+  { path: "/admin/admins", label: "管理员", icon: Shield, perm: "admins.read" },
+  { path: "/admin/logs", label: "操作日志", icon: ScrollText, perm: "logs.read" },
 ];
+
+const ROLE_LABELS: Record<string, string> = {
+  superadmin: "超级管理员",
+  finance: "财务",
+  customer_service: "客服",
+  custom: "自定义",
+};
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -29,6 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { toast } = useToast();
 
   const admin = getAdminSession();
+  const perms: string[] = admin?.permissions || [];
 
   useEffect(() => {
     if (!admin) {
@@ -39,8 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Redirect unauthorized routes on initial load only
   useEffect(() => {
     if (!admin) return;
-    const role = (admin.role || "superadmin") as AdminRole;
-    const allowed = NAV_ITEMS.filter(item => item.roles.includes(role));
+    const allowed = NAV_ITEMS.filter(item => perms.includes(item.perm));
     const isAllowed = allowed.some(item => location === item.path);
     if (!isAllowed && allowed.length > 0) {
       setLocation(allowed[0].path);
@@ -54,9 +60,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setLocation("/admin");
   };
 
-  const adminRole = (admin?.role || "superadmin") as AdminRole;
-  const filteredNav = NAV_ITEMS.filter(item => item.roles.includes(adminRole));
-  const roleLabels: Record<AdminRole, string> = { superadmin: "超级管理员", finance: "财务", customer_service: "客服" };
+  const filteredNav = NAV_ITEMS.filter(item => perms.includes(item.perm));
+  const roleLabel = ROLE_LABELS[admin?.role] || admin?.role || "";
 
   if (!admin) return null;
 
@@ -80,7 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="font-bold text-sm" style={{ color: "#C9A227" }}>CoreX Admin</div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground">{admin.username}</span>
-              <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>{roleLabels[adminRole]}</span>
+              <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>{roleLabel}</span>
             </div>
           </div>
           <button className="lg:hidden ml-auto p-1" onClick={() => setSidebarOpen(false)}>

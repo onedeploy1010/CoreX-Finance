@@ -3,12 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { getSettlementConfig, updateSettlementTime, adminAddLog } from "@/lib/api";
-import { Settings, Clock, Save, Loader2 } from "lucide-react";
+import { getSettlementConfig, updateSettlementTime, adminAddLog, getAutoApproveWithdrawal, setAutoApproveWithdrawal } from "@/lib/api";
+import { Settings, Clock, Save, Loader2, ShieldCheck } from "lucide-react";
 
 export default function AdminSettings() {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [savingAuto, setSavingAuto] = useState(false);
   const [hour, setHour] = useState<number | null>(null);
   const [minute, setMinute] = useState<number | null>(null);
 
@@ -16,6 +17,26 @@ export default function AdminSettings() {
     queryKey: ["/api/admin/settlement-config"],
     queryFn: getSettlementConfig,
   });
+
+  const { data: autoApprove, isLoading: loadingAuto } = useQuery({
+    queryKey: ["/api/admin/auto-approve-withdrawal"],
+    queryFn: getAutoApproveWithdrawal,
+  });
+
+  const handleToggleAutoApprove = async () => {
+    setSavingAuto(true);
+    try {
+      const newVal = !autoApprove;
+      await setAutoApproveWithdrawal(newVal);
+      await adminAddLog("修改提现自动审批", "settings", "auto_approve_withdrawal", { enabled: newVal });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/auto-approve-withdrawal"] });
+      toast({ title: newVal ? "已开启自动审批" : "已关闭自动审批" });
+    } catch (err: any) {
+      toast({ title: "更新失败", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingAuto(false);
+    }
+  };
 
   const cfg = config as any;
   const displayHour = hour ?? (cfg ? ((parseInt(cfg.utcHour) + 8) % 24) : 0);
@@ -123,6 +144,51 @@ export default function AdminSettings() {
           {saving ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
           {saving ? "保存中..." : "保存设置"}
         </Button>
+      </div>
+
+      <div
+        className="rounded-xl p-5 space-y-4"
+        style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}
+      >
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)" }}>
+            <ShieldCheck size={16} style={{ color: "#C9A227" }} />
+          </div>
+          <div>
+            <div className="font-semibold text-sm">提现自动审批</div>
+            <div className="text-xs text-muted-foreground">开启后，新提现申请将自动通过审批</div>
+          </div>
+        </div>
+
+        <div className="rounded-lg p-4 flex items-center justify-between" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.12)" }}>
+          <div>
+            <div className="text-sm font-medium">{loadingAuto ? "加载中..." : autoApprove ? "已开启" : "已关闭"}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {autoApprove ? "提现申请将自动批准" : "提现申请需要手动审批"}
+            </div>
+          </div>
+          <button
+            onClick={handleToggleAutoApprove}
+            disabled={savingAuto || loadingAuto}
+            className="relative w-12 h-6 rounded-full transition-colors"
+            style={{ background: autoApprove ? "rgba(34,197,94,0.6)" : "rgba(255,255,255,0.1)" }}
+          >
+            <div
+              className="absolute top-0.5 w-5 h-5 rounded-full transition-transform"
+              style={{
+                background: autoApprove ? "#22c55e" : "rgba(255,255,255,0.4)",
+                transform: autoApprove ? "translateX(26px)" : "translateX(2px)",
+              }}
+            />
+          </button>
+        </div>
+
+        <div className="rounded-lg p-3 space-y-1" style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.1)" }}>
+          <div className="text-xs font-semibold" style={{ color: "#ef4444" }}>注意</div>
+          <div className="text-xs text-muted-foreground">
+            开启自动审批后，所有新的提现申请将直接标记为已通过，不再需要手动审核。请谨慎使用。
+          </div>
+        </div>
       </div>
     </div>
   );

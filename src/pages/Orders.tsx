@@ -5,20 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useActiveAccount } from "thirdweb/react";
 import { useQuery } from "@tanstack/react-query";
-import { Wallet, TrendingUp, Clock, ArrowDownToLine, ClipboardList, Loader2, AlertCircle, Shield } from "lucide-react";
+import { Wallet, TrendingUp, Clock, ArrowDownToLine, ClipboardList, Loader2, AlertCircle, Shield, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { getOrdersByWallet, getEarnings, getWithdrawalsByWallet, createWithdrawal } from "@/lib/api";
-import { WITHDRAW_MIN, WITHDRAW_FEE } from "@shared/schema";
+import { getOrdersByWallet, getEarnings, getWithdrawalsByWallet, getRewardsByWallet, createWithdrawal } from "@/lib/api";
+import { WITHDRAW_MIN, WITHDRAW_FEE, WITHDRAW_MULTIPLE } from "@shared/schema";
+import { t, getLang, shortAddr } from "@/lib/i18n";
 
 export default function OrdersPage() {
-  const [activeTab, setActiveTab] = useState<"orders" | "withdrawals">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "rewards" | "withdrawals">("orders");
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const account = useActiveAccount();
   const { toast } = useToast();
   const address = account?.address?.toLowerCase();
+  const lang = getLang();
 
   const { data: orderList = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["/api/orders", address],
@@ -38,22 +40,32 @@ export default function OrdersPage() {
     enabled: !!address,
   });
 
+  const { data: rewardList = [], isLoading: rewardsLoading } = useQuery({
+    queryKey: ["/api/rewards", address],
+    queryFn: () => getRewardsByWallet(address!),
+    enabled: !!address,
+  });
+
   const availableBalance = parseFloat((earningsData as any)?.availableBalance || "0");
   const totalWithdrawn = parseFloat((earningsData as any)?.totalWithdrawn || "0");
   const totalDailyEarnings = parseFloat((earningsData as any)?.dailyRewards || "0");
 
   const handleWithdraw = async () => {
     if (!account) {
-      toast({ title: "请先连接钱包", variant: "destructive" });
+      toast({ title: t("orders.connect_wallet"), variant: "destructive" });
       return;
     }
     const amt = parseFloat(withdrawAmount);
     if (isNaN(amt) || amt < WITHDRAW_MIN) {
-      toast({ title: `最低提现金额 ${WITHDRAW_MIN} USDT`, variant: "destructive" });
+      toast({ title: `${t("withdraw.min")} ${WITHDRAW_MIN} USDT`, variant: "destructive" });
+      return;
+    }
+    if (amt % WITHDRAW_MULTIPLE !== 0) {
+      toast({ title: `Amount must be a multiple of ${WITHDRAW_MULTIPLE} USDT`, variant: "destructive" });
       return;
     }
     if (amt > availableBalance) {
-      toast({ title: "可提现余额不足", variant: "destructive" });
+      toast({ title: t("orders.available") + " insufficient", variant: "destructive" });
       return;
     }
     setWithdrawLoading(true);
@@ -61,11 +73,11 @@ export default function OrdersPage() {
       await createWithdrawal(account.address, amt, WITHDRAW_FEE);
       queryClient.invalidateQueries({ queryKey: ["/api/earnings", address] });
       queryClient.invalidateQueries({ queryKey: ["/api/withdrawals", address] });
-      toast({ title: "提现申请已提交", description: `提现 ${amt} USDT，手续费 ${WITHDRAW_FEE} USDT，实际到账 ${(amt - WITHDRAW_FEE).toFixed(2)} USDT` });
+      toast({ title: "OK", description: `${amt} USDT - ${WITHDRAW_FEE} = ${(amt - WITHDRAW_FEE).toFixed(2)} USDT` });
       setWithdrawOpen(false);
       setWithdrawAmount("");
     } catch (err: any) {
-      toast({ title: "提现失败", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setWithdrawLoading(false);
     }
@@ -74,14 +86,22 @@ export default function OrdersPage() {
   const getWithdrawStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
-        return <Badge style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }}>处理中</Badge>;
+        return <Badge style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }}>{t("withdraw.pending")}</Badge>;
       case "completed":
-        return <Badge style={{ background: "rgba(100,200,100,0.1)", color: "#6bc46b", border: "1px solid rgba(100,200,100,0.2)" }}>已完成</Badge>;
+        return <Badge style={{ background: "rgba(100,200,100,0.1)", color: "#6bc46b", border: "1px solid rgba(100,200,100,0.2)" }}>{t("withdraw.completed")}</Badge>;
       case "rejected":
-        return <Badge style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}>已拒绝</Badge>;
+        return <Badge style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}>{t("withdraw.rejected")}</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
+  };
+
+  const rewardTypeColor: Record<string, string> = {
+    daily: "#E8C547",
+    direct_referral: "#3b82f6",
+    indirect_referral: "#8b5cf6",
+    team_bonus: "#22c55e",
+    equal_level_bonus: "#f97316",
   };
 
   if (!account) {
@@ -89,11 +109,11 @@ export default function OrdersPage() {
       <div className="px-4 py-4 space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-          <h2 className="font-bold text-base">我的订单</h2>
+          <h2 className="font-bold text-base">{t("orders.title")}</h2>
         </div>
         <div className="text-center py-16 text-muted-foreground">
           <Wallet size={40} className="mx-auto mb-3 opacity-30" />
-          <p>请先连接钱包查看订单</p>
+          <p>{t("orders.connect_wallet")}</p>
         </div>
       </div>
     );
@@ -103,14 +123,14 @@ export default function OrdersPage() {
     <div className="px-4 py-4 space-y-4">
       <div className="flex items-center gap-2 mb-2">
         <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-        <h2 className="font-bold text-base">我的订单</h2>
+        <h2 className="font-bold text-base">{t("orders.title")}</h2>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
         <div className="stat-card rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Wallet size={12} style={{ color: "#C9A227" }} />
-            <span className="text-[10px] text-muted-foreground">可提现</span>
+            <span className="text-[10px] text-muted-foreground">{t("orders.available")}</span>
           </div>
           <div className="font-black text-base" data-testid="text-available-balance" style={{ color: "#C9A227" }}>
             {availableBalance.toFixed(2)}
@@ -120,7 +140,7 @@ export default function OrdersPage() {
         <div className="stat-card rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <TrendingUp size={12} style={{ color: "#E8C547" }} />
-            <span className="text-[10px] text-muted-foreground">累计日收益</span>
+            <span className="text-[10px] text-muted-foreground">{t("orders.daily_earnings")}</span>
           </div>
           <div className="font-black text-base" style={{ color: "#E8C547" }}>
             {totalDailyEarnings.toFixed(2)}
@@ -130,7 +150,7 @@ export default function OrdersPage() {
         <div className="stat-card rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <ArrowDownToLine size={12} style={{ color: "#6bc46b" }} />
-            <span className="text-[10px] text-muted-foreground">已提现</span>
+            <span className="text-[10px] text-muted-foreground">{t("orders.withdrawn")}</span>
           </div>
           <div className="font-black text-base" data-testid="text-total-withdrawn" style={{ color: "#6bc46b" }}>
             {totalWithdrawn.toFixed(2)}
@@ -146,32 +166,26 @@ export default function OrdersPage() {
         onClick={() => setWithdrawOpen(true)}
       >
         <ArrowDownToLine size={14} className="mr-1.5" />
-        立即提现
+        {t("orders.withdraw_now")}
       </Button>
 
       <div className="flex rounded-lg p-1 gap-1" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
-        <button
-          data-testid="tab-my-orders"
-          className="flex-1 py-2 text-sm font-semibold rounded-md transition-all duration-200"
-          style={activeTab === "orders"
-            ? { background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }
-            : { color: "rgba(255,255,255,0.5)" }}
-          onClick={() => setActiveTab("orders")}
-        >
-          我的订单
-        </button>
-        <button
-          data-testid="tab-withdraw-history"
-          className="flex-1 py-2 text-sm font-semibold rounded-md transition-all duration-200"
-          style={activeTab === "withdrawals"
-            ? { background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }
-            : { color: "rgba(255,255,255,0.5)" }}
-          onClick={() => setActiveTab("withdrawals")}
-        >
-          提现记录
-        </button>
+        {(["orders", "rewards", "withdrawals"] as const).map(tab => (
+          <button
+            key={tab}
+            data-testid={`tab-${tab}`}
+            className="flex-1 py-2 text-sm font-semibold rounded-md transition-all duration-200"
+            style={activeTab === tab
+              ? { background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }
+              : { color: "rgba(255,255,255,0.5)" }}
+            onClick={() => setActiveTab(tab)}
+          >
+            {t(`orders.tab_${tab}`)}
+          </button>
+        ))}
       </div>
 
+      {/* Orders Tab */}
       {activeTab === "orders" && (
         <div className="space-y-3">
           {ordersLoading ? (
@@ -181,7 +195,7 @@ export default function OrdersPage() {
           ) : (orderList as any[]).length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <ClipboardList size={40} className="mx-auto mb-3 opacity-30" />
-              <p>暂无订单</p>
+              <p>{t("orders.no_orders")}</p>
             </div>
           ) : (
             (orderList as any[]).map((order: any) => {
@@ -204,50 +218,50 @@ export default function OrdersPage() {
                         ? { background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
                         : { background: "rgba(100,200,100,0.1)", color: "#6bc46b", border: "1px solid rgba(100,200,100,0.2)" }}
                     >
-                      {order.status === "active" ? "质押中" : "已到期"}
+                      {order.status === "active" ? t("orders.staking") : t("orders.expired")}
                     </Badge>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-0.5">投资本金</div>
+                      <div className="text-xs text-muted-foreground mb-0.5">{t("orders.principal")}</div>
                       <div className="text-sm font-bold text-foreground">{parseFloat(order.amount).toFixed(0)} U</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-0.5">每日利息</div>
+                      <div className="text-xs text-muted-foreground mb-0.5">{t("orders.daily_interest")}</div>
                       <div className="text-sm font-bold" style={{ color: "#E8C547" }}>
                         +{(parseFloat(order.amount) * parseFloat(order.dailyRate) / 100).toFixed(2)} U
                       </div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-0.5">累计收益</div>
+                      <div className="text-xs text-muted-foreground mb-0.5">{t("orders.total_earned")}</div>
                       <div className="text-sm font-bold" style={{ color: "#C9A227" }}>+{parseFloat(order.totalEarned).toFixed(2)} U</div>
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-muted-foreground mb-0.5">
-                        {order.status === "active" ? "剩余天数" : "状态"}
+                        {order.status === "active" ? t("orders.days_left") : t("orders.status")}
                       </div>
                       <div className="text-sm font-bold text-foreground">
-                        {order.status === "active" ? `${daysLeft} 天` : "本金已返还"}
+                        {order.status === "active" ? `${daysLeft} ${t("common.days")}` : t("orders.principal_returned")}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between text-xs px-1" style={{ color: "rgba(201,162,39,0.5)" }}>
-                    <span>日利率: {order.dailyRate}%</span>
-                    <span>总天数: {order.days}天</span>
-                    <span>预计总收益: {(parseFloat(order.amount) * parseFloat(order.dailyRate) / 100 * order.days).toFixed(2)} U</span>
+                    <span>{t("orders.daily_rate")}: {order.dailyRate}%</span>
+                    <span>{t("orders.total_days")}: {order.days}{t("common.days")}</span>
+                    <span>{t("orders.est_total")}: {(parseFloat(order.amount) * parseFloat(order.dailyRate) / 100 * order.days).toFixed(2)} U</span>
                   </div>
 
                   <div className="pt-2 border-t" style={{ borderColor: "rgba(201,162,39,0.12)" }}>
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>开始: {new Date(order.startDate).toLocaleDateString()}</span>
-                      <span>到期: {endDate.toLocaleDateString()}</span>
+                      <span>{t("orders.start")}: {new Date(order.startDate).toLocaleDateString()}</span>
+                      <span>{t("orders.end")}: {endDate.toLocaleDateString()}</span>
                     </div>
                     {order.status === "active" && (
                       <div className="flex items-center gap-1 mt-1.5 text-xs" style={{ color: "rgba(201,162,39,0.6)" }}>
                         <Shield size={10} />
-                        <span>不可提前赎回 · 到期自动返还本金</span>
+                        <span>{t("orders.no_redeem")}</span>
                       </div>
                     )}
                   </div>
@@ -258,6 +272,69 @@ export default function OrdersPage() {
         </div>
       )}
 
+      {/* Rewards Tab */}
+      {activeTab === "rewards" && (
+        <div className="space-y-2">
+          {rewardsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={24} className="animate-spin" style={{ color: "#C9A227" }} />
+            </div>
+          ) : (rewardList as any[]).length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Gift size={40} className="mx-auto mb-3 opacity-30" />
+              <p>{t("reward.no_records")}</p>
+            </div>
+          ) : (
+            (rewardList as any[]).map((r: any) => {
+              const typeColor = rewardTypeColor[r.type] || "#C9A227";
+              const typeKey = `reward.${r.type}` as any;
+              return (
+                <div
+                  key={r.id}
+                  className="product-card rounded-xl p-3 space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ background: typeColor }} />
+                      <span className="text-sm font-semibold" style={{ color: typeColor }}>
+                        {t(typeKey)}
+                      </span>
+                    </div>
+                    <span className="text-sm font-bold" style={{ color: "#C9A227" }}>
+                      +{parseFloat(r.amount).toFixed(2)} U
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    {r.fromAddress && (
+                      <>
+                        <span className="text-muted-foreground">{t("reward.from_account")}</span>
+                        <span className="font-mono text-right">{shortAddr(r.fromAddress)}</span>
+                      </>
+                    )}
+                    {r.productName && (
+                      <>
+                        <span className="text-muted-foreground">{t("reward.product")}</span>
+                        <span className="text-right">{r.productName}</span>
+                      </>
+                    )}
+                    {!r.fromAddress && r.type === "daily" && (
+                      <>
+                        <span className="text-muted-foreground">{t("reward.product")}</span>
+                        <span className="text-right">{r.productName || "-"}</span>
+                      </>
+                    )}
+                    <span className="text-muted-foreground">{t("reward.time")}</span>
+                    <span className="text-right">{new Date(r.createdAt).toLocaleString()}</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Withdrawals Tab */}
       {activeTab === "withdrawals" && (
         <div className="space-y-3">
           {withdrawalsLoading ? (
@@ -267,7 +344,7 @@ export default function OrdersPage() {
           ) : (withdrawalList as any[]).length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <ArrowDownToLine size={40} className="mx-auto mb-3 opacity-30" />
-              <p>暂无提现记录</p>
+              <p>{t("orders.no_withdrawals")}</p>
             </div>
           ) : (
             (withdrawalList as any[]).map((w: any) => (
@@ -277,20 +354,20 @@ export default function OrdersPage() {
                 className="product-card rounded-xl p-3 space-y-2"
               >
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-foreground">提现 #{w.id}</div>
+                  <div className="text-sm font-semibold text-foreground">{t("withdraw.title")} #{w.id}</div>
                   {getWithdrawStatusBadge(w.status)}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="text-center">
-                    <div className="text-[10px] text-muted-foreground">提现金额</div>
+                    <div className="text-[10px] text-muted-foreground">{t("withdraw.amount_label")}</div>
                     <div className="text-xs font-bold text-foreground">{parseFloat(w.amount).toFixed(2)} U</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-muted-foreground">手续费</div>
+                    <div className="text-[10px] text-muted-foreground">{t("withdraw.fee")}</div>
                     <div className="text-xs font-bold" style={{ color: "#ef4444" }}>-{parseFloat(w.fee).toFixed(2)} U</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] text-muted-foreground">实际到账</div>
+                    <div className="text-[10px] text-muted-foreground">{t("withdraw.actual")}</div>
                     <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(2)} U</div>
                   </div>
                 </div>
@@ -308,26 +385,26 @@ export default function OrdersPage() {
         >
           <DialogHeader>
             <DialogTitle className="text-center" style={{ color: "#C9A227" }}>
-              提现
+              {t("withdraw.title")}
             </DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground">
-              日利润可随时提现 · 本金到期自动返还
+              {t("withdraw.desc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="rounded-lg p-3 text-center" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
-              <div className="text-xs text-muted-foreground mb-1">可提现余额</div>
+              <div className="text-xs text-muted-foreground mb-1">{t("withdraw.balance")}</div>
               <div className="font-black text-2xl" style={{ color: "#C9A227" }}>{availableBalance.toFixed(2)}</div>
               <div className="text-xs text-muted-foreground">USDT</div>
             </div>
 
             <div>
-              <label className="text-sm text-muted-foreground mb-2 block">提现金额 (USDT)</label>
+              <label className="text-sm text-muted-foreground mb-2 block">{t("withdraw.amount")}</label>
               <div className="relative">
                 <Input
                   data-testid="input-withdraw-amount"
                   type="number"
-                  placeholder={`最低 ${WITHDRAW_MIN} USDT`}
+                  placeholder={`${t("withdraw.min")} ${WITHDRAW_MIN} USDT`}
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
                   className="pr-16"
@@ -338,7 +415,7 @@ export default function OrdersPage() {
                   style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227" }}
                   onClick={() => setWithdrawAmount(availableBalance.toFixed(2))}
                 >
-                  全部
+                  {t("withdraw.all")}
                 </button>
               </div>
             </div>
@@ -346,15 +423,15 @@ export default function OrdersPage() {
             {parseFloat(withdrawAmount) > 0 && (
               <div className="rounded-lg p-3 space-y-1.5" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">提现金额</span>
+                  <span className="text-muted-foreground">{t("withdraw.amount_label")}</span>
                   <span className="text-foreground">{parseFloat(withdrawAmount).toFixed(2)} USDT</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">手续费</span>
+                  <span className="text-muted-foreground">{t("withdraw.fee")}</span>
                   <span style={{ color: "#ef4444" }}>-{WITHDRAW_FEE} USDT</span>
                 </div>
                 <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: "rgba(201,162,39,0.15)" }}>
-                  <span className="text-muted-foreground">实际到账</span>
+                  <span className="text-muted-foreground">{t("withdraw.actual")}</span>
                   <span style={{ color: "#C9A227" }}>{(parseFloat(withdrawAmount) - WITHDRAW_FEE).toFixed(2)} USDT</span>
                 </div>
               </div>
@@ -363,15 +440,19 @@ export default function OrdersPage() {
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <AlertCircle size={11} style={{ color: "#C9A227" }} />
-                <span>最低提现金额: {WITHDRAW_MIN} USDT</span>
+                <span>{t("withdraw.min")}: {WITHDRAW_MIN} USDT</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <AlertCircle size={11} style={{ color: "#C9A227" }} />
-                <span>手续费: 每笔 {WITHDRAW_FEE} USDT</span>
+                <span>{t("withdraw.fee_per")} {WITHDRAW_FEE} USDT</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <AlertCircle size={11} style={{ color: "#C9A227" }} />
+                <span>Multiple of {WITHDRAW_MULTIPLE} USDT</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield size={11} style={{ color: "#C9A227" }} />
-                <span>仅可提取日利润及奖励，本金到期自动返还</span>
+                <span>{t("withdraw.only_profit")}</span>
               </div>
             </div>
 
@@ -382,7 +463,7 @@ export default function OrdersPage() {
               style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
               onClick={handleWithdraw}
             >
-              {withdrawLoading ? "处理中..." : "确认提现"}
+              {withdrawLoading ? t("withdraw.processing") : t("withdraw.confirm")}
             </Button>
           </div>
         </DialogContent>

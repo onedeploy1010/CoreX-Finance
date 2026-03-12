@@ -15,6 +15,14 @@
 - Emits `InvestmentCreated` event for backend callback
 - Backend calculates: daily yield, direct referral (10%), indirect referral (5%), team bonus
 
+### 3. CoreXWithdrawal
+- Batch withdrawal contract for processing user withdrawals
+- Minimum withdrawal: 30 USDT, must be multiples of 10 USDT
+- Fee: 1 USDT per withdrawal (sent to fee collector)
+- Operator-controlled batch processing (up to 100 per batch)
+- Batch ID deduplication to prevent double-processing
+- Pausable for emergency situations
+
 ## Deployment (thirdweb)
 
 ### Prerequisites
@@ -37,7 +45,23 @@ Constructor:
 - `_usdt` = `0x55d398326f99059fF775485246999027B3197955`
 - `_fundDistributor` = FundDistributor address from step 1
 
-### 3. Configure FundDistributor
+### 3. Deploy CoreXWithdrawal
+```bash
+npx thirdweb deploy -f CoreXWithdrawal.sol
+```
+Constructor:
+- `_usdt` = `0x55d398326f99059fF775485246999027B3197955`
+- `_feeCollector` = Fee collection wallet address
+
+### 4. Configure CoreXWithdrawal
+
+**setOperator**: Authorize backend operator wallet
+- `_operator`: Backend operator address
+- `_authorized`: true
+
+**deposit**: Fund the contract with USDT for withdrawals
+
+### 5. Configure FundDistributor
 
 **setAuthorizedCaller**: Authorize CoreXInvestment contract
 - `caller`: CoreXInvestment address
@@ -50,7 +74,7 @@ percentages: [4000, 3000, 3000]
 labels: ["Operations", "Technology", "Reserve"]
 ```
 
-### 4. Add Products to CoreXInvestment
+### 6. Add Products to CoreXInvestment
 
 Call `addProduct` for each:
 
@@ -62,12 +86,13 @@ Call `addProduct` for each:
 | CX Pro 01 | 2000000000000000000000 | 0 |
 | CX Elite 01 | 3000000000000000000000 | 0 |
 
-### 5. Update Frontend Contract Addresses
+### 7. Update Frontend Contract Addresses
 
-Edit `client/src/lib/contracts.ts`:
+Edit `src/lib/contracts.ts`:
 ```typescript
 export const FUND_DISTRIBUTOR_ADDRESS = "0x...";
 export const COREX_INVESTMENT_ADDRESS = "0x...";
+export const COREX_WITHDRAWAL_ADDRESS = "0x...";
 ```
 
 ## Investment Flow
@@ -82,4 +107,18 @@ User selects product -> enters amount
   -> Frontend: send txHash to backend API
   -> Backend: create order, start daily yield calculation
   -> Backend: auto-calculate direct(10%), indirect(5%), team bonus
+```
+
+## Withdrawal Flow
+
+```
+User requests withdrawal (min 30 USDT, multiples of 10)
+  -> Backend: validate amount, check balance, create pending withdrawal
+  -> Admin/Cron: collect pending withdrawals into batch
+  -> Backend: call CoreXWithdrawal.batchWithdraw(batchId, recipients, amounts)
+  -> Contract: deduct 1 USDT fee per withdrawal
+  -> Contract: transfer net amount to each recipient
+  -> Contract: send total fees to fee collector
+  -> Contract: emit WithdrawalProcessed + BatchProcessed events
+  -> Backend: update withdrawal records as completed
 ```

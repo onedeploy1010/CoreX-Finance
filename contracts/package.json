@@ -1,0 +1,9 @@
+{
+  "name": "corex-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "@openzeppelin/contracts": "^5.1.0",
+    "hardhat": "^2.22.0"
+  }
+}

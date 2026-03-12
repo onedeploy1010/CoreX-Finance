@@ -8,24 +8,56 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { queryClient } from "@/lib/queryClient";
 import { getAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, adminAddLog } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Plus, Edit, Trash2, UserCog } from "lucide-react";
+import { Plus, Edit, Trash2, UserCog } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   superadmin: "超级管理员",
   finance: "财务",
   customer_service: "客服",
+  custom: "自定义",
 };
 
 const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
   superadmin: { bg: "rgba(239,68,68,0.1)", color: "#ef4444" },
   finance: { bg: "rgba(59,130,246,0.1)", color: "#3b82f6" },
   customer_service: { bg: "rgba(34,197,94,0.1)", color: "#22c55e" },
+  custom: { bg: "rgba(168,85,247,0.1)", color: "#a855f7" },
 };
+
+const ROLE_PRESETS: Record<string, string[]> = {
+  superadmin: [
+    "dashboard.read", "members.read", "members.write", "referrals.read",
+    "orders.read", "withdrawals.read", "withdrawals.write",
+    "messages.read", "messages.write", "finance.read",
+    "settings.read", "settings.write", "admins.read", "admins.write", "logs.read",
+  ],
+  finance: [
+    "members.read", "referrals.read", "orders.read",
+    "withdrawals.read", "withdrawals.write", "finance.read",
+  ],
+  customer_service: [
+    "members.read", "referrals.read",
+  ],
+};
+
+const PERM_MODULES = [
+  { key: "dashboard", label: "统计台", hasWrite: false },
+  { key: "members", label: "会员管理", hasWrite: true },
+  { key: "referrals", label: "推荐管理", hasWrite: false },
+  { key: "orders", label: "订单管理", hasWrite: false },
+  { key: "withdrawals", label: "提现管理", hasWrite: true },
+  { key: "messages", label: "消息管理", hasWrite: true },
+  { key: "finance", label: "财务管理", hasWrite: false },
+  { key: "settings", label: "系统设置", hasWrite: true },
+  { key: "admins", label: "管理员", hasWrite: true },
+  { key: "logs", label: "操作日志", hasWrite: false },
+];
 
 export default function AdminManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ username: "", password: "", role: "customer_service" });
+  const [form, setForm] = useState({ username: "", password: "", role: "custom" });
+  const [perms, setPerms] = useState<string[]>([]);
   const { toast } = useToast();
 
   const { data: admins = [], isLoading } = useQuery({
@@ -34,9 +66,9 @@ export default function AdminManagement() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string; role: string }) => {
-      const result = await createAdminUser(data.username, data.password, data.role);
-      await adminAddLog("创建管理员", "admin", data.username, { role: data.role });
+    mutationFn: async (data: { username: string; password: string; role: string; permissions: string[] }) => {
+      const result = await createAdminUser(data.username, data.password, data.role, data.permissions);
+      await adminAddLog("创建管理员", "admin", data.username, { role: data.role, permissions: data.permissions });
       return result;
     },
     onSuccess: () => {
@@ -49,9 +81,9 @@ export default function AdminManagement() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, role, password }: { id: number; role: string; password?: string }) => {
-      const result = await updateAdminUser(id, role, password);
-      await adminAddLog("更新管理员", "admin", id.toString(), { role, hasNewPassword: !!password });
+    mutationFn: async ({ id, role, password, permissions }: { id: number; role: string; password?: string; permissions: string[] }) => {
+      const result = await updateAdminUser(id, role, password, permissions);
+      await adminAddLog("更新管理员", "admin", id.toString(), { role, permissions, hasNewPassword: !!password });
       return result;
     },
     onSuccess: () => {
@@ -77,7 +109,10 @@ export default function AdminManagement() {
     onError: (err: any) => toast({ title: "删除失败", description: err.message, variant: "destructive" }),
   });
 
-  const resetForm = () => setForm({ username: "", password: "", role: "customer_service" });
+  const resetForm = () => {
+    setForm({ username: "", password: "", role: "custom" });
+    setPerms([]);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -88,18 +123,38 @@ export default function AdminManagement() {
   const openEdit = (admin: any) => {
     setEditing(admin);
     setForm({ username: admin.username, password: "", role: admin.role });
+    setPerms(admin.permissions || []);
     setDialogOpen(true);
+  };
+
+  const handleRoleChange = (role: string) => {
+    setForm(f => ({ ...f, role }));
+    if (ROLE_PRESETS[role]) {
+      setPerms([...ROLE_PRESETS[role]]);
+    }
+  };
+
+  const togglePerm = (perm: string) => {
+    setPerms(prev => {
+      const next = prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm];
+      // If permissions don't match any preset, set role to custom
+      const matchedRole = Object.entries(ROLE_PRESETS).find(
+        ([, presetPerms]) => presetPerms.length === next.length && presetPerms.every(p => next.includes(p))
+      );
+      setForm(f => ({ ...f, role: matchedRole ? matchedRole[0] : "custom" }));
+      return next;
+    });
   };
 
   const handleSave = () => {
     if (editing) {
-      updateMutation.mutate({ id: editing.id, role: form.role, password: form.password || undefined });
+      updateMutation.mutate({ id: editing.id, role: form.role, password: form.password || undefined, permissions: perms });
     } else {
       if (!form.username || !form.password) {
         toast({ title: "请填写用户名和密码", variant: "destructive" });
         return;
       }
-      createMutation.mutate(form);
+      createMutation.mutate({ ...form, permissions: perms });
     }
   };
 
@@ -119,31 +174,13 @@ export default function AdminManagement() {
         </Button>
       </div>
 
-      {/* Role description */}
-      <div className="rounded-xl p-3 space-y-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.12)" }}>
-        <div className="text-xs font-semibold" style={{ color: "#C9A227" }}>角色权限说明</div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-          <div className="p-2 rounded" style={{ background: "rgba(239,68,68,0.04)" }}>
-            <div className="font-semibold mb-1" style={{ color: "#ef4444" }}>超级管理员</div>
-            <div className="text-muted-foreground">全部功能 + 管理员管理 + 操作日志 + 调整等级/结算</div>
-          </div>
-          <div className="p-2 rounded" style={{ background: "rgba(59,130,246,0.04)" }}>
-            <div className="font-semibold mb-1" style={{ color: "#3b82f6" }}>财务</div>
-            <div className="text-muted-foreground">查看会员/推荐 + 订单管理 + 出入金 + 批准提现</div>
-          </div>
-          <div className="p-2 rounded" style={{ background: "rgba(34,197,94,0.04)" }}>
-            <div className="font-semibold mb-1" style={{ color: "#22c55e" }}>客服</div>
-            <div className="text-muted-foreground">仅查看会员和推荐关系</div>
-          </div>
-        </div>
-      </div>
-
       {isLoading ? (
         <div className="text-center text-muted-foreground py-10">加载中...</div>
       ) : (
         <div className="space-y-2">
           {(admins as any[]).map((a: any) => {
-            const rc = ROLE_COLORS[a.role] || ROLE_COLORS.customer_service;
+            const rc = ROLE_COLORS[a.role] || ROLE_COLORS.custom;
+            const permCount = (a.permissions || []).length;
             return (
               <div key={a.id} className="rounded-xl p-3 flex items-center justify-between" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.12)" }}>
                 <div className="flex items-center gap-3">
@@ -156,6 +193,7 @@ export default function AdminManagement() {
                       <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: rc.bg, color: rc.color }}>
                         {ROLE_LABELS[a.role] || a.role}
                       </span>
+                      <span className="text-[10px] text-muted-foreground">{permCount} 项权限</span>
                       {a.createdAt && <span className="text-[10px] text-muted-foreground">{new Date(a.createdAt).toLocaleDateString()}</span>}
                     </div>
                   </div>
@@ -205,18 +243,54 @@ export default function AdminManagement() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">角色</Label>
-              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
+              <Label className="text-xs text-muted-foreground">角色预设</Label>
+              <Select value={form.role} onValueChange={handleRoleChange}>
                 <SelectTrigger style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "40px" }}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="superadmin">超级管理员</SelectItem>
-                  <SelectItem value="finance">财务</SelectItem>
-                  <SelectItem value="customer_service">客服</SelectItem>
+                  <SelectItem value="superadmin">超级管理员（全部权限）</SelectItem>
+                  <SelectItem value="finance">财务（会员/订单/出入金）</SelectItem>
+                  <SelectItem value="customer_service">客服（仅查看）</SelectItem>
+                  <SelectItem value="custom">自定义</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">权限配置</Label>
+              <div className="rounded-lg p-3 space-y-2" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.12)" }}>
+                {PERM_MODULES.map(mod => (
+                  <div key={mod.key} className="flex items-center justify-between py-1">
+                    <span className="text-xs">{mod.label}</span>
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={perms.includes(`${mod.key}.read`)}
+                          onChange={() => togglePerm(`${mod.key}.read`)}
+                          className="accent-[#C9A227] w-3.5 h-3.5"
+                        />
+                        <span className="text-[10px] text-muted-foreground">读</span>
+                      </label>
+                      {mod.hasWrite && (
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={perms.includes(`${mod.key}.write`)}
+                            onChange={() => togglePerm(`${mod.key}.write`)}
+                            className="accent-[#C9A227] w-3.5 h-3.5"
+                          />
+                          <span className="text-[10px] text-muted-foreground">写</span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-[10px] text-muted-foreground">已选 {perms.length} 项权限</div>
+            </div>
+
             <Button
               className="w-full font-bold"
               style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "40px" }}

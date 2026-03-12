@@ -119,7 +119,7 @@ export default function ProfilePage() {
 
   const activeOrders = (orderList as any[]).filter((o: any) => o.status === "active").length;
   const totalEarned = parseFloat(earningsData?.totalEarnings || "0") + parseFloat(earningsData?.totalRewards || "0");
-  const level = (memberData as any)?.level || teamStats?.level || 0;
+  const level = (memberData as any)?.level ?? 0;
   const currentLangObj = LANGUAGES.find(l => l.code === currentLang) || LANGUAGES[0];
   const enabledNotifCount = Object.values(notifications).filter(Boolean).length;
 
