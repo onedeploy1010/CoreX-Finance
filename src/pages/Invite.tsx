@@ -157,7 +157,13 @@ export default function InvitePage() {
 
   const directRewards = parseFloat((earningsData as any)?.directRewards || "0");
   const indirectRewards = parseFloat((earningsData as any)?.indirectRewards || "0");
-  const teamRewards = parseFloat((earningsData as any)?.teamRewards || "0");
+  const totalTeamRewards = parseFloat((earningsData as any)?.teamRewards || "0");
+
+  // Split team_bonus into pure team bonus vs equal-level bonus using reward list
+  const equalLevelTotal = (rewardList as any[])
+    .filter((r: any) => r.type === "team_bonus" && r.description?.includes("equal-level"))
+    .reduce((s: number, r: any) => s + parseFloat(r.amount || "0"), 0);
+  const teamRewards = totalTeamRewards - equalLevelTotal;
 
   const filteredRewards = (rewardList as any[]).filter((r: any) => {
     if (rewardSubTab === "equal_level_bonus") {
@@ -270,7 +276,7 @@ export default function InvitePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <div className="stat-card rounded-lg p-2.5 text-center">
           <div className="text-[10px] text-muted-foreground">直推奖励</div>
           <div className="font-bold text-xs" style={{ color: "#E8C547" }}>{directRewards.toFixed(2)} U</div>
@@ -282,6 +288,10 @@ export default function InvitePage() {
         <div className="stat-card rounded-lg p-2.5 text-center">
           <div className="text-[10px] text-muted-foreground">团队奖励</div>
           <div className="font-bold text-xs" style={{ color: "#FFD700" }}>{teamRewards.toFixed(2)} U</div>
+        </div>
+        <div className="stat-card rounded-lg p-2.5 text-center">
+          <div className="text-[10px] text-muted-foreground">同级奖励</div>
+          <div className="font-bold text-xs" style={{ color: "#f97316" }}>{equalLevelTotal.toFixed(2)} U</div>
         </div>
       </div>
 
