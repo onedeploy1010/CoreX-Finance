@@ -75,7 +75,7 @@ export const LEVEL_CONFIG = [
   { level: 7, name: "V7", people: 1000, amount: 10000000, bonus: 33, subLevel: 6, subCount: 2, lifetimeLock: false },
 ];
 
-
+export const EQUAL_LEVEL_BONUS = 10;
 export const WITHDRAW_MIN = 30;
 export const WITHDRAW_FEE = 1;
 export const WITHDRAW_MULTIPLE = 10;

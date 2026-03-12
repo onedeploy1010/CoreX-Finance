@@ -107,7 +107,7 @@ export default function InvitePage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"referral" | "team" | "rewards" | "levels">("referral");
   const [refSubTab, setRefSubTab] = useState<"direct" | "indirect">("direct");
-  const [rewardSubTab, setRewardSubTab] = useState<"direct_referral" | "indirect_referral" | "team_bonus">("direct_referral");
+  const [rewardSubTab, setRewardSubTab] = useState<"direct_referral" | "indirect_referral" | "team_bonus" | "equal_level_bonus">("direct_referral");
   const address = account?.address?.toLowerCase();
 
   const [drillPath, setDrillPath] = useState<string[]>([]);
@@ -165,9 +165,21 @@ export default function InvitePage() {
 
   const directRewards = parseFloat((earningsData as any)?.directRewards || "0");
   const indirectRewards = parseFloat((earningsData as any)?.indirectRewards || "0");
-  const teamRewards = parseFloat((earningsData as any)?.teamRewards || "0");
+  const totalTeamRewards = parseFloat((earningsData as any)?.teamRewards || "0");
+
+  // Split team_bonus into pure team bonus vs equal-level bonus using reward list
+  const equalLevelTotal = (rewardList as any[])
+    .filter((r: any) => r.type === "team_bonus" && r.description?.includes("equal-level"))
+    .reduce((s: number, r: any) => s + parseFloat(r.amount || "0"), 0);
+  const teamRewards = totalTeamRewards - equalLevelTotal;
 
   const filteredRewards = (rewardList as any[]).filter((r: any) => {
+    if (rewardSubTab === "equal_level_bonus") {
+      return r.type === "team_bonus" && r.description?.includes("equal-level");
+    }
+    if (rewardSubTab === "team_bonus") {
+      return r.type === "team_bonus" && !r.description?.includes("equal-level");
+    }
     return r.type === rewardSubTab;
   });
 
@@ -276,7 +288,7 @@ export default function InvitePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <div className="stat-card rounded-lg p-2.5 text-center">
           <div className="text-[10px] text-muted-foreground">直推奖励</div>
           <div className="font-bold text-xs" style={{ color: "#E8C547" }}>{directRewards.toFixed(2)} U</div>
@@ -288,6 +300,10 @@ export default function InvitePage() {
         <div className="stat-card rounded-lg p-2.5 text-center">
           <div className="text-[10px] text-muted-foreground">团队奖励</div>
           <div className="font-bold text-xs" style={{ color: "#FFD700" }}>{teamRewards.toFixed(2)} U</div>
+        </div>
+        <div className="stat-card rounded-lg p-2.5 text-center">
+          <div className="text-[10px] text-muted-foreground">同级奖励</div>
+          <div className="font-bold text-xs" style={{ color: "#f97316" }}>{equalLevelTotal.toFixed(2)} U</div>
         </div>
       </div>
 
@@ -327,6 +343,10 @@ export default function InvitePage() {
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">团队奖励</span>
             <span className="font-semibold" style={{ color: "#E8C547" }}>团队总业绩 x 个人最高日利率 x 等级%</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">同级奖励</span>
+            <span className="font-semibold" style={{ color: "#E8C547" }}>同级下线团队奖励 x 10%</span>
           </div>
         </div>
       </div>
@@ -493,6 +513,7 @@ export default function InvitePage() {
               { key: "direct_referral" as const, label: "直推奖励" },
               { key: "indirect_referral" as const, label: "间推奖励" },
               { key: "team_bonus" as const, label: "团队奖励" },
+              { key: "equal_level_bonus" as const, label: "同级奖励" },
             ]).map(({ key, label }) => (
               <button
                 key={key}
@@ -580,10 +601,11 @@ export default function InvitePage() {
                     <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
                       style={{ background: "rgba(201,162,39,0.12)", border: "1px solid rgba(201,162,39,0.25)" }}>
                       {rewardSubTab === "direct_referral" ? <Users size={13} style={{ color: "#E8C547" }} /> :
+                       rewardSubTab === "equal_level_bonus" ? <Star size={13} style={{ color: "#f97316" }} /> :
                        <ChevronRight size={13} style={{ color: "#D4A832" }} />}
                     </div>
                     <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>
-                      {rewardSubTab === "direct_referral" ? "直推奖励" : "间推奖励"}
+                      {rewardSubTab === "direct_referral" ? "直推奖励" : rewardSubTab === "equal_level_bonus" ? "同级奖励" : "间推奖励"}
                     </span>
                   </div>
                   <span className="font-bold text-sm" style={{ color: "#C9A227" }}>+{parseFloat(reward.amount).toFixed(2)} U</span>
@@ -670,7 +692,7 @@ export default function InvitePage() {
             );
           })}
           <div className="text-xs text-muted-foreground text-center pt-1 pb-2">
-            * 团队奖励 = 团队总业绩 x 个人最高日利率 x 等级%
+            * 团队奖励 = 团队总业绩 x 个人最高日利率 x 等级% · 同级奖励 = 同级下线团队奖励 x 10%
           </div>
         </div>
       )}

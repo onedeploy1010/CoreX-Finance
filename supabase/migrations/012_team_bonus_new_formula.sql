@@ -90,6 +90,7 @@ $$;
 
 -- 2. New function: calculate team bonuses for all V1+ leaders
 -- Formula: team_total_staking × leader's_highest_daily_rate × level_bonus%
+-- Equal-level bonus: if leader's direct upline has the same level, upline gets 10% of leader's team bonus
 CREATE OR REPLACE FUNCTION process_team_bonuses_daily()
 RETURNS VOID
 LANGUAGE plpgsql
@@ -100,11 +101,13 @@ DECLARE
   v_highest_rate DECIMAL;
   v_bonus_rate INTEGER;
   v_team_reward DECIMAL;
+  v_referrer members%ROWTYPE;
+  v_equal_bonus DECIMAL;
   v_level_configs INTEGER[] := ARRAY[0, 8, 13, 18, 22, 26, 30, 33]; -- V0-V7
 BEGIN
   -- Iterate all V1+ leaders who have active orders (must have personal investment)
   FOR v_leader IN
-    SELECT m.wallet_address, m.level
+    SELECT m.wallet_address, m.level, m.referrer_address
     FROM members m
     WHERE m.level >= 1
       AND EXISTS (SELECT 1 FROM orders o WHERE o.wallet_address = m.wallet_address AND o.status = 'active')
@@ -140,6 +143,20 @@ BEGIN
       INSERT INTO rewards (wallet_address, type, amount, description)
       VALUES (v_leader.wallet_address, 'team_bonus', v_team_reward,
               'V' || v_leader.level || ' team bonus: team ' || v_team_staking || ' × ' || v_highest_rate || '% × ' || v_bonus_rate || '%');
+
+      -- Equal-level bonus: if direct upline has the same level, upline gets 10% of this leader's team reward
+      IF v_leader.referrer_address IS NOT NULL THEN
+        SELECT * INTO v_referrer FROM members WHERE wallet_address = v_leader.referrer_address;
+        IF FOUND AND v_referrer.level = v_leader.level AND v_referrer.level >= 1 THEN
+          v_equal_bonus := v_team_reward * 10 / 100;
+          IF v_equal_bonus > 0 THEN
+            INSERT INTO rewards (wallet_address, type, amount, from_address, description)
+            VALUES (v_referrer.wallet_address, 'team_bonus', v_equal_bonus,
+                    v_leader.wallet_address,
+                    'V' || v_referrer.level || ' equal-level bonus 10% from V' || v_leader.level || ' ' || LEFT(v_leader.wallet_address, 6) || '...');
+          END IF;
+        END IF;
+      END IF;
     END IF;
   END LOOP;
 END;
@@ -179,10 +196,12 @@ AS $$
 DECLARE
   v_order RECORD;
   v_member members%ROWTYPE;
+  v_referrer members%ROWTYPE;
   v_team_staking DECIMAL;
   v_highest_rate DECIMAL;
   v_bonus_rate INTEGER;
   v_team_reward DECIMAL;
+  v_equal_bonus DECIMAL;
   v_level_configs INTEGER[] := ARRAY[0, 8, 13, 18, 22, 26, 30, 33];
 BEGIN
   -- Settle all active orders for this wallet
@@ -215,6 +234,20 @@ BEGIN
           INSERT INTO rewards (wallet_address, type, amount, description)
           VALUES (p_wallet_address, 'team_bonus', v_team_reward,
                   'V' || v_member.level || ' team bonus: team ' || v_team_staking || ' × ' || v_highest_rate || '% × ' || v_bonus_rate || '%');
+
+          -- Equal-level bonus: if direct upline has the same level, upline gets 10%
+          IF v_member.referrer_address IS NOT NULL THEN
+            SELECT * INTO v_referrer FROM members WHERE wallet_address = v_member.referrer_address;
+            IF FOUND AND v_referrer.level = v_member.level AND v_referrer.level >= 1 THEN
+              v_equal_bonus := v_team_reward * 10 / 100;
+              IF v_equal_bonus > 0 THEN
+                INSERT INTO rewards (wallet_address, type, amount, from_address, description)
+                VALUES (v_referrer.wallet_address, 'team_bonus', v_equal_bonus,
+                        p_wallet_address,
+                        'V' || v_referrer.level || ' equal-level bonus 10% from V' || v_member.level || ' ' || LEFT(p_wallet_address, 6) || '...');
+              END IF;
+            END IF;
+          END IF;
         END IF;
       END IF;
     END IF;
