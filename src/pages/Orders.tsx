@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useActiveAccount } from "thirdweb/react";
 import { useQuery } from "@tanstack/react-query";
-import { Wallet, TrendingUp, Clock, ClipboardList, Loader2, Shield, Gift } from "lucide-react";
+import { Wallet, TrendingUp, Clock, ClipboardList, Loader2, Shield, Gift, ExternalLink } from "lucide-react";
 import { getOrdersByWallet, getEarnings, getRewardsByWallet } from "@/lib/api";
 import { t, getLang } from "@/lib/i18n";
 
@@ -175,6 +175,18 @@ export default function OrdersPage() {
                       <span>{t("orders.start")}: {new Date(order.startDate).toLocaleDateString()}</span>
                       <span>{t("orders.end")}: {endDate.toLocaleDateString()}</span>
                     </div>
+                    {order.txHash && (
+                      <a
+                        href={`https://bscscan.com/tx/${order.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 mt-1.5 text-xs"
+                        style={{ color: "#C9A227" }}
+                      >
+                        <ExternalLink size={10} />
+                        <span>View on BscScan</span>
+                      </a>
+                    )}
                     {order.status === "active" && (
                       <div className="flex items-center gap-1 mt-1.5 text-xs" style={{ color: "rgba(201,162,39,0.6)" }}>
                         <Shield size={10} />

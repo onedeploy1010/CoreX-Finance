@@ -8,7 +8,7 @@ import { useActiveAccount } from "thirdweb/react";
 import { useSendTransaction } from "thirdweb/react";
 import { prepareContractCall } from "thirdweb";
 import { getWithdrawalContract, parseUSDT } from "@/lib/contracts";
-import { ChevronLeft, ChevronRight, Check, X, Send, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink } from "lucide-react";
 
 const STATUS_TABS = [
   { value: "all", label: "全部" },
@@ -81,10 +81,17 @@ function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => v
           <div className="text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleDateString()}</div>
         </div>
       </div>
-      {w.tx_hash && (
-        <div className="text-xs text-muted-foreground truncate">
-          TX: {shortAddr(w.tx_hash)}
-        </div>
+      {w.txHash && (
+        <a
+          href={`https://bscscan.com/tx/${w.txHash}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-xs"
+          style={{ color: "#C9A227" }}
+        >
+          <ExternalLink size={10} />
+          <span>View on BscScan: {shortAddr(w.txHash)}</span>
+        </a>
       )}
     </div>
   );

@@ -16,7 +16,7 @@ import { t, getLang, shortAddr } from "@/lib/i18n";
 import {
   User, Bell, Globe, ChevronRight, Check, Clock,
   LogOut, Copy, Wallet, Crown, Award, BellRing, BellOff,
-  ArrowDownToLine, AlertCircle, Shield, Gift, Loader2, FileText
+  ArrowDownToLine, AlertCircle, Shield, Gift, Loader2, FileText, ExternalLink
 } from "lucide-react";
 
 function getLevelName(level: number) {
@@ -537,12 +537,21 @@ export default function ProfilePage() {
                       <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(2)} U</div>
                     </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleString()}</div>
-                  {w.txHash && (
-                    <div className="text-xs text-muted-foreground truncate">
-                      TX: {w.txHash.slice(0, 10)}...{w.txHash.slice(-6)}
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground">{new Date(w.createdAt).toLocaleString()}</div>
+                    {w.txHash && (
+                      <a
+                        href={`https://bscscan.com/tx/${w.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs"
+                        style={{ color: "#C9A227" }}
+                      >
+                        <ExternalLink size={10} />
+                        <span>BscScan</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
               ))
             )}
