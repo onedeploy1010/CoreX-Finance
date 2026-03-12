@@ -57,11 +57,11 @@ export interface Message {
 }
 
 export const PRODUCTS = [
-  { id: 1, name: "芯未来", nameEn: "CX Peak 01", days: 30, dailyRate: 0.3, minAmount: 200, description: "入门级稳健理财" },
-  { id: 2, name: "芯未来1号", nameEn: "CX Flash 01", days: 120, dailyRate: 0.41, minAmount: 500, description: "进阶稳健增值" },
-  { id: 3, name: "芯未来2号", nameEn: "CX Career 01", days: 180, dailyRate: 0.5, minAmount: 1000, description: "中期复利增长" },
-  { id: 4, name: "芯未来3号", nameEn: "CX Pro 01", days: 240, dailyRate: 0.65, minAmount: 2000, description: "高收益专业级" },
-  { id: 5, name: "芯未来4号", nameEn: "CX Elite 01", days: 360, dailyRate: 0.72, minAmount: 3000, description: "顶级年化收益" },
+  { id: 1, name: "芯未来", nameEn: "CoreX Future", days: 30, dailyRate: 0.3, minAmount: 200, description: "入门级稳健理财" },
+  { id: 2, name: "芯未来1号", nameEn: "CoreX Future I", days: 120, dailyRate: 0.41, minAmount: 500, description: "进阶稳健增值" },
+  { id: 3, name: "芯未来2号", nameEn: "CoreX Future II", days: 180, dailyRate: 0.5, minAmount: 1000, description: "中期复利增长" },
+  { id: 4, name: "芯未来3号", nameEn: "CoreX Future III", days: 240, dailyRate: 0.65, minAmount: 2000, description: "高收益专业级" },
+  { id: 5, name: "芯未来4号", nameEn: "CoreX Future IV", days: 360, dailyRate: 0.72, minAmount: 3000, description: "顶级年化收益" },
 ];
 
 export const LEVEL_CONFIG = [

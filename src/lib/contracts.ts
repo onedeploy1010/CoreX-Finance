@@ -110,6 +110,23 @@ const COREX_INVESTMENT_ABI = [
     stateMutability: "view",
   },
   {
+    type: "function",
+    name: "addProduct",
+    inputs: [
+      { type: "uint256", name: "_minAmount" },
+      { type: "uint256", name: "_maxAmount" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "productCount",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
     type: "event",
     name: "InvestmentCreated",
     inputs: [
@@ -335,4 +352,21 @@ export async function isAuthorizedCaller(address: string): Promise<boolean> {
     params: [address],
   });
   return result as boolean;
+}
+
+export function prepareAddProduct(minAmount: bigint, maxAmount: bigint) {
+  return prepareContractCall({
+    contract: getInvestmentContract(),
+    method: "addProduct",
+    params: [minAmount, maxAmount],
+  });
+}
+
+export async function getProductCount(): Promise<number> {
+  const result = await readContract({
+    contract: getInvestmentContract(),
+    method: "productCount",
+    params: [],
+  });
+  return Number(result);
 }
