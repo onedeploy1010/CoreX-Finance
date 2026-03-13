@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, ArrowRight, Users, BarChart3 } from "lucide-react";
 
 async function getMedia() {
   const { data } = await supabase
@@ -59,33 +59,25 @@ function MediaSlider({ items }: { items: any[] }) {
   }, [current, isAutoPlay, items, next]);
 
   if (items.length === 0) return null;
-
   const item = items[current];
 
   return (
     <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
-      <div className="absolute inset-0 rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(201,162,39,0.15)" }}>
+      <div className="absolute inset-0 rounded-2xl overflow-hidden"
+        style={{ border: "1px solid rgba(201,162,39,0.12)", boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }}>
         {item.type === "image" && (
           <img src={item.url} alt={item.title || ""} className="w-full h-full object-cover transition-opacity duration-700" />
         )}
         {item.type === "video" && (
-          <video
-            src={item.url}
-            controls
-            className="w-full h-full object-contain"
-            style={{ background: "#000" }}
-            onPlay={() => setIsAutoPlay(false)}
-            onEnded={() => setIsAutoPlay(true)}
-          />
+          <video src={item.url} controls className="w-full h-full object-contain" style={{ background: "#000" }}
+            onPlay={() => setIsAutoPlay(false)} onEnded={() => setIsAutoPlay(true)} />
         )}
         {item.type === "youtube" && <YouTubeEmbed url={item.url} />}
-
-        {/* Gradient overlay */}
-        <div className="absolute inset-0" style={{ background: "linear-gradient(0deg, rgba(12,10,8,0.7) 0%, transparent 40%)" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(0deg, rgba(12,10,8,0.8) 0%, transparent 50%)" }} />
       </div>
 
       {item.title && (
-        <div className="absolute bottom-0 left-0 right-0 p-5 rounded-b-2xl">
+        <div className="absolute bottom-0 left-0 right-0 p-5 rounded-b-2xl z-10">
           <div className="text-base font-bold text-white">{item.title}</div>
           {item.description && <div className="text-sm text-white/50 mt-1">{item.description}</div>}
         </div>
@@ -93,33 +85,18 @@ function MediaSlider({ items }: { items: any[] }) {
 
       {items.length > 1 && (
         <>
-          <button
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-sm transition-all active:scale-90"
-            style={{ background: "rgba(201,162,39,0.15)", border: "1px solid rgba(201,162,39,0.25)" }}
-            onClick={prev}
-          >
+          <button className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90 z-10"
+            style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(201,162,39,0.2)" }} onClick={prev}>
             <ChevronLeft size={18} style={{ color: "#C9A227" }} />
           </button>
-          <button
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-sm transition-all active:scale-90"
-            style={{ background: "rgba(201,162,39,0.15)", border: "1px solid rgba(201,162,39,0.25)" }}
-            onClick={next}
-          >
+          <button className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90 z-10"
+            style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(201,162,39,0.2)" }} onClick={next}>
             <ChevronRight size={18} style={{ color: "#C9A227" }} />
           </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
             {items.map((_, i) => (
-              <button
-                key={i}
-                className="transition-all duration-300"
-                style={{
-                  width: i === current ? 20 : 8,
-                  height: 4,
-                  borderRadius: 2,
-                  background: i === current ? "#C9A227" : "rgba(255,255,255,0.3)",
-                }}
-                onClick={() => setCurrent(i)}
-              />
+              <button key={i} className="transition-all duration-300" onClick={() => setCurrent(i)}
+                style={{ width: i === current ? 24 : 6, height: 4, borderRadius: 2, background: i === current ? "#C9A227" : "rgba(255,255,255,0.25)" }} />
             ))}
           </div>
         </>
@@ -128,120 +105,187 @@ function MediaSlider({ items }: { items: any[] }) {
   );
 }
 
-export default function LandingPage({ onEnter }: { onEnter: () => void }) {
-  const { data: media = [] } = useQuery({
-    queryKey: ["/api/media"],
-    queryFn: getMedia,
-  });
+// Animated number counter
+function AnimatedNum({ value, suffix = "" }: { value: string; suffix?: string }) {
+  return <span className="tabular-nums">{value}{suffix}</span>;
+}
 
-  const { data: companyIntro = "" } = useQuery({
-    queryKey: ["/api/company-intro"],
-    queryFn: getCompanyIntro,
-  });
+export default function LandingPage({ onEnter }: { onEnter: () => void }) {
+  const { data: media = [] } = useQuery({ queryKey: ["/api/media"], queryFn: getMedia });
+  const { data: companyIntro = "" } = useQuery({ queryKey: ["/api/company-intro"], queryFn: getCompanyIntro });
+
+  const [visible, setVisible] = useState(false);
+  useEffect(() => { requestAnimationFrame(() => setVisible(true)); }, []);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "radial-gradient(ellipse at top, #1a1510 0%, #0c0a08 50%, #080604 100%)" }}>
-      {/* Ambient glow */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
-        style={{ background: "radial-gradient(ellipse, rgba(201,162,39,0.08) 0%, transparent 70%)" }} />
+    <div className="min-h-screen flex flex-col overflow-hidden" style={{ background: "#080604" }}>
+      {/* Background effects */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px]"
+          style={{ background: "radial-gradient(ellipse, rgba(201,162,39,0.06) 0%, transparent 70%)" }} />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px]"
+          style={{ background: "radial-gradient(circle, rgba(201,162,39,0.03) 0%, transparent 60%)" }} />
+        <div className="absolute top-1/3 right-0 w-[300px] h-[300px]"
+          style={{ background: "radial-gradient(circle, rgba(201,162,39,0.02) 0%, transparent 60%)" }} />
+        {/* Grid pattern */}
+        <div className="absolute inset-0 opacity-[0.015]"
+          style={{ backgroundImage: "linear-gradient(rgba(201,162,39,1) 1px, transparent 1px), linear-gradient(90deg, rgba(201,162,39,1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+      </div>
 
-      {/* Header */}
-      <header className="relative z-10 flex items-center justify-center px-6 pt-10 pb-6">
-        <div className="flex flex-col items-center gap-3">
-          <img src="/corex.png" alt="CoreX" className="w-20 h-20 drop-shadow-lg"
-            style={{ filter: "drop-shadow(0 8px 24px rgba(201,162,39,0.4))" }} />
-          <div className="text-center">
-            <h1 className="font-black text-3xl tracking-wider" style={{
-              background: "linear-gradient(135deg, #E8D48B, #C9A227, #9A7A1A)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}>CoreX</h1>
-            <p className="text-xs tracking-[0.3em] mt-1" style={{ color: "rgba(201,162,39,0.5)" }}>
-              AI COMPUTING INFRASTRUCTURE
-            </p>
-          </div>
+      {/* Hero Section */}
+      <div className="relative z-10 flex flex-col items-center pt-12 pb-8 px-6"
+        style={{ transition: "opacity 0.8s ease, transform 0.8s ease", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(20px)" }}>
+        {/* Logo */}
+        <div className="relative mb-5">
+          <div className="absolute inset-0 scale-150 blur-3xl opacity-30"
+            style={{ background: "radial-gradient(circle, rgba(201,162,39,0.4), transparent 70%)" }} />
+          <img src="/corex.png" alt="CoreX" className="w-24 h-24 relative z-10"
+            style={{ filter: "drop-shadow(0 0 30px rgba(201,162,39,0.3))" }} />
         </div>
-      </header>
 
-      <main className="flex-1 px-5 pb-10 space-y-6 relative z-10">
+        {/* Title */}
+        <h1 className="font-black text-4xl tracking-wider mb-2" style={{
+          background: "linear-gradient(135deg, #F5E6A3 0%, #C9A227 50%, #8B6914 100%)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          textShadow: "none",
+        }}>CoreX</h1>
+        <p className="text-[11px] tracking-[0.4em] uppercase font-medium" style={{ color: "rgba(201,162,39,0.4)" }}>
+          AI Computing Infrastructure
+        </p>
+
+        {/* Tagline */}
+        <div className="mt-4 text-center max-w-xs">
+          <p className="text-sm font-medium text-foreground/50 leading-relaxed">
+            新一代去中心化AI算力投资平台<br />
+            <span style={{ color: "rgba(201,162,39,0.7)" }}>安全 · 透明 · 高效</span>
+          </p>
+        </div>
+      </div>
+
+      <main className="flex-1 px-5 pb-10 space-y-7 relative z-10"
+        style={{ transition: "opacity 1s ease 0.3s, transform 1s ease 0.3s", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)" }}>
+
         {/* Media Carousel */}
         {media.length > 0 && <MediaSlider items={media} />}
 
-        {/* Stats Row */}
-        <div className="flex items-center justify-center gap-8 py-2">
+        {/* Stats Strip */}
+        <div className="rounded-2xl p-4 grid grid-cols-3 gap-4"
+          style={{
+            background: "linear-gradient(135deg, rgba(201,162,39,0.06) 0%, rgba(201,162,39,0.02) 100%)",
+            border: "1px solid rgba(201,162,39,0.1)",
+          }}>
           {[
-            { value: "BSC", label: "区块链" },
-            { value: "24/7", label: "自动结算" },
-            { value: "USDT", label: "稳定币" },
+            { icon: Shield, value: "BSC", label: "安全区块链", color: "#22c55e" },
+            { icon: BarChart3, value: "24/7", label: "自动结算", color: "#C9A227" },
+            { icon: Users, value: "USDT", label: "稳定币质押", color: "#3b82f6" },
           ].map((s) => (
-            <div key={s.label} className="text-center">
-              <div className="text-lg font-black" style={{ color: "#C9A227" }}>{s.value}</div>
-              <div className="text-[10px] text-muted-foreground mt-0.5">{s.label}</div>
+            <div key={s.label} className="text-center space-y-1.5">
+              <div className="w-9 h-9 rounded-xl mx-auto flex items-center justify-center"
+                style={{ background: `${s.color}10`, border: `1px solid ${s.color}20` }}>
+                <s.icon size={16} style={{ color: s.color }} />
+              </div>
+              <div className="text-base font-black" style={{ color: "#C9A227" }}>
+                <AnimatedNum value={s.value} />
+              </div>
+              <div className="text-[10px] text-foreground/30">{s.label}</div>
             </div>
           ))}
         </div>
 
         {/* Company Intro */}
         {companyIntro && (
-          <div className="rounded-2xl p-5 space-y-3 relative overflow-hidden"
+          <div className="rounded-2xl relative overflow-hidden"
             style={{
-              background: "linear-gradient(145deg, rgba(26,21,16,0.9), rgba(17,14,10,0.9))",
-              border: "1px solid rgba(201,162,39,0.15)",
-              backdropFilter: "blur(20px)",
+              background: "linear-gradient(145deg, rgba(26,21,16,0.95), rgba(12,10,8,0.95))",
+              border: "1px solid rgba(201,162,39,0.12)",
             }}>
-            {/* Decorative corner */}
-            <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
-              style={{ background: "radial-gradient(circle at top right, rgba(201,162,39,0.08), transparent 70%)" }} />
-            <div className="flex items-center gap-2.5">
-              <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #E8D48B, #9A7A1A)" }} />
-              <h2 className="font-bold text-base" style={{ color: "#C9A227" }}>关于 CoreX</h2>
+            {/* Top gold line */}
+            <div className="h-[2px] w-full" style={{ background: "linear-gradient(90deg, transparent, #C9A227, transparent)" }} />
+            <div className="p-5 space-y-3">
+              <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none"
+                style={{ background: "radial-gradient(circle at top right, rgba(201,162,39,0.06), transparent 70%)" }} />
+              <div className="flex items-center gap-2.5">
+                <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #F5E6A3, #9A7A1A)" }} />
+                <h2 className="font-bold text-base" style={{ color: "#C9A227" }}>关于 CoreX</h2>
+              </div>
+              <p className="text-[13px] text-foreground/50 leading-[1.8] whitespace-pre-line">{companyIntro}</p>
             </div>
-            <p className="text-sm text-foreground/60 leading-relaxed whitespace-pre-line">{companyIntro}</p>
           </div>
         )}
 
         {/* Features */}
         <div className="space-y-3">
-          {[
-            { icon: Shield, title: "安全可靠", desc: "智能合约自动执行，链上透明可查，资金安全有保障", color: "#22c55e" },
-            { icon: TrendingUp, title: "稳定收益", desc: "AI算力驱动的量化投资策略，每日自动结算收益", color: "#C9A227" },
-            { icon: Zap, title: "即时结算", desc: "BSC链上自动执行，提现秒到账，无需人工审核", color: "#3b82f6" },
-            { icon: Globe, title: "全球节点", desc: "分布式AI算力网络，覆盖全球主要数据中心", color: "#a855f7" },
-          ].map((f) => (
-            <div key={f.title} className="flex items-start gap-4 rounded-2xl p-4 transition-all"
-              style={{
-                background: "linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
-                border: "1px solid rgba(255,255,255,0.06)",
-              }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: `${f.color}12`, border: `1px solid ${f.color}25` }}>
-                <f.icon size={18} style={{ color: f.color }} />
+          <div className="flex items-center gap-2 px-1 mb-1">
+            <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
+            <span className="text-sm font-bold text-foreground/70">核心优势</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: Shield, title: "安全可靠", desc: "智能合约保障\n链上透明可查", color: "#22c55e" },
+              { icon: TrendingUp, title: "稳定收益", desc: "AI算力驱动\n每日自动结算", color: "#C9A227" },
+              { icon: Zap, title: "即时提现", desc: "链上自动执行\n到账快速", color: "#3b82f6" },
+              { icon: Globe, title: "全球节点", desc: "分布式算力网络\n覆盖全球", color: "#a855f7" },
+            ].map((f) => (
+              <div key={f.title} className="rounded-2xl p-4 relative overflow-hidden group"
+                style={{
+                  background: "linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.005))",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}>
+                {/* Hover glow */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                  style={{ background: `radial-gradient(circle at center, ${f.color}08, transparent 70%)` }} />
+
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
+                  style={{ background: `${f.color}10`, border: `1px solid ${f.color}18` }}>
+                  <f.icon size={18} style={{ color: f.color }} />
+                </div>
+                <div className="font-bold text-sm text-foreground mb-1">{f.title}</div>
+                <div className="text-[11px] text-foreground/30 leading-relaxed whitespace-pre-line">{f.desc}</div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-bold text-sm text-foreground mb-0.5">{f.title}</div>
-                <div className="text-xs text-foreground/40 leading-relaxed">{f.desc}</div>
-              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Trust indicators */}
+        <div className="flex items-center justify-center gap-6 py-2">
+          {["BSC Chain", "Smart Contract", "USDT", "Auto Settlement"].map((t) => (
+            <div key={t} className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#22c55e" }} />
+              <span className="text-[10px] text-foreground/25">{t}</span>
             </div>
           ))}
         </div>
 
         {/* CTA */}
-        <div className="pt-2 space-y-4">
+        <div className="pt-1 space-y-5">
           <button
-            className="w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            className="w-full py-4.5 rounded-2xl font-bold text-base transition-all active:scale-[0.97] flex items-center justify-center gap-2.5 relative overflow-hidden group"
             style={{
-              background: "linear-gradient(135deg, #E8D48B, #C9A227, #9A7A1A)",
+              background: "linear-gradient(135deg, #F5E6A3, #C9A227, #9A7A1A)",
               color: "#0c0a08",
-              boxShadow: "0 8px 32px rgba(201,162,39,0.3), inset 0 1px 0 rgba(255,255,255,0.2)",
+              boxShadow: "0 8px 32px rgba(201,162,39,0.25), 0 2px 8px rgba(201,162,39,0.2)",
+              padding: "18px 0",
             }}
             onClick={onEnter}
           >
-            进入平台 <ArrowRight size={18} />
+            {/* Shine effect */}
+            <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity"
+              style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), transparent)" }} />
+            <span className="relative z-10 flex items-center gap-2">
+              进入平台 <ArrowRight size={18} strokeWidth={2.5} />
+            </span>
           </button>
 
-          <div className="text-center space-y-1">
-            <div className="text-[11px] text-foreground/25">CoreX Finance</div>
-            <div className="text-[10px] text-foreground/15">BSC Chain · USDT Staking Platform</div>
+          {/* Footer */}
+          <div className="text-center space-y-2 pb-4">
+            <div className="flex items-center justify-center gap-2">
+              <div className="h-[1px] w-8" style={{ background: "linear-gradient(90deg, transparent, rgba(201,162,39,0.15))" }} />
+              <span className="text-[10px] font-medium" style={{ color: "rgba(201,162,39,0.2)" }}>CoreX Finance</span>
+              <div className="h-[1px] w-8" style={{ background: "linear-gradient(90deg, rgba(201,162,39,0.15), transparent)" }} />
+            </div>
+            <div className="text-[9px] text-foreground/10">BSC Chain · USDT Staking · Decentralized Platform</div>
           </div>
         </div>
       </main>
