@@ -6,8 +6,9 @@ import {
   getAdminWithdrawals, updateWithdrawalStatus, triggerAutoWithdraw, adminAddLog,
   getAdminNotifications, markNotificationRead, markAllNotificationsRead,
 } from "@/lib/api";
-import { readContract, sendTransaction } from "thirdweb";
-import { useActiveAccount, useSendTransaction } from "thirdweb/react";
+import { readContract } from "thirdweb";
+import { useActiveAccount, useSendTransaction, ConnectButton } from "thirdweb/react";
+import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { getWithdrawalContract, getUSDTContract, formatUSDT, prepareApproveUSDTForWithdrawal, getWithdrawalAllowance, COREX_WITHDRAWAL_ADDRESS } from "@/lib/contracts";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck } from "lucide-react";
@@ -175,8 +176,43 @@ function AuthorizationPanel() {
       </div>
 
       {!connectedAddr ? (
-        <div className="text-xs text-muted-foreground p-2 rounded-lg" style={{ background: "rgba(234,179,8,0.06)" }}>
-          请连接提现钱包进行授权。连接后点击「授权」按钮，签名一次即可永久生效。
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground p-2 rounded-lg" style={{ background: "rgba(234,179,8,0.06)" }}>
+            请连接提现钱包进行授权。连接后点击「授权」按钮，签名一次即可永久生效。
+          </div>
+          <ConnectButton
+            client={client}
+            chain={bscChain}
+            wallets={wallets}
+            connectModal={{ size: "compact", showThirdwebBranding: false }}
+            connectButton={{
+              label: "连接提现钱包",
+              style: {
+                width: "100%",
+                background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
+                color: "#0c0a08",
+                fontWeight: "700",
+                fontSize: "14px",
+                padding: "10px 18px",
+                borderRadius: "10px",
+                border: "none",
+                cursor: "pointer",
+              },
+            }}
+            detailsButton={{
+              style: {
+                width: "100%",
+                background: "rgba(201,162,39,0.12)",
+                border: "1px solid rgba(201,162,39,0.35)",
+                color: "#C9A227",
+                fontWeight: "600",
+                fontSize: "13px",
+                padding: "8px 14px",
+                borderRadius: "10px",
+              },
+            }}
+            theme="dark"
+          />
         </div>
       ) : (
         <div className="space-y-2">
