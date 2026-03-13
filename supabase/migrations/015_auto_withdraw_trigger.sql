@@ -24,19 +24,24 @@ BEGIN
 
   -- Get service role key from system_settings (we'll store it there)
   SELECT value INTO v_service_key FROM system_settings WHERE key = 'service_role_key';
-  IF v_service_key IS NULL THEN
+  IF v_service_key IS NULL OR v_service_key = '' THEN
     RETURN NEW; -- Skip if not configured
   END IF;
 
   -- Call edge function via pg_net (async, non-blocking)
-  PERFORM extensions.http_post(
-    url := v_supabase_url || '/functions/v1/auto-withdraw',
-    body := '{}',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || v_service_key
-    )
-  );
+  BEGIN
+    PERFORM extensions.http_post(
+      url := v_supabase_url || '/functions/v1/auto-withdraw',
+      body := '{}',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || v_service_key
+      )
+    );
+  EXCEPTION WHEN OTHERS THEN
+    -- Don't block withdrawal if edge function call fails
+    NULL;
+  END;
 
   RETURN NEW;
 END;
