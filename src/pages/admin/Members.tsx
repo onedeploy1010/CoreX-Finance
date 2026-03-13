@@ -279,7 +279,7 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
                   </div>
                   <div className="text-[10px] text-muted-foreground">
                     {new Date(o.start_date || o.startDate).toLocaleDateString()} ~ {new Date(o.end_date || o.endDate).toLocaleDateString()}
-                    {o.total_earned || o.totalEarned ? ` · 已赚 ${parseFloat(o.total_earned || o.totalEarned || "0").toFixed(2)}U` : ""}
+                    {o.total_earned || o.totalEarned ? ` · 已赚 ${parseFloat(o.total_earned || o.totalEarned || "0").toFixed(6)}U` : ""}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -317,7 +317,7 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
           <div className="space-y-1.5">
             {data.withdrawals.map((w: any) => (
               <div key={w.id} className="flex items-center justify-between p-2 rounded" style={{ background: "rgba(201,162,39,0.04)" }}>
-                <span className="text-xs font-semibold">{parseFloat(w.amount).toFixed(2)} U</span>
+                <span className="text-xs font-semibold">{parseFloat(w.amount).toFixed(6)} U</span>
                 <span className="text-xs text-muted-foreground">{new Date(w.created_at || w.createdAt).toLocaleDateString()}</span>
                 <span className="text-xs" style={{ color: w.status === "pending" ? "#eab308" : w.status === "completed" ? "#22c55e" : "#ef4444" }}>
                   {w.status === "pending" ? "待审核" : w.status === "completed" ? "已完成" : "已拒绝"}

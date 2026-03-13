@@ -56,15 +56,15 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard icon={Users} label="总会员" value={d.memberCount?.toString() || "0"} />
         <StatCard icon={ShoppingCart} label="总订单" value={d.orderCount?.toString() || "0"} sub={`活跃 ${d.activeOrderCount || 0}`} />
-        <StatCard icon={DollarSign} label="活跃质押(U)" value={parseFloat(d.totalStaking || 0).toFixed(2)} />
-        <StatCard icon={TrendingUp} label="累计发放(U)" value={parseFloat(d.totalEarned || 0).toFixed(2)} />
+        <StatCard icon={DollarSign} label="活跃质押(U)" value={parseFloat(d.totalStaking || 0).toFixed(6)} />
+        <StatCard icon={TrendingUp} label="累计发放(U)" value={parseFloat(d.totalEarned || 0).toFixed(6)} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon={ArrowDownToLine} label="累计提现(U)" value={parseFloat(d.totalWithdrawn || 0).toFixed(2)} sub={`${d.withdrawalCount || 0} 笔`} />
-        <StatCard icon={Clock} label="待审提现" value={d.pendingWithdrawals?.count?.toString() || "0"} sub={`${parseFloat(d.pendingWithdrawals?.total || 0).toFixed(2)} U`} color="#ef4444" />
-        <StatCard icon={DollarSign} label="累计奖励(U)" value={parseFloat(d.totalRewards || 0).toFixed(2)} />
-        <StatCard icon={ShoppingCart} label="已完成订单(U)" value={parseFloat(d.completedOrderAmount || 0).toFixed(2)} />
+        <StatCard icon={ArrowDownToLine} label="累计提现(U)" value={parseFloat(d.totalWithdrawn || 0).toFixed(6)} sub={`${d.withdrawalCount || 0} 笔`} />
+        <StatCard icon={Clock} label="待审提现" value={d.pendingWithdrawals?.count?.toString() || "0"} sub={`${parseFloat(d.pendingWithdrawals?.total || 0).toFixed(6)} U`} color="#ef4444" />
+        <StatCard icon={DollarSign} label="累计奖励(U)" value={parseFloat(d.totalRewards || 0).toFixed(6)} />
+        <StatCard icon={ShoppingCart} label="已完成订单(U)" value={parseFloat(d.completedOrderAmount || 0).toFixed(6)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

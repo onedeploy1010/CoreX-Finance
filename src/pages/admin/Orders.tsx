@@ -51,7 +51,7 @@ function OrderCard({ o, onView }: { o: any; onView: () => void }) {
         </div>
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">已赚</div>
-          <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(o.totalEarned).toFixed(2)}U</div>
+          <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(o.totalEarned).toFixed(6)}U</div>
         </div>
       </div>
       <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t" style={{ borderColor: "rgba(201,162,39,0.08)" }}>
@@ -324,13 +324,13 @@ function OrderDetail({ data }: { data: any }) {
       <div className="grid grid-cols-2 gap-2">
         <InfoItem label="产品" value={data.productName} />
         <InfoItem label="状态" value={data.status === "active" ? "进行中" : data.status === "cancelled" ? "已取消" : "已完成"} color={data.status === "active" ? "#22c55e" : data.status === "cancelled" ? "#ef4444" : "#888"} />
-        <InfoItem label="质押金额" value={`${parseFloat(data.amount).toFixed(2)} U`} />
+        <InfoItem label="质押金额" value={`${parseFloat(data.amount).toFixed(6)} U`} />
         <InfoItem label="日利率" value={`${data.dailyRate}%`} />
-        <InfoItem label="日利息" value={`${parseFloat(data.dailyEarning).toFixed(4)} U`} highlight />
+        <InfoItem label="日利息" value={`${parseFloat(data.dailyEarning).toFixed(6)} U`} highlight />
         <InfoItem label="总天数" value={`${data.days} 天`} />
         <InfoItem label="已释放" value={`${data.elapsedDays} 天`} highlight />
         <InfoItem label="剩余" value={`${data.remainingDays} 天`} />
-        <InfoItem label="已赚" value={`${parseFloat(data.totalEarned).toFixed(4)} U`} highlight />
+        <InfoItem label="已赚" value={`${parseFloat(data.totalEarned).toFixed(6)} U`} highlight />
         <InfoItem label="开始日期" value={new Date(data.startDate).toLocaleDateString()} />
         <InfoItem label="结束日期" value={new Date(data.endDate).toLocaleDateString()} />
         <InfoItem label="创建时间" value={new Date(data.startDate).toLocaleString()} />

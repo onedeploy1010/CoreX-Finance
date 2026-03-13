@@ -71,7 +71,7 @@ export default function OrdersPage() {
             <span className="text-[10px] text-muted-foreground">日收益</span>
           </div>
           <div className="font-black text-lg" style={{ color: "#E8C547" }}>
-            {todayDailyEarnings.toFixed(2)}
+            {todayDailyEarnings.toFixed(6)}
           </div>
           <div className="text-[10px] text-muted-foreground">USDT</div>
         </div>
@@ -81,7 +81,7 @@ export default function OrdersPage() {
             <span className="text-[10px] text-muted-foreground">总收益</span>
           </div>
           <div className="font-black text-lg" style={{ color: "#C9A227" }}>
-            {totalEarnings.toFixed(2)}
+            {totalEarnings.toFixed(6)}
           </div>
           <div className="text-[10px] text-muted-foreground">USDT</div>
         </div>
@@ -178,12 +178,12 @@ export default function OrdersPage() {
                     <div className="text-center">
                       <div className="text-xs text-muted-foreground mb-0.5">{t("orders.daily_interest")}</div>
                       <div className="text-sm font-bold" style={{ color: "#E8C547" }}>
-                        +{(parseFloat(order.amount) * parseFloat(order.dailyRate) / 100).toFixed(2)} U
+                        +{(parseFloat(order.amount) * parseFloat(order.dailyRate) / 100).toFixed(6)} U
                       </div>
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-muted-foreground mb-0.5">{t("orders.total_earned")}</div>
-                      <div className="text-sm font-bold" style={{ color: "#C9A227" }}>+{parseFloat(order.totalEarned).toFixed(2)} U</div>
+                      <div className="text-sm font-bold" style={{ color: "#C9A227" }}>+{parseFloat(order.totalEarned).toFixed(6)} U</div>
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-muted-foreground mb-0.5">
@@ -198,7 +198,7 @@ export default function OrdersPage() {
                   <div className="flex items-center justify-between text-xs px-1" style={{ color: "rgba(201,162,39,0.5)" }}>
                     <span>{t("orders.daily_rate")}: {order.dailyRate}%</span>
                     <span>{t("orders.total_days")}: {order.days}{t("common.days")}</span>
-                    <span>{t("orders.est_total")}: {(parseFloat(order.amount) * parseFloat(order.dailyRate) / 100 * order.days).toFixed(2)} U</span>
+                    <span>{t("orders.est_total")}: {(parseFloat(order.amount) * parseFloat(order.dailyRate) / 100 * order.days).toFixed(6)} U</span>
                   </div>
 
                   <div className="pt-2 border-t" style={{ borderColor: "rgba(201,162,39,0.12)" }}>
@@ -258,7 +258,7 @@ export default function OrdersPage() {
                     </span>
                   </div>
                   <span className="text-sm font-bold" style={{ color: "#C9A227" }}>
-                    +{parseFloat(r.amount).toFixed(2)} U
+                    +{parseFloat(r.amount).toFixed(6)} U
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">

@@ -58,15 +58,15 @@ function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => v
       <div className="grid grid-cols-4 gap-2">
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">金额</div>
-          <div className="text-xs font-bold">{parseFloat(w.amount).toFixed(2)}U</div>
+          <div className="text-xs font-bold">{parseFloat(w.amount).toFixed(6)}U</div>
         </div>
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">手续费</div>
-          <div className="text-xs font-semibold text-muted-foreground">{parseFloat(w.fee).toFixed(2)}U</div>
+          <div className="text-xs font-semibold text-muted-foreground">{parseFloat(w.fee).toFixed(6)}U</div>
         </div>
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">实际</div>
-          <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(2)}U</div>
+          <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(6)}U</div>
         </div>
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">时间</div>

@@ -314,7 +314,7 @@ export default function InvitePage() {
         ].map(({ label, value, color }) => (
           <div key={label} className="rounded-lg py-2.5 px-2 text-center" style={cardStyle}>
             <div className="text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>{label}奖励</div>
-            <div className="font-bold text-xs mt-1" style={{ color }}>{value.toFixed(2)}</div>
+            <div className="font-bold text-xs mt-1" style={{ color }}>{value.toFixed(6)}</div>
           </div>
         ))}
       </div>
@@ -521,7 +521,7 @@ export default function InvitePage() {
                       <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>{new Date(reward.createdAt).toLocaleDateString()}</span>
                       <span className="text-xs font-semibold text-right" style={{ color: "#F0D060" }}>{perf}</span>
                       <span className="text-xs font-semibold text-right" style={{ color: "#D4AF37" }}>{rate}</span>
-                      <span className="text-xs font-bold text-right" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(2)}</span>
+                      <span className="text-xs font-bold text-right" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(6)}</span>
                     </div>
                   );
                 })}
@@ -548,7 +548,7 @@ export default function InvitePage() {
                         {rewardSubTab === "direct_referral" ? "直推奖励" : rewardSubTab === "equal_level_bonus" ? "同级奖励" : "间推奖励"}
                       </span>
                     </div>
-                    <span className="font-bold text-sm" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(2)} U</span>
+                    <span className="font-bold text-sm" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(6)} U</span>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs pl-10">
                     {reward.fromAddress && (

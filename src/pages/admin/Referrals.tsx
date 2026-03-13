@@ -52,8 +52,8 @@ function MemberDetailDialog({ address, open, onClose }: { address: string; open:
                 { label: "等级", value: member.level === 0 ? "普通" : `V${member.level}`, icon: Crown, color: "#C9A227" },
                 { label: "直推人数", value: directReferrals.length, icon: UserPlus, color: "#22c55e" },
                 { label: "活跃投资", value: `${totalStaking.toFixed(0)} U`, icon: ShoppingCart, color: "#3b82f6" },
-                { label: "总收益", value: `${totalEarnings.toFixed(2)} U`, icon: Gift, color: "#C9A227" },
-                { label: "已提现", value: `${totalWithdrawn.toFixed(2)} U`, icon: ArrowDownToLine, color: "#ef4444" },
+                { label: "总收益", value: `${totalEarnings.toFixed(6)} U`, icon: Gift, color: "#C9A227" },
+                { label: "已提现", value: `${totalWithdrawn.toFixed(6)} U`, icon: ArrowDownToLine, color: "#ef4444" },
                 { label: "注册时间", value: new Date(member.createdAt).toLocaleDateString(), icon: Wallet, color: "rgba(255,255,255,0.5)" },
               ].map((item) => (
                 <div key={item.label} className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -114,7 +114,7 @@ function MemberDetailDialog({ address, open, onClose }: { address: string; open:
                       <div>
                         <span className="text-muted-foreground">{r.type}</span>
                       </div>
-                      <span className="font-medium" style={{ color: "#C9A227" }}>+{parseFloat(r.amount).toFixed(4)} U</span>
+                      <span className="font-medium" style={{ color: "#C9A227" }}>+{parseFloat(r.amount).toFixed(6)} U</span>
                     </div>
                   ))}
                   {rewards.length > 20 && <div className="text-center text-[10px] text-muted-foreground py-1">...还有 {rewards.length - 20} 条</div>}

@@ -232,15 +232,15 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
             <div className="rounded-lg p-3 space-y-1.5" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">预计每日收益</span>
-                <span style={{ color }}>+{(parseFloat(amount) * product.dailyRate / 100).toFixed(4)} USDT</span>
+                <span style={{ color }}>+{(parseFloat(amount) * product.dailyRate / 100).toFixed(6)} USDT</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">到期总收益</span>
-                <span style={{ color }}>+{estimatedProfit.toFixed(4)} USDT</span>
+                <span style={{ color }}>+{estimatedProfit.toFixed(6)} USDT</span>
               </div>
               <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: "rgba(201,162,39,0.15)" }}>
                 <span className="text-muted-foreground">到期返还</span>
-                <span style={{ color }}>{(parseFloat(amount) + estimatedProfit).toFixed(4)} USDT</span>
+                <span style={{ color }}>{(parseFloat(amount) + estimatedProfit).toFixed(6)} USDT</span>
               </div>
             </div>
           )}

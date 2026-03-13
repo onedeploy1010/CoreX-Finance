@@ -120,7 +120,7 @@ export default function ProfilePage() {
       id: `order-${o.id}`,
       type: "order" as const,
       label: "投资",
-      amount: `−${parseFloat(o.amount).toFixed(2)}`,
+      amount: `−${parseFloat(o.amount).toFixed(6)}`,
       amountColor: "#ef4444",
       detail: o.productName || o.product_name,
       date: o.startDate || o.start_date,
@@ -129,7 +129,7 @@ export default function ProfilePage() {
       id: `reward-${r.id}`,
       type: "reward" as const,
       label: r.type === "daily" ? "日收益" : r.type === "direct_referral" ? "直推奖励" : r.type === "indirect_referral" ? "间推奖励" : r.type === "team_bonus" ? "团队奖励" : "奖励",
-      amount: `+${parseFloat(r.amount).toFixed(2)}`,
+      amount: `+${parseFloat(r.amount).toFixed(6)}`,
       amountColor: "#C9A227",
       detail: r.productName || r.description || "",
       date: r.createdAt,
@@ -138,9 +138,9 @@ export default function ProfilePage() {
       id: `withdraw-${w.id}`,
       type: "withdrawal" as const,
       label: w.status === "completed" ? "提现成功" : w.status === "rejected" ? "提现拒绝" : "提现申请",
-      amount: `−${parseFloat(w.amount).toFixed(2)}`,
+      amount: `−${parseFloat(w.amount).toFixed(6)}`,
       amountColor: w.status === "rejected" ? "rgba(255,255,255,0.4)" : "#6bc46b",
-      detail: w.status === "completed" ? `实到 ${parseFloat(w.actualAmount).toFixed(2)} U` : w.status === "rejected" ? "已退回" : "处理中",
+      detail: w.status === "completed" ? `实到 ${parseFloat(w.actualAmount).toFixed(6)} U` : w.status === "rejected" ? "已退回" : "处理中",
       date: w.createdAt,
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -337,26 +337,26 @@ export default function ProfilePage() {
         >
           <div className="text-center">
             <div className="text-xs text-muted-foreground mb-1">{t("withdraw.balance")}</div>
-            <div className="font-black text-3xl" style={{ color: "#C9A227" }}>{availableBalance.toFixed(2)}</div>
+            <div className="font-black text-3xl" style={{ color: "#C9A227" }}>{availableBalance.toFixed(6)}</div>
             <div className="text-xs text-muted-foreground">USDT</div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="stat-card rounded-lg p-2.5 text-center">
               <div className="text-[10px] text-muted-foreground">投资收益金额</div>
-              <div className="font-bold text-sm" style={{ color: "#E8C547" }}>{totalDailyEarnings.toFixed(2)} U</div>
+              <div className="font-bold text-sm" style={{ color: "#E8C547" }}>{totalDailyEarnings.toFixed(6)} U</div>
             </div>
             <div className="stat-card rounded-lg p-2.5 text-center">
               <div className="text-[10px] text-muted-foreground">推荐收益金额</div>
-              <div className="font-bold text-sm" style={{ color: "#3b82f6" }}>{totalReferralRewards.toFixed(2)} U</div>
+              <div className="font-bold text-sm" style={{ color: "#3b82f6" }}>{totalReferralRewards.toFixed(6)} U</div>
             </div>
             <div className="stat-card rounded-lg p-2.5 text-center">
               <div className="text-[10px] text-muted-foreground">合计收益金额</div>
-              <div className="font-bold text-sm" style={{ color: "#C9A227" }}>{totalIncome.toFixed(2)} U</div>
+              <div className="font-bold text-sm" style={{ color: "#C9A227" }}>{totalIncome.toFixed(6)} U</div>
             </div>
             <div className="stat-card rounded-lg p-2.5 text-center">
               <div className="text-[10px] text-muted-foreground">累计提现金额</div>
-              <div className="font-bold text-sm" style={{ color: "#6bc46b" }}>{totalWithdrawn.toFixed(2)} U</div>
+              <div className="font-bold text-sm" style={{ color: "#6bc46b" }}>{totalWithdrawn.toFixed(6)} U</div>
             </div>
           </div>
 
@@ -441,7 +441,7 @@ export default function ProfilePage() {
           <div className="space-y-4 py-2">
             <div className="rounded-lg p-3 text-center" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
               <div className="text-xs text-muted-foreground mb-1">{t("withdraw.balance")}</div>
-              <div className="font-black text-2xl" style={{ color: "#C9A227" }}>{availableBalance.toFixed(2)}</div>
+              <div className="font-black text-2xl" style={{ color: "#C9A227" }}>{availableBalance.toFixed(6)}</div>
               <div className="text-xs text-muted-foreground">USDT</div>
             </div>
 
@@ -532,7 +532,7 @@ export default function ProfilePage() {
               <div className="rounded-lg p-3 space-y-1.5" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t("withdraw.amount_label")}</span>
-                  <span className="text-foreground">{parseFloat(withdrawAmount).toFixed(2)} USDT</span>
+                  <span className="text-foreground">{parseFloat(withdrawAmount).toFixed(6)} USDT</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t("withdraw.fee")}</span>
@@ -540,7 +540,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: "rgba(201,162,39,0.15)" }}>
                   <span className="text-muted-foreground">{t("withdraw.actual")}</span>
-                  <span style={{ color: "#C9A227" }}>{(parseFloat(withdrawAmount) - WITHDRAW_FEE).toFixed(2)} USDT</span>
+                  <span style={{ color: "#C9A227" }}>{(parseFloat(withdrawAmount) - WITHDRAW_FEE).toFixed(6)} USDT</span>
                 </div>
               </div>
             )}
@@ -611,15 +611,15 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="text-center">
                       <div className="text-[10px] text-muted-foreground">{t("withdraw.amount_label")}</div>
-                      <div className="text-xs font-bold text-foreground">{parseFloat(w.amount).toFixed(2)} U</div>
+                      <div className="text-xs font-bold text-foreground">{parseFloat(w.amount).toFixed(6)} U</div>
                     </div>
                     <div className="text-center">
                       <div className="text-[10px] text-muted-foreground">{t("withdraw.fee")}</div>
-                      <div className="text-xs font-bold" style={{ color: "#ef4444" }}>-{parseFloat(w.fee).toFixed(2)} U</div>
+                      <div className="text-xs font-bold" style={{ color: "#ef4444" }}>-{parseFloat(w.fee).toFixed(6)} U</div>
                     </div>
                     <div className="text-center">
                       <div className="text-[10px] text-muted-foreground">{t("withdraw.actual")}</div>
-                      <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(2)} U</div>
+                      <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(6)} U</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
