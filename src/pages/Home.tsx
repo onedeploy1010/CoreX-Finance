@@ -80,8 +80,7 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
 
       // Step 2: Call invest on smart contract
       setStep("investing");
-      // Contract product IDs are 0-based, DB product IDs are 1-based
-      const investTx = prepareInvest(product.id - 1, amountWei);
+      const investTx = prepareInvest(product.id, amountWei);
       const result = await sendTransaction(investTx);
       const txHash = result.transactionHash;
 
