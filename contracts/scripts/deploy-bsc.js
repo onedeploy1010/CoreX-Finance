@@ -59,6 +59,12 @@ async function main() {
   await tx2.wait();
   console.log("   CoreXInvestment authorized");
 
+  // 5.5 Set funding wallet on withdrawal contract
+  console.log("Setting funding wallet on CoreXWithdrawal...");
+  const tx3 = await withdrawal.setFundingWallet(WITHDRAWAL_WALLET);
+  await tx3.wait();
+  console.log("   Funding wallet set:", WITHDRAWAL_WALLET);
+
   // 6. Add products (matching your PRODUCTS array)
   console.log("\nAdding products...");
   const products = [

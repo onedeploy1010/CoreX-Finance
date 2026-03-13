@@ -26,12 +26,12 @@ const WITHDRAWAL_ABI = [
   "function batchWithdraw(bytes32 _batchId, address[] calldata _recipients, uint256[] calldata _amounts) external",
   "function getContractBalance() external view returns (uint256)",
   "function isBatchProcessed(bytes32 _batchId) external view returns (bool)",
-  "function deposit(uint256 amount) external",
+  "function pullFunds(uint256 amount) external",
+  "function fundingWallet() external view returns (address)",
 ];
 
 const ERC20_ABI = [
   "function balanceOf(address account) external view returns (uint256)",
-  "function approve(address spender, uint256 amount) external returns (bool)",
   "function allowance(address owner, address spender) external view returns (uint256)",
 ];
 
@@ -139,87 +139,166 @@ Deno.serve(async (req) => {
     let funded = false;
     let fundTxHash = "";
 
-    // 4. If contract balance insufficient (or would drop below min threshold), try to auto-fund
+    // 4. If contract balance insufficient (or would drop below min threshold), try to auto-fund via pullFunds
     const targetBalance = totalNeeded + contractMinBalance; // ensure min balance remains after withdrawal
     if (contractBalance < targetBalance) {
       const deficit = targetBalance - contractBalance;
-      const walletUSDTBalance = await usdtContract.balanceOf(wallet.address);
 
-      if (walletUSDTBalance >= deficit) {
-        // Auto-fund: approve + deposit USDT to withdrawal contract
-        console.log(`Auto-funding contract: deficit=${ethers.formatUnits(deficit, 18)} USDT`);
+      // Check if funding wallet is configured in contract
+      let fundingWalletAddr: string;
+      try {
+        fundingWalletAddr = await contract.fundingWallet();
+      } catch {
+        fundingWalletAddr = ethers.ZeroAddress;
+      }
 
-        // Check current allowance
-        const currentAllowance = await usdtContract.allowance(wallet.address, WITHDRAWAL_CONTRACT);
-        if (currentAllowance < deficit) {
-          const approveTx = await usdtContract.approve(WITHDRAWAL_CONTRACT, ethers.MaxUint256);
-          await approveTx.wait();
-          console.log("USDT approved for withdrawal contract");
+      if (fundingWalletAddr && fundingWalletAddr !== ethers.ZeroAddress) {
+        // Check funding wallet's USDT balance and allowance
+        const walletUSDTBalance = await usdtContract.balanceOf(fundingWalletAddr);
+        const allowance = await usdtContract.allowance(fundingWalletAddr, WITHDRAWAL_CONTRACT);
+
+        if (walletUSDTBalance >= deficit && allowance >= deficit) {
+          // Pull USDT from funding wallet via contract (no private key needed for funding wallet)
+          console.log(`Auto-pulling from funding wallet: deficit=${ethers.formatUnits(deficit, 18)} USDT`);
+
+          const pullTx = await contract.pullFunds(deficit);
+          const pullReceipt = await pullTx.wait();
+          fundTxHash = pullReceipt.hash;
+          funded = true;
+
+          console.log(`Pulled ${ethers.formatUnits(deficit, 18)} USDT, tx: ${fundTxHash}`);
+
+          // Log the auto-funding action
+          await supabase.from("admin_logs").insert({
+            admin_id: 0,
+            admin_username: "system",
+            admin_role: "system",
+            action: "自动从提现钱包拉取资金",
+            target_type: "withdrawal_contract",
+            target_id: WITHDRAWAL_CONTRACT,
+            detail: JSON.stringify({
+              fundingWallet: fundingWalletAddr,
+              deficit: ethers.formatUnits(deficit, 18),
+              txHash: fundTxHash,
+              walletBalance: ethers.formatUnits(walletUSDTBalance, 18),
+            }),
+          });
+        } else {
+          // Funding wallet insufficient or not enough allowance
+          const walletBalanceFormatted = ethers.formatUnits(walletUSDTBalance, 18);
+          const allowanceFormatted = ethers.formatUnits(allowance, 18);
+          const contractBalanceFormatted = ethers.formatUnits(contractBalance, 18);
+          const totalNeededFormatted = ethers.formatUnits(totalNeeded, 18);
+
+          const reason = allowance < deficit
+            ? `授权不足 (已授权: ${allowanceFormatted} USDT)，请在后台重新授权`
+            : `钱包余额不足 (余额: ${walletBalanceFormatted} USDT)`;
+
+          await supabase.from("admin_notifications").insert({
+            type: "insufficient_funds",
+            title: "提现资金不足",
+            message: `${reason}。提现合约余额: ${contractBalanceFormatted} USDT, 需要: ${totalNeededFormatted} USDT。`,
+            is_read: false,
+          });
+
+          await supabase.from("admin_logs").insert({
+            admin_id: 0,
+            admin_username: "system",
+            admin_role: "system",
+            action: "提现资金不足警告",
+            target_type: "withdrawal_contract",
+            target_id: WITHDRAWAL_CONTRACT,
+            detail: JSON.stringify({
+              contractBalance: contractBalanceFormatted,
+              walletBalance: walletBalanceFormatted,
+              allowance: allowanceFormatted,
+              totalNeeded: totalNeededFormatted,
+              pendingCount: pending.length,
+            }),
+          });
+
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: `资金不足：${reason}，已通知管理员`,
+              contractBalance: contractBalanceFormatted,
+              walletBalance: walletBalanceFormatted,
+              needed: totalNeededFormatted,
+              pendingCount: pending.length,
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
+      }
 
-        // Deposit USDT to withdrawal contract
-        const depositTx = await contract.deposit(deficit);
-        const depositReceipt = await depositTx.wait();
-        fundTxHash = depositReceipt.hash;
-        funded = true;
+      // Fallback: if pullFunds failed or no funding wallet, try direct deposit from operator wallet
+      if (!funded) {
+        const operatorUSDTBalance = await usdtContract.balanceOf(wallet.address);
+        if (operatorUSDTBalance >= deficit) {
+          console.log(`Fallback: depositing from operator wallet, deficit=${ethers.formatUnits(deficit, 18)} USDT`);
 
-        console.log(`Funded ${ethers.formatUnits(deficit, 18)} USDT, tx: ${fundTxHash}`);
+          // Approve if needed
+          const opAllowance = await usdtContract.allowance(wallet.address, WITHDRAWAL_CONTRACT);
+          if (opAllowance < deficit) {
+            const approveTx = await (new ethers.Contract(USDT_BSC, ["function approve(address,uint256) returns (bool)"], wallet)).approve(WITHDRAWAL_CONTRACT, ethers.MaxUint256);
+            await approveTx.wait();
+          }
 
-        // Log the auto-funding action
-        await supabase.from("admin_logs").insert({
-          admin_id: 0,
-          admin_username: "system",
-          admin_role: "system",
-          action: "自动充值提现合约",
-          target_type: "withdrawal_contract",
-          target_id: WITHDRAWAL_CONTRACT,
-          detail: JSON.stringify({
-            deficit: ethers.formatUnits(deficit, 18),
-            txHash: fundTxHash,
-            walletBalance: ethers.formatUnits(walletUSDTBalance, 18),
-          }),
-        });
-      } else {
-        // Wallet also insufficient - notify admin, keep withdrawals pending
-        const walletBalanceFormatted = ethers.formatUnits(walletUSDTBalance, 18);
-        const contractBalanceFormatted = ethers.formatUnits(contractBalance, 18);
-        const totalNeededFormatted = ethers.formatUnits(totalNeeded, 18);
+          const depositContract = new ethers.Contract(WITHDRAWAL_CONTRACT, ["function deposit(uint256) external"], wallet);
+          const depositTx = await depositContract.deposit(deficit);
+          const depositReceipt = await depositTx.wait();
+          fundTxHash = depositReceipt.hash;
+          funded = true;
 
-        // Create admin notification
-        await supabase.from("admin_notifications").insert({
-          type: "insufficient_funds",
-          title: "提现资金不足",
-          message: `提现合约余额: ${contractBalanceFormatted} USDT, 提现钱包余额: ${walletBalanceFormatted} USDT, 需要: ${totalNeededFormatted} USDT。请及时充值！`,
-          is_read: false,
-        });
+          await supabase.from("admin_logs").insert({
+            admin_id: 0,
+            admin_username: "system",
+            admin_role: "system",
+            action: "操作员钱包直接充值提现合约",
+            target_type: "withdrawal_contract",
+            target_id: WITHDRAWAL_CONTRACT,
+            detail: JSON.stringify({
+              deficit: ethers.formatUnits(deficit, 18),
+              txHash: fundTxHash,
+            }),
+          });
+        } else {
+          // All sources insufficient - notify admin
+          const contractBalanceFormatted = ethers.formatUnits(contractBalance, 18);
+          const totalNeededFormatted = ethers.formatUnits(totalNeeded, 18);
 
-        // Log the event
-        await supabase.from("admin_logs").insert({
-          admin_id: 0,
-          admin_username: "system",
-          admin_role: "system",
-          action: "提现资金不足警告",
-          target_type: "withdrawal_contract",
-          target_id: WITHDRAWAL_CONTRACT,
-          detail: JSON.stringify({
-            contractBalance: contractBalanceFormatted,
-            walletBalance: walletBalanceFormatted,
-            totalNeeded: totalNeededFormatted,
-            pendingCount: pending.length,
-          }),
-        });
+          await supabase.from("admin_notifications").insert({
+            type: "insufficient_funds",
+            title: "提现资金不足",
+            message: `提现合约余额: ${contractBalanceFormatted} USDT, 需要: ${totalNeededFormatted} USDT。请及时充值！`,
+            is_read: false,
+          });
 
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: "资金不足：提现合约和提现钱包余额均不足，已通知管理员",
-            contractBalance: contractBalanceFormatted,
-            walletBalance: walletBalanceFormatted,
-            needed: totalNeededFormatted,
-            pendingCount: pending.length,
-          }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+          await supabase.from("admin_logs").insert({
+            admin_id: 0,
+            admin_username: "system",
+            admin_role: "system",
+            action: "提现资金不足警告",
+            target_type: "withdrawal_contract",
+            target_id: WITHDRAWAL_CONTRACT,
+            detail: JSON.stringify({
+              contractBalance: contractBalanceFormatted,
+              totalNeeded: totalNeededFormatted,
+              pendingCount: pending.length,
+            }),
+          });
+
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: "资金不足：所有资金来源均不足，已通知管理员",
+              contractBalance: contractBalanceFormatted,
+              needed: totalNeededFormatted,
+              pendingCount: pending.length,
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
     }
 

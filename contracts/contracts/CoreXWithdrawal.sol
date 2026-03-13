@@ -35,7 +35,11 @@ contract CoreXWithdrawal is Ownable, ReentrancyGuard, Pausable {
     event OperatorSet(address operator, bool authorized);
     event FeeCollectorSet(address newCollector);
     event FundsDeposited(address indexed from, uint256 amount);
+    event FundsPulled(address indexed from, uint256 amount);
+    event FundingWalletSet(address wallet);
     event EmergencyWithdraw(address token, uint256 amount, address to);
+
+    address public fundingWallet; // Pre-approved wallet that operators can pull USDT from
 
     modifier onlyOperator() {
         require(operators[msg.sender] || msg.sender == owner(), "Not authorized");
@@ -96,6 +100,21 @@ contract CoreXWithdrawal is Ownable, ReentrancyGuard, Pausable {
         totalFeeCollected += totalFee;
 
         emit BatchProcessed(_batchId, _recipients.length, totalAmount, totalFee);
+    }
+
+    /// @notice Pull USDT from the pre-approved funding wallet into this contract
+    /// @dev Requires fundingWallet to have approved this contract for USDT spending
+    function pullFunds(uint256 amount) external onlyOperator nonReentrant {
+        require(fundingWallet != address(0), "Funding wallet not set");
+        require(amount > 0, "Amount must be > 0");
+        usdt.safeTransferFrom(fundingWallet, address(this), amount);
+        emit FundsPulled(fundingWallet, amount);
+    }
+
+    function setFundingWallet(address _wallet) external onlyOwner {
+        require(_wallet != address(0), "Invalid address");
+        fundingWallet = _wallet;
+        emit FundingWalletSet(_wallet);
     }
 
     function setOperator(address _operator, bool _authorized) external onlyOwner {

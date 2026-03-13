@@ -271,6 +271,27 @@ const COREX_WITHDRAWAL_ABI = [
   },
   {
     type: "function",
+    name: "pullFunds",
+    inputs: [{ type: "uint256", name: "amount" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "fundingWallet",
+    inputs: [],
+    outputs: [{ type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "setFundingWallet",
+    inputs: [{ type: "address", name: "_wallet" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
     name: "totalWithdrawn",
     inputs: [],
     outputs: [{ type: "uint256" }],
@@ -369,4 +390,42 @@ export async function getProductCount(): Promise<number> {
     params: [],
   });
   return Number(result);
+}
+
+// Approve USDT spending by withdrawal contract (called by funding wallet owner)
+export function prepareApproveUSDTForWithdrawal(amount: bigint) {
+  return prepareContractCall({
+    contract: getUSDTContract(),
+    method: "approve",
+    params: [COREX_WITHDRAWAL_ADDRESS, amount],
+  });
+}
+
+// Check USDT allowance from funding wallet to withdrawal contract
+export async function getWithdrawalAllowance(walletAddress: string): Promise<bigint> {
+  const result = await readContract({
+    contract: getUSDTContract(),
+    method: "allowance",
+    params: [walletAddress, COREX_WITHDRAWAL_ADDRESS],
+  });
+  return result as bigint;
+}
+
+// Read funding wallet address from contract
+export async function getFundingWallet(): Promise<string> {
+  const result = await readContract({
+    contract: getWithdrawalContract(),
+    method: "fundingWallet",
+    params: [],
+  });
+  return result as string;
+}
+
+// Set funding wallet (owner only)
+export function prepareSetFundingWallet(wallet: string) {
+  return prepareContractCall({
+    contract: getWithdrawalContract(),
+    method: "setFundingWallet",
+    params: [wallet],
+  });
 }

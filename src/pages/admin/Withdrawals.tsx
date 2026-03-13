@@ -6,10 +6,11 @@ import {
   getAdminWithdrawals, updateWithdrawalStatus, triggerAutoWithdraw, adminAddLog,
   getAdminNotifications, markNotificationRead, markAllNotificationsRead,
 } from "@/lib/api";
-import { readContract } from "thirdweb";
-import { getWithdrawalContract, getUSDTContract, formatUSDT } from "@/lib/contracts";
+import { readContract, sendTransaction } from "thirdweb";
+import { useActiveAccount, useSendTransaction } from "thirdweb/react";
+import { getWithdrawalContract, getUSDTContract, formatUSDT, prepareApproveUSDTForWithdrawal, getWithdrawalAllowance, COREX_WITHDRAWAL_ADDRESS } from "@/lib/contracts";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck } from "lucide-react";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
 
 const STATUS_TABS = [
@@ -121,6 +122,99 @@ function BalancePanel() {
       <div className="text-[10px] text-muted-foreground/50">
         合约余额不足时，系统自动从提现钱包转入合约；钱包余额也不足则暂停提现并通知管理员
       </div>
+    </div>
+  );
+}
+
+function AuthorizationPanel() {
+  const account = useActiveAccount();
+  const { toast } = useToast();
+  const { mutateAsync: sendTx } = useSendTransaction();
+  const [approving, setApproving] = useState(false);
+
+  const connectedAddr = account?.address || "";
+
+  // Check current allowance from connected wallet to withdrawal contract
+  const { data: allowance, refetch: refetchAllowance } = useQuery({
+    queryKey: ["/api/withdrawal-allowance", connectedAddr],
+    queryFn: () => connectedAddr ? getWithdrawalAllowance(connectedAddr) : Promise.resolve(BigInt(0)),
+    enabled: !!connectedAddr,
+    refetchInterval: 15000,
+  });
+
+  const allowanceNum = allowance ? parseFloat(formatUSDT(allowance as bigint)) : 0;
+  const isAuthorized = allowanceNum > 1000000; // Consider authorized if > 1M USDT allowance
+
+  const handleApprove = async () => {
+    if (!account) {
+      toast({ title: "请先连接提现钱包", variant: "destructive" });
+      return;
+    }
+    setApproving(true);
+    try {
+      const tx = prepareApproveUSDTForWithdrawal(BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
+      await sendTx(tx);
+      await refetchAllowance();
+      await adminAddLog("授权提现合约USDT", "withdrawal_contract", COREX_WITHDRAWAL_ADDRESS, { wallet: connectedAddr });
+      toast({ title: "授权成功", description: "提现合约已获得 USDT 无限授权，系统可自动从此钱包拉取资金" });
+    } catch (err: any) {
+      toast({ title: "授权失败", description: err.message, variant: "destructive" });
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl p-4 space-y-3" style={{
+      background: "linear-gradient(145deg, #1a1510, #110e0a)",
+      border: isAuthorized ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(234,179,8,0.2)",
+    }}>
+      <div className="flex items-center gap-2">
+        <ShieldCheck size={16} style={{ color: isAuthorized ? "#22c55e" : "#eab308" }} />
+        <span className="text-sm font-bold text-foreground">提现钱包授权</span>
+      </div>
+
+      {!connectedAddr ? (
+        <div className="text-xs text-muted-foreground p-2 rounded-lg" style={{ background: "rgba(234,179,8,0.06)" }}>
+          请连接提现钱包进行授权。连接后点击「授权」按钮，签名一次即可永久生效。
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.06)" }}>
+            <div>
+              <div className="text-[10px] text-muted-foreground">当前钱包</div>
+              <CopyableAddress address={connectedAddr} className="text-xs text-foreground" />
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] text-muted-foreground">授权状态</div>
+              <span className="text-xs font-bold" style={{ color: isAuthorized ? "#22c55e" : "#ef4444" }}>
+                {isAuthorized ? "已授权" : "未授权"}
+              </span>
+            </div>
+          </div>
+
+          {!isAuthorized && (
+            <Button
+              className="w-full font-bold text-sm"
+              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+              disabled={approving}
+              onClick={handleApprove}
+            >
+              {approving ? (
+                <><Loader2 size={14} className="mr-1.5 animate-spin" /> 授权中...</>
+              ) : (
+                <><ShieldCheck size={14} className="mr-1.5" /> 授权提现合约使用 USDT</>
+              )}
+            </Button>
+          )}
+
+          <div className="text-[10px] text-muted-foreground/50">
+            {isAuthorized
+              ? "已授权：系统可自动从此钱包拉取 USDT 充值到提现合约"
+              : "点击授权后，系统在合约余额不足时自动从此钱包拉取 USDT（无需私钥）"}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -348,6 +442,9 @@ export default function AdminWithdrawals() {
     <div className="space-y-4">
       {/* Balance overview */}
       <BalancePanel />
+
+      {/* Authorization */}
+      <AuthorizationPanel />
 
       {/* System notifications */}
       <NotificationPanel />
