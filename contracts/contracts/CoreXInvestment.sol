@@ -87,6 +87,17 @@ contract CoreXInvestment is Ownable, ReentrancyGuard, Pausable {
         );
     }
 
+    function updateProduct(
+        uint256 _productId,
+        uint256 _minAmount,
+        uint256 _maxAmount
+    ) external onlyOwner {
+        require(products[_productId].id != 0, "Product not found");
+        require(_minAmount > 0, "Min amount must be > 0");
+        products[_productId].minAmount = _minAmount;
+        products[_productId].maxAmount = _maxAmount;
+    }
+
     function setProductActive(uint256 _productId, bool _active) external onlyOwner {
         require(products[_productId].id != 0, "Product not found");
         products[_productId].active = _active;

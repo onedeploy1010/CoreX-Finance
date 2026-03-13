@@ -2,7 +2,7 @@ import { getContract, prepareContractCall, readContract } from "thirdweb";
 import { client, bscChain, USDT_ADDRESS_BSC } from "./thirdweb";
 
 export const FUND_DISTRIBUTOR_ADDRESS = "0x530ec0cb6bc97C11bfeC9f8A52208fD104d6A01F";
-export const COREX_INVESTMENT_ADDRESS = "0x92931E7E9244C19d344305c210c0e541170d2230";
+export const COREX_INVESTMENT_ADDRESS = "0xD1dA72B8DF0db5d6c61DF96F1E186E73608B5fCB";
 export const COREX_WITHDRAWAL_ADDRESS = "0xC67116b71942a5043C3eaB01a308ebFd842228bE";
 
 const FUND_DISTRIBUTOR_ABI = [
