@@ -924,10 +924,68 @@ export async function setAutoWithdrawLimit(limit: number) {
   if (error) throw new Error(error.message);
 }
 
-export async function triggerAutoWithdraw() {
-  const { data, error } = await supabase.functions.invoke("auto-withdraw", { body: {} });
+export async function triggerAutoWithdraw(manual = true) {
+  const { data, error } = await supabase.functions.invoke("auto-withdraw", { body: { manual } });
   if (error) throw new Error(error.message);
   return data;
+}
+
+// Admin notifications
+export async function getAdminNotifications(limit = 20) {
+  const { data, error } = await supabase
+    .from("admin_notifications")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from("admin_notifications")
+    .select("*", { count: "exact", head: true })
+    .eq("is_read", false);
+  if (error) return 0;
+  return count || 0;
+}
+
+export async function markNotificationRead(id: number) {
+  const { error } = await supabase
+    .from("admin_notifications")
+    .update({ is_read: true })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// Withdrawal contract minimum balance threshold
+export async function getWithdrawalContractMinBalance(): Promise<number> {
+  const { data } = await supabase.from("system_settings").select("value").eq("key", "withdrawal_contract_min_balance").single();
+  return parseFloat(data?.value || "0");
+}
+
+export async function setWithdrawalContractMinBalance(amount: number) {
+  const { error } = await supabase.from("system_settings").upsert({ key: "withdrawal_contract_min_balance", value: amount.toString() }, { onConflict: "key" });
+  if (error) throw new Error(error.message);
+}
+
+// Auto-execute withdrawal minimum batch amount
+export async function getAutoWithdrawExecMin(): Promise<number> {
+  const { data } = await supabase.from("system_settings").select("value").eq("key", "auto_withdraw_exec_min").single();
+  return parseFloat(data?.value || "0");
+}
+
+export async function setAutoWithdrawExecMin(amount: number) {
+  const { error } = await supabase.from("system_settings").upsert({ key: "auto_withdraw_exec_min", value: amount.toString() }, { onConflict: "key" });
+  if (error) throw new Error(error.message);
+}
+
+export async function markAllNotificationsRead() {
+  const { error } = await supabase
+    .from("admin_notifications")
+    .update({ is_read: true })
+    .eq("is_read", false);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteAdminUser(id: number) {

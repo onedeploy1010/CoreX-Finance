@@ -2,17 +2,13 @@
  * Auto-withdraw Edge Function
  *
  * Processes approved withdrawals by calling the CoreXWithdrawal contract on BSC.
- * Uses operator private key stored in Supabase secrets.
+ * Auto-funds the contract from operator wallet when contract balance is insufficient.
+ * Notifies admin when operator wallet is also insufficient.
  *
  * Env vars required:
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  *   WITHDRAWAL_PRIVATE_KEY - operator wallet private key
  *   BSC_RPC_URL - (optional, defaults to public BSC RPC)
- *
- * Can be triggered by:
- *   - pg_cron scheduled job
- *   - Manual call from admin UI
- *   - Database webhook on withdrawal approval
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -24,11 +20,19 @@ const PRIVATE_KEY = Deno.env.get("WITHDRAWAL_PRIVATE_KEY")!;
 const BSC_RPC = Deno.env.get("BSC_RPC_URL") || "https://bsc-dataseed1.binance.org";
 
 const WITHDRAWAL_CONTRACT = "0xA25c9C1dE6DA0CE04D06A27eB2779d6BAfAe9236";
+const USDT_BSC = "0x55d398326f99059fF775485246999027B3197955";
 
 const WITHDRAWAL_ABI = [
   "function batchWithdraw(bytes32 _batchId, address[] calldata _recipients, uint256[] calldata _amounts) external",
   "function getContractBalance() external view returns (uint256)",
   "function isBatchProcessed(bytes32 _batchId) external view returns (bool)",
+  "function deposit(uint256 amount) external",
+];
+
+const ERC20_ABI = [
+  "function balanceOf(address account) external view returns (uint256)",
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) external view returns (uint256)",
 ];
 
 const corsHeaders = {
@@ -58,6 +62,13 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+    // Parse request body for manual trigger flag
+    let isManual = false;
+    try {
+      const body = await req.json();
+      isManual = body?.manual === true;
+    } catch { /* empty body is fine */ }
+
     // 1. Get approved withdrawals ready for processing
     const { data: withdrawals, error: fetchError } = await supabase.rpc(
       "get_approved_withdrawals_for_processing",
@@ -79,6 +90,31 @@ Deno.serve(async (req) => {
       );
     }
 
+    // 1.5 Check auto-execute minimum batch amount (skip if manual trigger)
+    if (!isManual) {
+      const { data: execMinRow } = await supabase
+        .from("system_settings").select("value").eq("key", "auto_withdraw_exec_min").single();
+      const execMin = parseFloat(execMinRow?.value || "0");
+
+      if (execMin > 0) {
+        const totalPendingAmount = pending.reduce(
+          (sum: number, w: any) => sum + parseFloat(w.amount.toString()), 0
+        );
+        if (totalPendingAmount < execMin) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: `待提现总额 ${totalPendingAmount.toFixed(2)} USDT 未达到自动执行最低额度 ${execMin} USDT`,
+              processed: 0,
+              totalPending: totalPendingAmount,
+              execMin,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
+
     // 2. Setup ethers provider and wallet
     const provider = new ethers.JsonRpcProvider(BSC_RPC, {
       name: "bsc",
@@ -86,32 +122,113 @@ Deno.serve(async (req) => {
     });
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
     const contract = new ethers.Contract(WITHDRAWAL_CONTRACT, WITHDRAWAL_ABI, wallet);
+    const usdtContract = new ethers.Contract(USDT_BSC, ERC20_ABI, wallet);
 
     // 3. Check contract balance
-    const balance = await contract.getContractBalance();
+    const contractBalance = await contract.getContractBalance();
     const totalNeeded = pending.reduce(
       (sum: bigint, w: any) => sum + parseUSDT(w.amount.toString()),
       0n
     );
 
-    if (balance < totalNeeded) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: `Insufficient contract balance. Need ${ethers.formatUnits(totalNeeded, 18)} USDT, have ${ethers.formatUnits(balance, 18)} USDT`,
-          balance: ethers.formatUnits(balance, 18),
-          needed: ethers.formatUnits(totalNeeded, 18),
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // 3.5 Read contract minimum balance threshold
+    const { data: minBalRow } = await supabase
+      .from("system_settings").select("value").eq("key", "withdrawal_contract_min_balance").single();
+    const contractMinBalance = parseUSDT(minBalRow?.value || "0");
+
+    let funded = false;
+    let fundTxHash = "";
+
+    // 4. If contract balance insufficient (or would drop below min threshold), try to auto-fund
+    const targetBalance = totalNeeded + contractMinBalance; // ensure min balance remains after withdrawal
+    if (contractBalance < targetBalance) {
+      const deficit = targetBalance - contractBalance;
+      const walletUSDTBalance = await usdtContract.balanceOf(wallet.address);
+
+      if (walletUSDTBalance >= deficit) {
+        // Auto-fund: approve + deposit USDT to withdrawal contract
+        console.log(`Auto-funding contract: deficit=${ethers.formatUnits(deficit, 18)} USDT`);
+
+        // Check current allowance
+        const currentAllowance = await usdtContract.allowance(wallet.address, WITHDRAWAL_CONTRACT);
+        if (currentAllowance < deficit) {
+          const approveTx = await usdtContract.approve(WITHDRAWAL_CONTRACT, ethers.MaxUint256);
+          await approveTx.wait();
+          console.log("USDT approved for withdrawal contract");
+        }
+
+        // Deposit USDT to withdrawal contract
+        const depositTx = await contract.deposit(deficit);
+        const depositReceipt = await depositTx.wait();
+        fundTxHash = depositReceipt.hash;
+        funded = true;
+
+        console.log(`Funded ${ethers.formatUnits(deficit, 18)} USDT, tx: ${fundTxHash}`);
+
+        // Log the auto-funding action
+        await supabase.from("admin_logs").insert({
+          admin_id: 0,
+          admin_username: "system",
+          admin_role: "system",
+          action: "自动充值提现合约",
+          target_type: "withdrawal_contract",
+          target_id: WITHDRAWAL_CONTRACT,
+          detail: JSON.stringify({
+            deficit: ethers.formatUnits(deficit, 18),
+            txHash: fundTxHash,
+            walletBalance: ethers.formatUnits(walletUSDTBalance, 18),
+          }),
+        });
+      } else {
+        // Wallet also insufficient - notify admin, keep withdrawals pending
+        const walletBalanceFormatted = ethers.formatUnits(walletUSDTBalance, 18);
+        const contractBalanceFormatted = ethers.formatUnits(contractBalance, 18);
+        const totalNeededFormatted = ethers.formatUnits(totalNeeded, 18);
+
+        // Create admin notification
+        await supabase.from("admin_notifications").insert({
+          type: "insufficient_funds",
+          title: "提现资金不足",
+          message: `提现合约余额: ${contractBalanceFormatted} USDT, 提现钱包余额: ${walletBalanceFormatted} USDT, 需要: ${totalNeededFormatted} USDT。请及时充值！`,
+          is_read: false,
+        });
+
+        // Log the event
+        await supabase.from("admin_logs").insert({
+          admin_id: 0,
+          admin_username: "system",
+          admin_role: "system",
+          action: "提现资金不足警告",
+          target_type: "withdrawal_contract",
+          target_id: WITHDRAWAL_CONTRACT,
+          detail: JSON.stringify({
+            contractBalance: contractBalanceFormatted,
+            walletBalance: walletBalanceFormatted,
+            totalNeeded: totalNeededFormatted,
+            pendingCount: pending.length,
+          }),
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "资金不足：提现合约和提现钱包余额均不足，已通知管理员",
+            contractBalance: contractBalanceFormatted,
+            walletBalance: walletBalanceFormatted,
+            needed: totalNeededFormatted,
+            pendingCount: pending.length,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    // 4. Prepare batch data
+    // 5. Prepare batch data
     const recipients = pending.map((w: any) => w.wallet_address);
     const amounts = pending.map((w: any) => parseUSDT(w.amount.toString()));
     const ids = pending.map((w: any) => w.id);
 
-    // 5. Generate batch ID
+    // 6. Generate batch ID
     const batchData = new TextEncoder().encode(Date.now().toString() + JSON.stringify(ids));
     const hashBuffer = await crypto.subtle.digest("SHA-256", batchData);
     const batchId = "0x" + Array.from(new Uint8Array(hashBuffer))
@@ -119,7 +236,7 @@ Deno.serve(async (req) => {
       .join("");
     const batchIdBytes32 = batchId.slice(0, 66);
 
-    // 6. Check if batch already processed
+    // 7. Check if batch already processed
     const alreadyProcessed = await contract.isBatchProcessed(batchIdBytes32);
     if (alreadyProcessed) {
       return new Response(
@@ -128,12 +245,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 7. Send transaction
+    // 8. Send transaction
     const tx = await contract.batchWithdraw(batchIdBytes32, recipients, amounts);
     const receipt = await tx.wait();
     const txHash = receipt.hash;
 
-    // 8. Update database
+    // 9. Update database
     const { error: updateError } = await supabase.rpc("mark_withdrawals_processed", {
       p_ids: ids,
       p_batch_id: batchIdBytes32,
@@ -141,7 +258,6 @@ Deno.serve(async (req) => {
     });
 
     if (updateError) {
-      // Transaction succeeded but DB update failed - log for manual recovery
       console.error("TX succeeded but DB update failed!", {
         txHash,
         batchId: batchIdBytes32,
@@ -160,7 +276,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 9. Log the action
+    // 10. Log the action
     await supabase.from("admin_logs").insert({
       admin_id: 0,
       admin_username: "system",
@@ -172,6 +288,8 @@ Deno.serve(async (req) => {
         count: ids.length,
         txHash,
         totalAmount: ethers.formatUnits(totalNeeded, 18),
+        autoFunded: funded,
+        fundTxHash: fundTxHash || undefined,
       }),
     });
 
@@ -183,6 +301,8 @@ Deno.serve(async (req) => {
         processed: ids.length,
         totalAmount: ethers.formatUnits(totalNeeded, 18),
         bscscanUrl: `https://bscscan.com/tx/${txHash}`,
+        autoFunded: funded,
+        fundTxHash: fundTxHash || undefined,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

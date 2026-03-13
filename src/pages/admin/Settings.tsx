@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { getSettlementConfig, updateSettlementTime, adminAddLog, getAutoApproveWithdrawal, setAutoApproveWithdrawal, getAutoWithdrawLimit, setAutoWithdrawLimit, triggerAutoWithdraw } from "@/lib/api";
-import { Settings, Clock, Save, Loader2, ShieldCheck, Zap, AlertTriangle, Send, DollarSign } from "lucide-react";
+import { getSettlementConfig, updateSettlementTime, adminAddLog, getAutoApproveWithdrawal, setAutoApproveWithdrawal, getAutoWithdrawLimit, setAutoWithdrawLimit, triggerAutoWithdraw, getWithdrawalContractMinBalance, setWithdrawalContractMinBalance, getAutoWithdrawExecMin, setAutoWithdrawExecMin } from "@/lib/api";
+import { Settings, Clock, Save, Loader2, ShieldCheck, Zap, AlertTriangle, Send, DollarSign, Wallet, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const TIMEZONES = [
@@ -31,6 +31,14 @@ export default function AdminSettings() {
   const [savingLimit, setSavingLimit] = useState(false);
   const [autoWithdrawRunning, setAutoWithdrawRunning] = useState(false);
 
+  // Contract min balance
+  const [contractMinBal, setContractMinBal] = useState<string>("");
+  const [savingMinBal, setSavingMinBal] = useState(false);
+
+  // Auto-execute min amount
+  const [execMin, setExecMin] = useState<string>("");
+  const [savingExecMin, setSavingExecMin] = useState(false);
+
   const { data: config, isLoading } = useQuery({
     queryKey: ["/api/admin/settlement-config"],
     queryFn: getSettlementConfig,
@@ -44,6 +52,16 @@ export default function AdminSettings() {
   const { data: currentLimit } = useQuery({
     queryKey: ["/api/admin/auto-withdraw-limit"],
     queryFn: getAutoWithdrawLimit,
+  });
+
+  const { data: currentContractMinBal } = useQuery({
+    queryKey: ["/api/admin/withdrawal-contract-min-balance"],
+    queryFn: getWithdrawalContractMinBalance,
+  });
+
+  const { data: currentExecMin } = useQuery({
+    queryKey: ["/api/admin/auto-withdraw-exec-min"],
+    queryFn: getAutoWithdrawExecMin,
   });
 
   const handleToggleAutoApprove = async () => {
@@ -349,6 +367,128 @@ export default function AdminSettings() {
         >
           {savingLimit ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
           保存额度
+        </Button>
+      </div>
+
+      {/* Contract Min Balance Threshold */}
+      <div
+        className="rounded-xl p-5 space-y-4"
+        style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}
+      >
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)" }}>
+            <Wallet size={16} style={{ color: "#C9A227" }} />
+          </div>
+          <div>
+            <div className="font-semibold text-sm">提现合约最低余额</div>
+            <div className="text-xs text-muted-foreground">合约余额低于该值时，自动从提现钱包充值到合约</div>
+          </div>
+        </div>
+
+        <div className="rounded-lg p-4 space-y-3" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.12)" }}>
+          <div className="text-xs text-muted-foreground">当前设置: <span className="font-bold" style={{ color: "#C9A227" }}>{(currentContractMinBal || 0) > 0 ? `${currentContractMinBal} USDT` : "未设置 (关闭)"}</span></div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              placeholder="输入金额 (0=关闭)"
+              value={contractMinBal}
+              onChange={e => setContractMinBal(e.target.value)}
+              className="flex-1 rounded-lg px-3 py-2 text-sm"
+              style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
+            />
+            <span className="text-xs text-muted-foreground">USDT</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground space-y-0.5">
+            <div>设为 0 = 关闭自动充值</div>
+            <div>例: 设为 1000，提现后合约会保留至少 1000U 余额</div>
+            <div>提现钱包余额不足时会通知管理员</div>
+          </div>
+        </div>
+
+        <Button
+          className="w-full font-bold text-sm"
+          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+          disabled={savingMinBal || contractMinBal === ""}
+          onClick={async () => {
+            setSavingMinBal(true);
+            try {
+              const val = parseFloat(contractMinBal);
+              if (isNaN(val) || val < 0) throw new Error("请输入有效金额");
+              await setWithdrawalContractMinBalance(val);
+              await adminAddLog("修改提现合约最低余额", "settings", "withdrawal_contract_min_balance", { amount: val });
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawal-contract-min-balance"] });
+              toast({ title: "提现合约最低余额已更新", description: val > 0 ? `合约将保留至少 ${val} USDT` : "已关闭自动充值" });
+              setContractMinBal("");
+            } catch (err: any) {
+              toast({ title: "更新失败", description: err.message, variant: "destructive" });
+            } finally {
+              setSavingMinBal(false);
+            }
+          }}
+        >
+          {savingMinBal ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
+          保存设置
+        </Button>
+      </div>
+
+      {/* Auto-Execute Withdrawal Min Batch Amount */}
+      <div
+        className="rounded-xl p-5 space-y-4"
+        style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}
+      >
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)" }}>
+            <BarChart3 size={16} style={{ color: "#C9A227" }} />
+          </div>
+          <div>
+            <div className="font-semibold text-sm">自动提现执行最低额度</div>
+            <div className="text-xs text-muted-foreground">待提现总额达到该值时才自动执行上链提现</div>
+          </div>
+        </div>
+
+        <div className="rounded-lg p-4 space-y-3" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.12)" }}>
+          <div className="text-xs text-muted-foreground">当前设置: <span className="font-bold" style={{ color: "#C9A227" }}>{(currentExecMin || 0) > 0 ? `${currentExecMin} USDT` : "未设置 (无限制)"}</span></div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              placeholder="输入金额 (0=无限制)"
+              value={execMin}
+              onChange={e => setExecMin(e.target.value)}
+              className="flex-1 rounded-lg px-3 py-2 text-sm"
+              style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
+            />
+            <span className="text-xs text-muted-foreground">USDT</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground space-y-0.5">
+            <div>设为 0 = 无限制，有审批通过的提现就执行</div>
+            <div>例: 设为 500，待提现总额达到 500U 时才自动上链</div>
+            <div>手动点击「批量上链提现」不受此限制</div>
+          </div>
+        </div>
+
+        <Button
+          className="w-full font-bold text-sm"
+          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+          disabled={savingExecMin || execMin === ""}
+          onClick={async () => {
+            setSavingExecMin(true);
+            try {
+              const val = parseFloat(execMin);
+              if (isNaN(val) || val < 0) throw new Error("请输入有效金额");
+              await setAutoWithdrawExecMin(val);
+              await adminAddLog("修改自动提现执行最低额度", "settings", "auto_withdraw_exec_min", { amount: val });
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/auto-withdraw-exec-min"] });
+              toast({ title: "自动提现执行额度已更新", description: val > 0 ? `总额达到 ${val} USDT 时自动执行` : "已取消限制" });
+              setExecMin("");
+            } catch (err: any) {
+              toast({ title: "更新失败", description: err.message, variant: "destructive" });
+            } finally {
+              setSavingExecMin(false);
+            }
+          }}
+        >
+          {savingExecMin ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
+          保存设置
         </Button>
       </div>
 

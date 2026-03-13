@@ -2,9 +2,14 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
-import { getAdminWithdrawals, updateWithdrawalStatus, triggerAutoWithdraw, adminAddLog } from "@/lib/api";
+import {
+  getAdminWithdrawals, updateWithdrawalStatus, triggerAutoWithdraw, adminAddLog,
+  getAdminNotifications, markNotificationRead, markAllNotificationsRead,
+} from "@/lib/api";
+import { readContract } from "thirdweb";
+import { getWithdrawalContract, getUSDTContract, formatUSDT } from "@/lib/contracts";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck } from "lucide-react";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
 
 const STATUS_TABS = [
@@ -14,6 +19,173 @@ const STATUS_TABS = [
   { value: "completed", label: "已完成" },
   { value: "rejected", label: "已拒绝" },
 ];
+
+// Operator wallet address (derived from WITHDRAWAL_PRIVATE_KEY on server)
+const OPERATOR_WALLET = "0x4E05c5c549E45b35e03f4b285633e8AB881Cd64d";
+
+async function getContractBalance(): Promise<string> {
+  try {
+    const result = await readContract({
+      contract: getWithdrawalContract(),
+      method: "getContractBalance",
+      params: [],
+    });
+    return formatUSDT(result as bigint);
+  } catch {
+    return "0.000000";
+  }
+}
+
+async function getWalletBalance(): Promise<string> {
+  try {
+    const result = await readContract({
+      contract: getUSDTContract(),
+      method: "balanceOf",
+      params: [OPERATOR_WALLET],
+    });
+    return formatUSDT(result as bigint);
+  } catch {
+    return "0.000000";
+  }
+}
+
+function BalancePanel() {
+  const { data: contractBal, isLoading: loadingContract, refetch: refetchContract } = useQuery({
+    queryKey: ["/api/contract-balance"],
+    queryFn: getContractBalance,
+    refetchInterval: 30000,
+  });
+  const { data: walletBal, isLoading: loadingWallet, refetch: refetchWallet } = useQuery({
+    queryKey: ["/api/wallet-balance"],
+    queryFn: getWalletBalance,
+    refetchInterval: 30000,
+  });
+
+  const contractNum = parseFloat(contractBal || "0");
+  const walletNum = parseFloat(walletBal || "0");
+  const totalAvailable = contractNum + walletNum;
+  const isLow = totalAvailable < 100;
+
+  return (
+    <div className="rounded-xl p-4 space-y-3" style={{
+      background: "linear-gradient(145deg, #1a1510, #110e0a)",
+      border: isLow ? "1px solid rgba(239,68,68,0.3)" : "1px solid rgba(201,162,39,0.15)",
+    }}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Wallet size={16} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-bold text-foreground">提现资金概览</span>
+        </div>
+        <button
+          className="p-1.5 rounded-lg transition-all"
+          style={{ background: "rgba(201,162,39,0.08)" }}
+          onClick={() => { refetchContract(); refetchWallet(); }}
+        >
+          <RefreshCw size={13} style={{ color: "#C9A227" }} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="text-center p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.06)" }}>
+          <div className="text-[10px] text-muted-foreground mb-1">提现合约余额</div>
+          <div className="text-sm font-bold" style={{ color: "#C9A227" }}>
+            {loadingContract ? "..." : `${contractNum.toFixed(2)} U`}
+          </div>
+        </div>
+        <div className="text-center p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.06)" }}>
+          <div className="text-[10px] text-muted-foreground mb-1">提现钱包余额</div>
+          <div className="text-sm font-bold" style={{ color: "#3b82f6" }}>
+            {loadingWallet ? "..." : `${walletNum.toFixed(2)} U`}
+          </div>
+        </div>
+        <div className="text-center p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.06)" }}>
+          <div className="text-[10px] text-muted-foreground mb-1">总可用</div>
+          <div className="text-sm font-bold" style={{ color: isLow ? "#ef4444" : "#22c55e" }}>
+            {(loadingContract || loadingWallet) ? "..." : `${totalAvailable.toFixed(2)} U`}
+          </div>
+        </div>
+      </div>
+
+      {isLow && (
+        <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
+          <AlertTriangle size={14} style={{ color: "#ef4444" }} />
+          <span className="text-xs" style={{ color: "#ef4444" }}>
+            资金不足！请及时向提现钱包充值 USDT，系统将自动转入提现合约
+          </span>
+        </div>
+      )}
+
+      <div className="text-[10px] text-muted-foreground">
+        提现钱包: <CopyableAddress address={OPERATOR_WALLET} className="text-muted-foreground inline" />
+      </div>
+      <div className="text-[10px] text-muted-foreground/50">
+        合约余额不足时，系统自动从提现钱包转入合约；钱包余额也不足则暂停提现并通知管理员
+      </div>
+    </div>
+  );
+}
+
+function NotificationPanel() {
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["/api/admin/notifications"],
+    queryFn: () => getAdminNotifications(10),
+    refetchInterval: 15000,
+  });
+
+  const unread = notifications.filter((n: any) => !n.is_read);
+  if (unread.length === 0) return null;
+
+  const handleMarkRead = async (id: number) => {
+    await markNotificationRead(id);
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] });
+  };
+
+  const handleMarkAllRead = async () => {
+    await markAllNotificationsRead();
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bell size={14} style={{ color: "#eab308" }} />
+          <span className="text-xs font-bold" style={{ color: "#eab308" }}>系统通知 ({unread.length})</span>
+        </div>
+        <button
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded"
+          style={{ color: "#C9A227", background: "rgba(201,162,39,0.08)" }}
+          onClick={handleMarkAllRead}
+        >
+          <CheckCheck size={12} /> 全部已读
+        </button>
+      </div>
+      {unread.map((n: any) => (
+        <div key={n.id} className="rounded-lg p-3 space-y-1" style={{
+          background: n.type === "insufficient_funds" ? "rgba(239,68,68,0.08)" : "rgba(234,179,8,0.08)",
+          border: `1px solid ${n.type === "insufficient_funds" ? "rgba(239,68,68,0.2)" : "rgba(234,179,8,0.2)"}`,
+        }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle size={12} style={{ color: n.type === "insufficient_funds" ? "#ef4444" : "#eab308" }} />
+              <span className="text-xs font-bold" style={{ color: n.type === "insufficient_funds" ? "#ef4444" : "#eab308" }}>
+                {n.title}
+              </span>
+            </div>
+            <button
+              className="text-[10px] text-muted-foreground hover:text-foreground"
+              onClick={() => handleMarkRead(n.id)}
+            >
+              已读
+            </button>
+          </div>
+          <p className="text-[11px] text-foreground/60 leading-relaxed">{n.message}</p>
+          <div className="text-[10px] text-muted-foreground/50">{new Date(n.created_at).toLocaleString()}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => void; onReject: () => void }) {
   const statusMap: Record<string, { label: string; color: string; bg: string }> = {
@@ -58,15 +230,15 @@ function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => v
       <div className="grid grid-cols-4 gap-2">
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">金额</div>
-          <div className="text-xs font-bold">{parseFloat(w.amount).toFixed(6)}U</div>
+          <div className="text-xs font-bold">{parseFloat(w.amount).toFixed(2)}U</div>
         </div>
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">手续费</div>
-          <div className="text-xs font-semibold text-muted-foreground">{parseFloat(w.fee).toFixed(6)}U</div>
+          <div className="text-xs font-semibold text-muted-foreground">{parseFloat(w.fee).toFixed(2)}U</div>
         </div>
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">实际</div>
-          <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(6)}U</div>
+          <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{parseFloat(w.actualAmount).toFixed(2)}U</div>
         </div>
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">时间</div>
@@ -132,6 +304,10 @@ export default function AdminWithdrawals() {
 
       if (!result.success) {
         toast({ title: "批量提现失败", description: result.message, variant: "destructive" });
+        // Refresh balances and notifications
+        queryClient.invalidateQueries({ queryKey: ["/api/contract-balance"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/wallet-balance"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] });
         return;
       }
 
@@ -144,15 +320,20 @@ export default function AdminWithdrawals() {
         count: result.processed,
         txHash: result.txHash,
         totalAmount: result.totalAmount,
+        autoFunded: result.autoFunded,
+        fundTxHash: result.fundTxHash,
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contract-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/wallet-balance"] });
 
-      toast({
-        title: "批量提现成功",
-        description: `${result.processed} 笔提现已上链 TX: ${result.txHash?.slice(0, 10)}...`,
-      });
+      const desc = result.autoFunded
+        ? `${result.processed} 笔已上链 (已自动从钱包充值合约) TX: ${result.txHash?.slice(0, 10)}...`
+        : `${result.processed} 笔提现已上链 TX: ${result.txHash?.slice(0, 10)}...`;
+
+      toast({ title: "批量提现成功", description: desc });
     } catch (err: any) {
       toast({ title: "批量提现失败", description: err.message, variant: "destructive" });
     } finally {
@@ -165,6 +346,12 @@ export default function AdminWithdrawals() {
 
   return (
     <div className="space-y-4">
+      {/* Balance overview */}
+      <BalancePanel />
+
+      {/* System notifications */}
+      <NotificationPanel />
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
