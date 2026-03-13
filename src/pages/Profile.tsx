@@ -180,10 +180,6 @@ export default function ProfilePage() {
       toast({ title: `${t("withdraw.min")} ${WITHDRAW_MIN} USDT`, variant: "destructive" });
       return;
     }
-    if (amt % WITHDRAW_MULTIPLE !== 0) {
-      toast({ title: `Amount must be a multiple of ${WITHDRAW_MULTIPLE} USDT`, variant: "destructive" });
-      return;
-    }
     if (amt > availableBalance) {
       toast({ title: t("orders.available") + " insufficient", variant: "destructive" });
       return;
@@ -463,16 +459,22 @@ export default function ProfilePage() {
                   −
                 </button>
                 <div
-                  className="flex-1 rounded-xl py-3 text-center"
+                  className="flex-1 rounded-xl overflow-hidden"
                   style={{
                     background: "rgba(201,162,39,0.08)",
                     border: "1px solid rgba(201,162,39,0.3)",
                   }}
                 >
-                  <div className="font-black text-2xl" style={{ color: "#f5e6b8" }}>
-                    {(parseFloat(withdrawAmount || "0") || WITHDRAW_MIN).toLocaleString()}
-                  </div>
-                  <div className="text-xs text-muted-foreground">USDT</div>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={withdrawAmount}
+                    onChange={e => setWithdrawAmount(e.target.value)}
+                    placeholder={WITHDRAW_MIN.toString()}
+                    className="w-full text-center font-black text-2xl py-3 bg-transparent outline-none"
+                    style={{ color: "#f5e6b8" }}
+                  />
+                  <div className="text-xs text-muted-foreground text-center pb-2 -mt-1">USDT</div>
                 </div>
                 <button
                   className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shrink-0 transition-all active:scale-95"
@@ -483,7 +485,7 @@ export default function ProfilePage() {
                   }}
                   onClick={() => {
                     const cur = parseFloat(withdrawAmount || "0");
-                    const next = cur < WITHDRAW_MIN ? WITHDRAW_MIN : Math.min(cur + WITHDRAW_MULTIPLE, Math.floor(availableBalance / WITHDRAW_MULTIPLE) * WITHDRAW_MULTIPLE);
+                    const next = cur < WITHDRAW_MIN ? WITHDRAW_MIN : Math.min(cur + WITHDRAW_MULTIPLE, availableBalance);
                     setWithdrawAmount(next.toString());
                   }}
                 >
@@ -503,7 +505,7 @@ export default function ProfilePage() {
                     onClick={() => {
                       const cur = parseFloat(withdrawAmount || "0");
                       const base = cur < WITHDRAW_MIN ? WITHDRAW_MIN : cur;
-                      const next = Math.min(base + inc, Math.floor(availableBalance / WITHDRAW_MULTIPLE) * WITHDRAW_MULTIPLE);
+                      const next = Math.min(base + inc, availableBalance);
                       setWithdrawAmount(Math.max(next, WITHDRAW_MIN).toString());
                     }}
                   >
@@ -518,8 +520,7 @@ export default function ProfilePage() {
                     color: "#C9A227",
                   }}
                   onClick={() => {
-                    const max = Math.floor(availableBalance / WITHDRAW_MULTIPLE) * WITHDRAW_MULTIPLE;
-                    setWithdrawAmount(Math.max(max, WITHDRAW_MIN).toString());
+                    setWithdrawAmount(Math.max(availableBalance, WITHDRAW_MIN).toString());
                   }}
                 >
                   {t("withdraw.all")}
@@ -547,7 +548,7 @@ export default function ProfilePage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <AlertCircle size={11} style={{ color: "#C9A227" }} />
-                <span>{t("withdraw.min")}: {WITHDRAW_MIN} USDT · {WITHDRAW_MULTIPLE}x</span>
+                <span>{t("withdraw.min")}: {WITHDRAW_MIN} USDT</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <AlertCircle size={11} style={{ color: "#C9A227" }} />
