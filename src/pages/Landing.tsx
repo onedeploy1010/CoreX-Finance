@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { t } from "@/lib/i18n";
+import { t, getLang } from "@/lib/i18n";
 import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, ArrowRight, Users, BarChart3 } from "lucide-react";
 import { LangSwitch } from "@/components/LangSwitch";
 
@@ -15,6 +15,17 @@ async function getMedia() {
 }
 
 async function getCompanyIntro() {
+  const lang = getLang();
+  // Try language-specific key first, fallback to default
+  const langKey = lang !== "zh" ? `company_intro_${lang}` : "company_intro";
+  if (lang !== "zh") {
+    const { data: langData } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", langKey)
+      .single();
+    if (langData?.value) return langData.value;
+  }
   const { data } = await supabase
     .from("system_settings")
     .select("value")
@@ -123,7 +134,7 @@ function AnimatedNum({ value, suffix = "" }: { value: string; suffix?: string })
 
 export default function LandingPage({ onEnter }: { onEnter: () => void }) {
   const { data: media = [] } = useQuery({ queryKey: ["/api/media"], queryFn: getMedia });
-  const { data: companyIntro = "" } = useQuery({ queryKey: ["/api/company-intro"], queryFn: getCompanyIntro });
+  const { data: companyIntro = "" } = useQuery({ queryKey: ["/api/company-intro", getLang()], queryFn: getCompanyIntro });
 
   const [visible, setVisible] = useState(false);
   useEffect(() => { requestAnimationFrame(() => setVisible(true)); }, []);
