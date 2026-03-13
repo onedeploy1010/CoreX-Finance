@@ -37,6 +37,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { toast } = useToast();
 
   const admin = getAdminSession();
+  const isSuperAdmin = admin?.role === "superadmin";
   const perms: string[] = admin?.permissions || [];
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setLocation("/admin");
   };
 
-  const filteredNav = NAV_ITEMS.filter(item => perms.includes(item.perm));
+  const filteredNav = isSuperAdmin ? NAV_ITEMS : NAV_ITEMS.filter(item => perms.includes(item.perm));
   const roleLabel = ROLE_LABELS[admin?.role] || admin?.role || "";
 
   if (!admin) return null;
