@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { WITHDRAW_MIN } from "@shared/schema";
 
 // ============ Products ============
 
@@ -376,8 +377,7 @@ export async function getEarnings(walletAddress: string) {
 // ============ Withdrawals ============
 
 export async function createWithdrawal(walletAddress: string, amount: number, fee: number) {
-  if (amount < 30) throw new Error("Minimum withdrawal is 30 USDT");
-  if (amount % 10 !== 0) throw new Error("Amount must be a multiple of 10 USDT");
+  if (amount < WITHDRAW_MIN) throw new Error(`Minimum withdrawal is ${WITHDRAW_MIN} USDT`);
   const actualAmount = amount - fee;
   const { data, error } = await supabase
     .from("withdrawals")
