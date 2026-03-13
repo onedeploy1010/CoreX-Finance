@@ -147,31 +147,31 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
             {product.name}
           </DialogTitle>
           <DialogDescription className="text-center text-xs text-muted-foreground">
-            {product.description} · {product.days}天周期 · 日利率{product.dailyRate}%
+            {`${product.description} · ${product.days}${t("home.day_cycle")} · ${t("home.daily_rate")}${product.dailyRate}%`}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="stat-card rounded-lg p-3 text-center">
-              <div className="text-xs text-muted-foreground mb-1">投资周期</div>
-              <div className="font-bold" style={{ color }}>{product.days} 天</div>
+              <div className="text-xs text-muted-foreground mb-1">{t("home.cycle")}</div>
+              <div className="font-bold" style={{ color }}>{product.days} {t("common.days")}</div>
             </div>
             <div className="stat-card rounded-lg p-3 text-center">
-              <div className="text-xs text-muted-foreground mb-1">日利率</div>
+              <div className="text-xs text-muted-foreground mb-1">{t("home.daily_rate")}</div>
               <div className="font-bold" style={{ color }}>{product.dailyRate}%</div>
             </div>
             <div className="stat-card rounded-lg p-3 text-center">
-              <div className="text-xs text-muted-foreground mb-1">总收益率</div>
+              <div className="text-xs text-muted-foreground mb-1">{t("home.total_return")}</div>
               <div className="font-bold" style={{ color }}>{(product.days * product.dailyRate).toFixed(2)}%</div>
             </div>
             <div className="stat-card rounded-lg p-3 text-center">
-              <div className="text-xs text-muted-foreground mb-1">最低投入</div>
+              <div className="text-xs text-muted-foreground mb-1">{t("home.min_invest")}</div>
               <div className="font-bold" style={{ color }}>{product.minAmount} U</div>
             </div>
           </div>
 
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">投资金额 (USDT)</label>
+            <label className="text-sm text-muted-foreground mb-2 block">{t("home.invest_amount_usdt")}</label>
             <div className="flex items-center gap-3">
               <button
                 data-testid="button-amount-minus"
@@ -220,10 +220,10 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
             </div>
             <div className="flex items-center justify-between mt-2">
               <span className="text-xs text-muted-foreground">
-                每次 ±{product.minAmount} USDT
+                {`${t("home.each_step")} ±${product.minAmount} USDT`}
               </span>
               <span className="text-xs" style={{ color: "rgba(201,162,39,0.6)" }}>
-                {Math.max(1, Math.round(parseFloat(amount || "0") / product.minAmount))}x 倍
+                {Math.max(1, Math.round(parseFloat(amount || "0") / product.minAmount))}x {t("home.times")}
               </span>
             </div>
           </div>
@@ -231,15 +231,15 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
           {parseFloat(amount) > 0 && (
             <div className="rounded-lg p-3 space-y-1.5" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">预计每日收益</span>
+                <span className="text-muted-foreground">{t("home.est_daily")}</span>
                 <span style={{ color }}>+{(parseFloat(amount) * product.dailyRate / 100).toFixed(6)} USDT</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">到期总收益</span>
+                <span className="text-muted-foreground">{t("home.est_total_profit")}</span>
                 <span style={{ color }}>+{estimatedProfit.toFixed(6)} USDT</span>
               </div>
               <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: "rgba(201,162,39,0.15)" }}>
-                <span className="text-muted-foreground">到期返还</span>
+                <span className="text-muted-foreground">{t("home.total_return_amount")}</span>
                 <span style={{ color }}>{(parseFloat(amount) + estimatedProfit).toFixed(6)} USDT</span>
               </div>
             </div>
@@ -248,11 +248,11 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Shield size={12} style={{ color: "#C9A227" }} />
-              <span>不可提前赎回 · 到期自动返还本金</span>
+              <span>{t("home.no_early_redeem")}</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Shield size={12} style={{ color: "#C9A227" }} />
-              <span>日利润可提现 · 每笔最低30U · 手续费1U</span>
+              <span>{t("home.daily_withdraw_note")}</span>
             </div>
           </div>
 
@@ -347,7 +347,7 @@ export default function HomePage() {
     <div className="px-4 py-4 space-y-4">
       <div className="flex items-center gap-2 mb-2">
         <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-        <h2 className="font-bold text-base text-foreground">CoreX投资产品</h2>
+        <h2 className="font-bold text-base text-foreground">{t("home.products")}</h2>
       </div>
 
       {PRODUCTS.map((product, index) => {
@@ -370,7 +370,7 @@ export default function HomePage() {
                 style={{ background: `linear-gradient(135deg, ${color}, #9A7A1A)`, color: "#0c0a08", padding: "6px 14px" }}
                 onClick={() => handleInvest(product)}
               >
-                投资
+                {t("home.invest")}
               </Button>
             </div>
 
@@ -378,21 +378,21 @@ export default function HomePage() {
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 mb-0.5">
                   <Clock size={11} className="text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">投资周期</span>
+                  <span className="text-xs text-muted-foreground">{t("home.cycle")}</span>
                 </div>
-                <div className="font-bold text-sm text-foreground">{product.days} 天</div>
+                <div className="font-bold text-sm text-foreground">{product.days} {t("common.days")}</div>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 mb-0.5">
                   <DollarSign size={11} className="text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">投资金额</span>
+                  <span className="text-xs text-muted-foreground">{t("home.amount")}</span>
                 </div>
                 <div className="font-bold text-sm text-foreground">{product.minAmount} USDT</div>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 mb-0.5">
                   <TrendingUp size={11} className="text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">总利润</span>
+                  <span className="text-xs text-muted-foreground">{t("home.total_profit")}</span>
                 </div>
                 <div className="font-bold text-sm" style={{ color }}>{product.dailyRate}%/天</div>
               </div>
@@ -402,16 +402,16 @@ export default function HomePage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col">
-                    <span className="text-xs text-muted-foreground">赎回时间</span>
-                    <span className="text-xs font-semibold text-foreground">{product.days}天</span>
+                    <span className="text-xs text-muted-foreground">{t("home.redeem_time")}</span>
+                    <span className="text-xs font-semibold text-foreground">{product.days}{t("common.days")}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs text-muted-foreground">投资次数</span>
-                    <span className="text-xs font-semibold text-foreground">到期复购</span>
+                    <span className="text-xs text-muted-foreground">{t("home.invest_times")}</span>
+                    <span className="text-xs font-semibold text-foreground">{t("home.repurchase")}</span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-muted-foreground">总收益率</div>
+                  <div className="text-xs text-muted-foreground">{t("home.total_return")}</div>
                   <div className="text-sm font-black" style={{ color }}>
                     {(product.days * product.dailyRate).toFixed(2)}%
                   </div>
@@ -468,7 +468,7 @@ export default function HomePage() {
                       color: referrerInfo.level > 0 ? "#C9A227" : "rgba(255,255,255,0.5)",
                       border: referrerInfo.level > 0 ? "1px solid rgba(201,162,39,0.3)" : "1px solid rgba(255,255,255,0.1)",
                     }}>
-                      {referrerInfo.level > 0 ? `V${referrerInfo.level}` : "普通"}
+                      {referrerInfo.level > 0 ? `V${referrerInfo.level}` : t("home.normal")}
                     </span>
                   </div>
                 </div>

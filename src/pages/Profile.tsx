@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 function getLevelName(level: number) {
-  if (level === 0) return "普通";
+  if (level === 0) return t("home.normal");
   return `V${level}`;
 }
 
@@ -119,7 +119,7 @@ export default function ProfilePage() {
     ...(orderList as any[]).map((o: any) => ({
       id: `order-${o.id}`,
       type: "order" as const,
-      label: "投资",
+      label: t("profile.invest_label"),
       amount: `−${parseFloat(o.amount).toFixed(6)}`,
       amountColor: "#ef4444",
       detail: o.productName || o.product_name,
@@ -128,7 +128,7 @@ export default function ProfilePage() {
     ...(rewardList as any[]).map((r: any) => ({
       id: `reward-${r.id}`,
       type: "reward" as const,
-      label: r.type === "daily" ? "日收益" : r.type === "direct_referral" ? "直推奖励" : r.type === "indirect_referral" ? "间推奖励" : r.type === "team_bonus" ? "团队奖励" : "奖励",
+      label: r.type === "daily" ? t("reward.daily") : r.type === "direct_referral" ? t("reward.direct_referral") : r.type === "indirect_referral" ? t("reward.indirect_referral") : r.type === "team_bonus" ? t("reward.team_bonus") : t("invite.rewards"),
       amount: `+${parseFloat(r.amount).toFixed(6)}`,
       amountColor: "#C9A227",
       detail: r.productName || r.description || "",
@@ -137,10 +137,10 @@ export default function ProfilePage() {
     ...(withdrawalList as any[]).map((w: any) => ({
       id: `withdraw-${w.id}`,
       type: "withdrawal" as const,
-      label: w.status === "completed" ? "提现成功" : w.status === "rejected" ? "提现拒绝" : "提现申请",
+      label: w.status === "completed" ? t("profile.withdraw_success") : w.status === "rejected" ? t("profile.withdraw_rejected") : t("profile.withdraw_request"),
       amount: `−${parseFloat(w.amount).toFixed(6)}`,
       amountColor: w.status === "rejected" ? "rgba(255,255,255,0.4)" : "#6bc46b",
-      detail: w.status === "completed" ? `实到 ${parseFloat(w.actualAmount).toFixed(6)} U` : w.status === "rejected" ? "已退回" : "处理中",
+      detail: w.status === "completed" ? `${t("profile.actual_received")} ${parseFloat(w.actualAmount).toFixed(6)} U` : w.status === "rejected" ? t("profile.returned") : t("profile.processing"),
       date: w.createdAt,
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -148,14 +148,14 @@ export default function ProfilePage() {
   const handleCopyAddress = () => {
     if (account?.address) {
       navigator.clipboard.writeText(account.address);
-      toast({ title: "地址已复制" });
+      toast({ title: t("profile.address_copied") });
     }
   };
 
   const handleDisconnect = () => {
     if (wallet) {
       disconnect(wallet);
-      toast({ title: "已断开连接" });
+      toast({ title: t("profile.disconnected") });
     }
   };
 
@@ -163,7 +163,7 @@ export default function ProfilePage() {
     setCurrentLang(code);
     try { localStorage.setItem("corex_lang", code); } catch {}
     const lang = LANGUAGES.find(l => l.code === code);
-    toast({ title: `语言已切换为 ${lang?.label || code}` });
+    toast({ title: `${lang?.label || code}` });
     setLangOpen(false);
   };
 
@@ -221,33 +221,33 @@ export default function ProfilePage() {
   const MENU_ITEMS = [
     {
       icon: ArrowDownToLine,
-      label: "提现明细",
-      desc: "查看提现记录",
+      label: t("profile.withdraw_records"),
+      desc: t("profile.withdraw_records_desc"),
       onClick: () => setWithdrawListOpen(true),
     },
     {
       icon: Clock,
-      label: "历史明细",
-      desc: "收益记录详情",
+      label: t("profile.history"),
+      desc: t("profile.history_desc"),
       onClick: () => setHistoryOpen(true),
     },
     {
       icon: Globe,
-      label: "语言切换",
+      label: t("profile.lang_switch"),
       desc: `${currentLangObj.flag} ${currentLangObj.label}`,
       onClick: () => setLangOpen(true),
     },
     {
       icon: Bell,
-      label: "消息通知",
-      desc: enabledNotifCount === 4 ? "全部开启" : `${enabledNotifCount}/4 项已开启`,
+      label: t("profile.notifications"),
+      desc: enabledNotifCount === 4 ? t("orders.all") : `${enabledNotifCount}/4`,
       onClick: () => setNotifOpen(true),
     },
     {
       icon: Award,
-      label: "帮助中心",
-      desc: "使用教程和常见问题",
-      onClick: () => toast({ title: "帮助中心", description: "功能开发中，敬请期待" }),
+      label: t("profile.help"),
+      desc: t("profile.help_desc"),
+      onClick: () => toast({ title: t("profile.help"), description: t("profile.coming_soon") }),
     },
   ];
 
@@ -255,7 +255,7 @@ export default function ProfilePage() {
     <div className="px-4 py-4 space-y-4">
       <div className="flex items-center gap-2 mb-2">
         <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-        <h2 className="font-bold text-base">我的</h2>
+        <h2 className="font-bold text-base">{t("profile.title")}</h2>
       </div>
 
       {/* Wallet Card */}
@@ -289,7 +289,7 @@ export default function ProfilePage() {
                   <Crown size={10} style={{ color: "#C9A227" }} />
                   <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>{getLevelName(level)}</span>
                 </div>
-                <span className="text-xs text-muted-foreground">BSC 网络</span>
+                <span className="text-xs text-muted-foreground">{t("profile.bsc_network")}</span>
               </div>
             </div>
           </div>
@@ -302,15 +302,15 @@ export default function ProfilePage() {
               <Wallet size={28} style={{ color: "#C9A227" }} />
             </div>
             <div className="text-center">
-              <div className="font-semibold text-foreground mb-1">尚未连接钱包</div>
-              <div className="text-xs text-muted-foreground">连接钱包以使用全部功能</div>
+              <div className="font-semibold text-foreground mb-1">{t("profile.not_connected")}</div>
+              <div className="text-xs text-muted-foreground">{t("profile.connect_desc")}</div>
             </div>
             <ConnectButton
               client={client}
               chain={bscChain}
               wallets={wallets}
               connectButton={{
-                label: "连接钱包",
+                label: t("nav.connect_wallet"),
                 style: {
                   background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
                   color: "#0c0a08",
@@ -343,19 +343,19 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-2 gap-2">
             <div className="stat-card rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-muted-foreground">投资收益金额</div>
+              <div className="text-[10px] text-muted-foreground">{t("profile.daily_earnings_amount")}</div>
               <div className="font-bold text-sm" style={{ color: "#E8C547" }}>{totalDailyEarnings.toFixed(6)} U</div>
             </div>
             <div className="stat-card rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-muted-foreground">推荐收益金额</div>
+              <div className="text-[10px] text-muted-foreground">{t("profile.referral_earnings_amount")}</div>
               <div className="font-bold text-sm" style={{ color: "#3b82f6" }}>{totalReferralRewards.toFixed(6)} U</div>
             </div>
             <div className="stat-card rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-muted-foreground">合计收益金额</div>
+              <div className="text-[10px] text-muted-foreground">{t("profile.total_earnings")}</div>
               <div className="font-bold text-sm" style={{ color: "#C9A227" }}>{totalIncome.toFixed(6)} U</div>
             </div>
             <div className="stat-card rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-muted-foreground">累计提现金额</div>
+              <div className="text-[10px] text-muted-foreground">{t("profile.total_withdrawn")}</div>
               <div className="font-bold text-sm" style={{ color: "#6bc46b" }}>{totalWithdrawn.toFixed(6)} U</div>
             </div>
           </div>
@@ -407,7 +407,6 @@ export default function ProfilePage() {
         style={{ background: "rgba(201,162,39,0.05)", border: "1px solid rgba(201,162,39,0.15)" }}
       >
         <div className="text-xs text-center text-muted-foreground mb-1">CoreX Finance</div>
-        <div className="text-xs text-center text-muted-foreground">BSC链 · USDT理财质押平台</div>
         <div className="text-xs text-center mt-1" style={{ color: "rgba(201,162,39,0.5)" }}>v1.0.0</div>
       </div>
 
@@ -420,7 +419,7 @@ export default function ProfilePage() {
           onClick={handleDisconnect}
         >
           <LogOut size={14} className="mr-2" />
-          断开连接
+          {t("profile.disconnect")}
         </Button>
       )}
 
@@ -548,7 +547,7 @@ export default function ProfilePage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <AlertCircle size={11} style={{ color: "#C9A227" }} />
-                <span>{t("withdraw.min")}: {WITHDRAW_MIN} USDT · {WITHDRAW_MULTIPLE}的倍数</span>
+                <span>{t("withdraw.min")}: {WITHDRAW_MIN} USDT · {WITHDRAW_MULTIPLE}x</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <AlertCircle size={11} style={{ color: "#C9A227" }} />
@@ -581,10 +580,10 @@ export default function ProfilePage() {
         >
           <DialogHeader>
             <DialogTitle className="text-center" style={{ color: "#C9A227" }}>
-              提现明细
+              {t("profile.withdraw_records")}
             </DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground">
-              提现记录详情
+              {t("profile.withdraw_records_desc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -652,10 +651,10 @@ export default function ProfilePage() {
         >
           <DialogHeader>
             <DialogTitle className="text-center" style={{ color: "#C9A227" }}>
-              历史明细
+              {t("profile.history")}
             </DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground">
-              投资·收益·提现记录
+              {t("profile.history_invest_earn_withdraw")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -709,18 +708,18 @@ export default function ProfilePage() {
         >
           <DialogHeader>
             <DialogTitle className="text-center" style={{ color: "#C9A227" }}>
-              消息通知
+              {t("profile.notifications")}
             </DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground">
-              管理您的通知偏好设置
+              {t("profile.notifications")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1 py-2">
             {[
-              { key: "orderExpiry" as const, icon: BellRing, label: "订单到期提醒", desc: "质押到期时通知您" },
-              { key: "dailyEarnings" as const, icon: Bell, label: "每日收益通知", desc: "每日结算后推送收益" },
-              { key: "referralReward" as const, icon: Bell, label: "推荐奖励通知", desc: "获得推荐奖励时通知" },
-              { key: "systemNotice" as const, icon: Bell, label: "系统公告", desc: "平台重要通知和公告" },
+              { key: "orderExpiry" as const, icon: BellRing, label: t("profile.notification_order_expire"), desc: t("profile.notification_order_expire_desc") },
+              { key: "dailyEarnings" as const, icon: Bell, label: t("profile.notification_daily"), desc: t("profile.notification_daily_desc") },
+              { key: "referralReward" as const, icon: Bell, label: t("profile.notification_referral"), desc: t("profile.notification_referral_desc") },
+              { key: "systemNotice" as const, icon: Bell, label: t("profile.notification_system"), desc: t("profile.notification_system_desc") },
             ].map((item) => (
               <div
                 key={item.key}
@@ -762,10 +761,10 @@ export default function ProfilePage() {
         >
           <DialogHeader>
             <DialogTitle className="text-center" style={{ color: "#C9A227" }}>
-              语言设置
+              {t("profile.lang_setting")}
             </DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground">
-              选择您的界面语言
+              {t("profile.select_lang")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1 py-2">

@@ -7,6 +7,7 @@ import { getTeamStats, getEarnings, getRewardsByWallet, getDirectReferrals, getI
 import { useToast } from "@/hooks/use-toast";
 import { Copy, Users, UserPlus, Crown, ChevronRight, ChevronDown, Star, ArrowLeft, TrendingUp, BarChart3, Loader2, Wallet, Award, Search } from "lucide-react";
 import { LEVEL_CONFIG } from "@shared/schema";
+import { t } from "@/lib/i18n";
 
 interface MemberInfo {
   walletAddress: string;
@@ -27,7 +28,7 @@ function shortAddr(addr: string) {
 }
 
 function getLevelName(level: number) {
-  if (level === 0) return "普通";
+  if (level === 0) return t("home.normal");
   return `V${level}`;
 }
 
@@ -67,7 +68,7 @@ function MemberCard({ member, onDrillDown }: { member: MemberInfo; onDrillDown?:
           </div>
           <div>
             <div className="text-sm font-semibold font-mono" style={{ color: "#fff" }}>{shortAddr(member.walletAddress)}</div>
-            <div className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>{new Date(member.createdAt).toLocaleDateString()} 加入</div>
+            <div className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>{new Date(member.createdAt).toLocaleDateString()} {t("invite.joined")}</div>
           </div>
         </div>
         <Badge className="px-2.5 py-1 text-xs font-bold" style={{
@@ -81,17 +82,17 @@ function MemberCard({ member, onDrillDown }: { member: MemberInfo; onDrillDown?:
 
       <div className="grid grid-cols-3 gap-3 pt-3 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
         <div className="text-center">
-          <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>质押中</div>
+          <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.staking")}</div>
           <div className="text-sm font-bold" style={{ color: member.stakingAmount > 0 ? "#D4AF37" : "rgba(255,255,255,0.25)" }}>
             {member.stakingAmount > 0 ? `${member.stakingAmount.toLocaleString()}` : "0"}
           </div>
         </div>
         <div className="text-center">
-          <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>团队业绩</div>
+          <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.performance")}</div>
           <div className="text-sm font-bold" style={{ color: "#F0D060" }}>{member.teamPerformance?.toLocaleString() || 0}</div>
         </div>
         <div className="text-center">
-          <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>有效账户</div>
+          <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.active_accounts")}</div>
           <div className="text-sm font-bold" style={{ color: "#fff" }}>{member.teamAccounts || 0}</div>
         </div>
       </div>
@@ -106,7 +107,7 @@ function MemberCard({ member, onDrillDown }: { member: MemberInfo; onDrillDown?:
           onClick={() => onDrillDown(member.walletAddress)}
         >
           <ChevronDown size={12} className="mr-1" />
-          查看下线 ({member.childrenCount}人)
+          {t("invite.view_downline")} ({member.childrenCount}{t("invite.persons")})
         </Button>
       )}
     </div>
@@ -197,20 +198,20 @@ export default function InvitePage() {
   });
 
   const referralLink = account?.address
-    ? (hasInvested ? `${window.location.origin}/?ref=${account.address}` : "需要先投资才能邀请")
-    : "请先连接钱包";
+    ? (hasInvested ? `${window.location.origin}/?ref=${account.address}` : t("invite.need_invest_first"))
+    : t("invite.connect_first");
 
   const handleCopy = () => {
     if (!account) {
-      toast({ title: "请先连接钱包", variant: "destructive" });
+      toast({ title: t("invite.connect_first"), variant: "destructive" });
       return;
     }
     if (!hasInvested) {
-      toast({ title: "需要先投资", description: "投资后才能生成邀请链接", variant: "destructive" });
+      toast({ title: t("invite.need_invest_first"), variant: "destructive" });
       return;
     }
     navigator.clipboard.writeText(referralLink);
-    toast({ title: "推荐链接已复制" });
+    toast({ title: t("invite.link_copied") });
   };
 
   const handleDrillDown = (addr: string) => setDrillPath(prev => [...prev, addr]);
@@ -225,11 +226,11 @@ export default function InvitePage() {
       <div className="px-4 py-6 space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="w-1 h-6 rounded-full" style={{ background: "linear-gradient(180deg, #D4AF37, #9A7A1A)" }} />
-          <h2 className="font-bold text-lg" style={{ color: "#fff" }}>邀请中心</h2>
+          <h2 className="font-bold text-lg" style={{ color: "#fff" }}>{t("invite.center")}</h2>
         </div>
         <div className="text-center py-20" style={{ color: "rgba(255,255,255,0.4)" }}>
           <Wallet size={44} className="mx-auto mb-4 opacity-30" />
-          <p className="text-sm">请先连接钱包</p>
+          <p className="text-sm">{t("invite.connect_first")}</p>
         </div>
       </div>
     );
@@ -240,14 +241,14 @@ export default function InvitePage() {
       {/* Header */}
       <div className="flex items-center gap-2.5">
         <div className="w-1 h-6 rounded-full" style={{ background: "linear-gradient(180deg, #D4AF37, #9A7A1A)" }} />
-        <h2 className="font-bold text-lg" style={{ color: "#fff" }}>邀请中心</h2>
+        <h2 className="font-bold text-lg" style={{ color: "#fff" }}>{t("invite.center")}</h2>
       </div>
 
       {/* Referral link */}
       <div className="rounded-2xl p-5 space-y-4" style={cardStyleGold}>
         <div className="flex items-center gap-2">
           <UserPlus size={16} style={{ color: "#D4AF37" }} />
-          <span className="text-sm font-semibold" style={{ color: "#D4AF37" }}>我的推荐链接</span>
+          <span className="text-sm font-semibold" style={{ color: "#D4AF37" }}>{t("invite.my_link")}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex-1 rounded-lg px-3 py-2.5 text-xs font-mono truncate"
@@ -258,7 +259,7 @@ export default function InvitePage() {
             style={{ background: "linear-gradient(135deg, #D4AF37, #9A7A1A)", color: "#0c0a08" }}
             onClick={handleCopy}>
             <Copy size={13} className="mr-1.5" />
-            复制
+            {t("invite.copy")}
           </Button>
         </div>
       </div>
@@ -270,12 +271,12 @@ export default function InvitePage() {
           <div className="flex items-center justify-center gap-3">
             <div>
               <div className="font-black text-lg leading-none" style={{ color: "#D4AF37" }}>{(teamStats as any)?.directCount || 0}</div>
-              <div className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>直推</div>
+              <div className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.direct")}</div>
             </div>
             <div className="w-px h-5" style={{ background: "rgba(255,255,255,0.1)" }} />
             <div>
               <div className="font-black text-lg leading-none" style={{ color: "#F0D060" }}>{(teamStats as any)?.indirectCount || 0}</div>
-              <div className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>间推</div>
+              <div className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.indirect")}</div>
             </div>
           </div>
         </div>
@@ -284,12 +285,12 @@ export default function InvitePage() {
           <div className="font-black text-xl leading-none" style={{ color: getLevelColor((memberData as any)?.level ?? 0) }}>
             {getLevelName((memberData as any)?.level ?? 0)}
           </div>
-          <div className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>当前等级</div>
+          <div className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.current_level")}</div>
         </div>
         <div className="rounded-xl p-3.5 text-center" style={cardStyle}>
           <BarChart3 size={15} className="mx-auto mb-2" style={{ color: "#F0D060" }} />
           <div className="font-black text-lg leading-none" style={{ color: "#D4AF37" }}>{(teamStats as any)?.totalAccounts || 0}</div>
-          <div className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>有效账户</div>
+          <div className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.active_accounts")}</div>
         </div>
       </div>
 
@@ -297,7 +298,7 @@ export default function InvitePage() {
       <div className="rounded-xl px-4 py-3.5 flex items-center justify-between" style={cardStyleGold}>
         <div className="flex items-center gap-2">
           <TrendingUp size={15} style={{ color: "#F0D060" }} />
-          <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>团队总业绩</span>
+          <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>{t("invite.team_performance")}</span>
         </div>
         <span className="font-black text-base" style={{ color: "#F0D060" }}>
           {parseFloat((teamStats as any)?.totalStaking || "0").toLocaleString()} <span className="text-xs font-normal" style={{ color: "rgba(255,255,255,0.4)" }}>USDT</span>
@@ -307,13 +308,13 @@ export default function InvitePage() {
       {/* Rewards summary - 4 columns */}
       <div className="grid grid-cols-4 gap-2">
         {[
-          { label: "直推", value: directRewards, color: "#F0D060" },
-          { label: "间推", value: indirectRewards, color: "#D4AF37" },
-          { label: "团队", value: teamRewards, color: "#FFD700" },
-          { label: "同级", value: equalLevelTotal, color: "#FF8C00" },
+          { label: t("invite.direct"), value: directRewards, color: "#F0D060" },
+          { label: t("invite.indirect"), value: indirectRewards, color: "#D4AF37" },
+          { label: t("invite.tab_team"), value: teamRewards, color: "#FFD700" },
+          { label: t("invite.equal_bonus"), value: equalLevelTotal, color: "#FF8C00" },
         ].map(({ label, value, color }) => (
           <div key={label} className="rounded-lg py-2.5 px-2 text-center" style={cardStyle}>
-            <div className="text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>{label}奖励</div>
+            <div className="text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>{label}{t("invite.rewards")}</div>
             <div className="font-bold text-xs mt-1" style={{ color }}>{value.toFixed(6)}</div>
           </div>
         ))}
@@ -328,7 +329,7 @@ export default function InvitePage() {
               ? { background: "linear-gradient(135deg, #D4AF37, #9A7A1A)", color: "#0c0a08" }
               : { color: "rgba(255,255,255,0.5)" }}
             onClick={() => { setActiveTab(tab); if (tab === "team") setDrillPath([]); }}>
-            {tab === "referral" ? "推荐" : tab === "team" ? "团队" : tab === "rewards" ? "奖励明细" : "等级制度"}
+            {tab === "referral" ? t("invite.tab_referrals") : tab === "team" ? t("invite.tab_team") : tab === "rewards" ? t("invite.tab_rewards") : t("invite.tab_levels")}
           </button>
         ))}
       </div>
@@ -344,15 +345,15 @@ export default function InvitePage() {
                   ? { background: "rgba(201,162,39,0.12)", color: "#D4AF37", border: "1px solid rgba(201,162,39,0.3)" }
                   : { color: "rgba(255,255,255,0.4)", border: "1px solid transparent" }}
                 onClick={() => setRefSubTab(sub)}>
-                {sub === "direct" ? `直推会员 (${(directMembers as any[]).length})` : `间推会员 (${(indirectMembers as any[]).length})`}
+                {sub === "direct" ? `${t("invite.direct_members")} (${(directMembers as any[]).length})` : `${t("invite.indirect_members")} (${(indirectMembers as any[]).length})`}
               </button>
             ))}
           </div>
           {(() => {
             const members = refSubTab === "direct" ? directMembers : indirectMembers;
             const loading = refSubTab === "direct" ? directLoading : indirectLoading;
-            const emptyText = refSubTab === "direct" ? "暂无直推会员" : "暂无间推会员";
-            const emptyHint = refSubTab === "direct" ? "分享推荐链接邀请好友加入" : "直推会员邀请的好友将出现在这里";
+            const emptyText = refSubTab === "direct" ? t("invite.no_direct") : t("invite.no_indirect");
+            const emptyHint = refSubTab === "direct" ? t("invite.share_link") : t("invite.indirect_appear");
             return loading ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 size={22} className="animate-spin" style={{ color: "#D4AF37" }} />
@@ -381,7 +382,7 @@ export default function InvitePage() {
             <button data-testid="button-team-back" onClick={handleBack}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold"
               style={{ background: "rgba(201,162,39,0.08)", color: "#D4AF37", border: "1px solid rgba(201,162,39,0.2)" }}>
-              <ArrowLeft size={13} /> 返回上级
+              <ArrowLeft size={13} /> {t("invite.back")}
             </button>
           )}
 
@@ -393,7 +394,7 @@ export default function InvitePage() {
                 fontWeight: drillPath.length === 0 ? 700 : 400,
                 background: drillPath.length === 0 ? "linear-gradient(135deg, #D4AF37, #9A7A1A)" : "transparent",
               }}>
-              我的直推
+              {t("invite.my_direct")}
             </button>
             {drillPath.map((addr, i) => (
               <div key={i} className="flex items-center gap-1">
@@ -418,7 +419,7 @@ export default function InvitePage() {
               <Search size={13} style={{ color: "rgba(255,255,255,0.3)" }} />
               <input
                 type="text"
-                placeholder="搜索地址..."
+                placeholder={t("invite.search_address")}
                 value={teamSearch}
                 onChange={e => setTeamSearch(e.target.value)}
                 className="bg-transparent border-none outline-none text-xs flex-1"
@@ -430,9 +431,9 @@ export default function InvitePage() {
               onChange={e => setTeamLevelFilter(e.target.value === "" ? null : Number(e.target.value))}
               className="rounded-lg px-2.5 py-2 text-xs font-semibold outline-none"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#D4AF37" }}>
-              <option value="" style={{ background: "#1a1a1a" }}>全部等级</option>
+              <option value="" style={{ background: "#1a1a1a" }}>{t("invite.all_levels")}</option>
               {[0, 1, 2, 3, 4, 5, 6, 7].map(l => (
-                <option key={l} value={l} style={{ background: "#1a1a1a" }}>{l === 0 ? "普通" : `V${l}`}</option>
+                <option key={l} value={l} style={{ background: "#1a1a1a" }}>{l === 0 ? t("home.normal") : `V${l}`}</option>
               ))}
             </select>
           </div>
@@ -451,17 +452,17 @@ export default function InvitePage() {
             ) : allChildren.length === 0 ? (
               <div className="text-center py-16">
                 <Users size={36} className="mx-auto mb-3" style={{ color: "rgba(255,255,255,0.1)" }} />
-                <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>该会员暂无直推下线</p>
+                <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.no_direct_downline")}</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-16">
                 <Search size={36} className="mx-auto mb-3" style={{ color: "rgba(255,255,255,0.1)" }} />
-                <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>没有匹配的会员</p>
+                <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.no_match")}</p>
               </div>
             ) : (
               <div className="space-y-3">
                 <div className="text-xs px-1" style={{ color: "rgba(255,255,255,0.4)" }}>
-                  共 {filtered.length} 位会员{(teamSearch || teamLevelFilter !== null) ? ` (筛选自 ${allChildren.length} 位)` : ""}
+                  {t("invite.total_members").replace("{count}", String(filtered.length))}{(teamSearch || teamLevelFilter !== null) ? ` (${t("invite.filtered_from").replace("{total}", String(allChildren.length))})` : ""}
                 </div>
                 {filtered.map((m: any) => (
                   <MemberCard key={m.walletAddress} member={m} onDrillDown={handleDrillDown} />
@@ -477,10 +478,10 @@ export default function InvitePage() {
         <div className="space-y-3">
           <div className="flex rounded-xl p-1 gap-1" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
             {([
-              { key: "direct_referral" as const, label: "直推" },
-              { key: "indirect_referral" as const, label: "间推" },
-              { key: "team_bonus" as const, label: "团队" },
-              { key: "equal_level_bonus" as const, label: "同级" },
+              { key: "direct_referral" as const, label: t("invite.direct") },
+              { key: "indirect_referral" as const, label: t("invite.indirect") },
+              { key: "team_bonus" as const, label: t("invite.tab_team") },
+              { key: "equal_level_bonus" as const, label: t("invite.equal_bonus") },
             ]).map(({ key, label }) => (
               <button key={key}
                 className="flex-1 py-2 text-xs font-semibold rounded-lg transition-all"
@@ -497,18 +498,18 @@ export default function InvitePage() {
             filteredRewards.length === 0 ? (
               <div className="text-center py-16">
                 <Award size={36} className="mx-auto mb-3" style={{ color: "rgba(255,255,255,0.1)" }} />
-                <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>暂无团队奖励</p>
-                <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.25)" }}>达到V1以上等级后可获得团队奖励</p>
+                <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.no_team_bonus")}</p>
+                <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.25)" }}>{t("invite.team_bonus_unlock")}</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {/* Table header */}
                 <div className="grid grid-cols-4 gap-2 px-4 py-3 text-[10px] font-semibold rounded-xl"
                   style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.45)" }}>
-                  <span>日期</span>
-                  <span className="text-right">业绩</span>
-                  <span className="text-right">最高利率</span>
-                  <span className="text-right">奖励</span>
+                  <span>{t("invite.date")}</span>
+                  <span className="text-right">{t("invite.performance")}</span>
+                  <span className="text-right">{t("invite.max_rate")}</span>
+                  <span className="text-right">{t("invite.rewards")}</span>
                 </div>
                 {filteredRewards.map((reward: any) => {
                   const desc = reward.description || "";
@@ -530,7 +531,7 @@ export default function InvitePage() {
           ) : filteredRewards.length === 0 ? (
             <div className="text-center py-16">
               <Award size={36} className="mx-auto mb-3" style={{ color: "rgba(255,255,255,0.1)" }} />
-              <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>暂无奖励记录</p>
+              <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.no_reward_records")}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -545,7 +546,7 @@ export default function InvitePage() {
                          <ChevronRight size={14} style={{ color: "#D4AF37" }} />}
                       </div>
                       <span className="text-xs font-semibold" style={{ color: "#D4AF37" }}>
-                        {rewardSubTab === "direct_referral" ? "直推奖励" : rewardSubTab === "equal_level_bonus" ? "同级奖励" : "间推奖励"}
+                        {rewardSubTab === "direct_referral" ? t("invite.direct_reward") : rewardSubTab === "equal_level_bonus" ? t("invite.equal_reward") : t("invite.indirect_reward")}
                       </span>
                     </div>
                     <span className="font-bold text-sm" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(6)} U</span>
@@ -553,7 +554,7 @@ export default function InvitePage() {
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs pl-10">
                     {reward.fromAddress && (
                       <>
-                        <span style={{ color: "rgba(255,255,255,0.4)" }}>来源账户</span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.source_account")}</span>
                         <span className="font-mono text-right" style={{ color: "rgba(255,255,255,0.7)" }}>
                           {shortAddr(reward.fromAddress)}
                           {reward.fromLevel > 0 && (
@@ -565,17 +566,17 @@ export default function InvitePage() {
                     )}
                     {reward.productName && (
                       <>
-                        <span style={{ color: "rgba(255,255,255,0.4)" }}>来源配套</span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.source_product")}</span>
                         <span className="text-right" style={{ color: "rgba(255,255,255,0.7)" }}>{reward.productName}</span>
                       </>
                     )}
                     {reward.orderAmount && (
                       <>
-                        <span style={{ color: "rgba(255,255,255,0.4)" }}>配套金额</span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.product_amount")}</span>
                         <span className="text-right" style={{ color: "rgba(255,255,255,0.7)" }}>{parseFloat(reward.orderAmount).toFixed(0)} U</span>
                       </>
                     )}
-                    <span style={{ color: "rgba(255,255,255,0.4)" }}>时间</span>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.time")}</span>
                     <span className="text-right" style={{ color: "rgba(255,255,255,0.7)" }}>{new Date(reward.createdAt).toLocaleString()}</span>
                   </div>
                 </div>
@@ -601,23 +602,23 @@ export default function InvitePage() {
                       V{lvl.level}
                     </div>
                     <div>
-                      <div className="font-bold text-sm" style={{ color }}>会员 V{lvl.level}</div>
-                      <div className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>团队奖励比例 {lvl.bonus}%</div>
+                      <div className="font-bold text-sm" style={{ color }}>{t("invite.member_v")}{lvl.level}</div>
+                      <div className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.team_bonus_rate")} {lvl.bonus}%</div>
                     </div>
                   </div>
                   <Star size={16} style={{ color, opacity: 0.5 }} />
                 </div>
                 <div className="grid grid-cols-3 gap-3 pt-3 border-t" style={{ borderColor: `${color}18` }}>
                   <div className="text-center">
-                    <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>有效账户</div>
-                    <div className="text-sm font-bold" style={{ color }}>{lvl.people}人</div>
+                    <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.active_accounts")}</div>
+                    <div className="text-sm font-bold" style={{ color }}>{lvl.people}{t("invite.persons")}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>团队业绩</div>
+                    <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.performance")}</div>
                     <div className="text-sm font-bold" style={{ color }}>{(lvl.amount / 1000).toLocaleString()}K</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>下级要求</div>
+                    <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.requirement")}</div>
                     <div className="text-sm font-bold" style={{ color }}>
                       {lvl.subCount > 0 ? `${lvl.subCount}个V${lvl.subLevel}` : "-"}
                     </div>
@@ -632,19 +633,19 @@ export default function InvitePage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Award size={14} style={{ color: "#D4AF37" }} />
-                <span className="text-xs font-bold" style={{ color: "#D4AF37" }}>团队奖励公式</span>
+                <span className="text-xs font-bold" style={{ color: "#D4AF37" }}>{t("invite.team_formula")}</span>
               </div>
               <div className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
-                团队总业绩 x 个人最高日利率 x 等级%
+                {t("invite.team_formula_desc")}
               </div>
             </div>
             <div className="border-t pt-3" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
               <div className="flex items-center gap-2 mb-2">
                 <Star size={14} style={{ color: "#FF8C00" }} />
-                <span className="text-xs font-bold" style={{ color: "#FF8C00" }}>同级奖励</span>
+                <span className="text-xs font-bold" style={{ color: "#FF8C00" }}>{t("invite.equal_bonus")}</span>
               </div>
               <div className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
-                推荐线上遇到同等级领导，可拿其团队奖励的10%，逐层递减，最多5层。
+                {t("invite.equal_bonus_desc")}
               </div>
               <div className="text-[10px] mt-2 leading-relaxed px-3 py-2 rounded-lg"
                 style={{ background: "rgba(255,140,0,0.06)", border: "1px solid rgba(255,140,0,0.1)", color: "rgba(255,255,255,0.35)" }}>

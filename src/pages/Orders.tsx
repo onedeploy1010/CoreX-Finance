@@ -68,7 +68,7 @@ export default function OrdersPage() {
         <div className="stat-card rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Clock size={12} style={{ color: "#E8C547" }} />
-            <span className="text-[10px] text-muted-foreground">日收益</span>
+            <span className="text-[10px] text-muted-foreground">{t("orders.daily_income")}</span>
           </div>
           <div className="font-black text-lg" style={{ color: "#E8C547" }}>
             {todayDailyEarnings.toFixed(6)}
@@ -78,7 +78,7 @@ export default function OrdersPage() {
         <div className="stat-card rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <TrendingUp size={12} style={{ color: "#C9A227" }} />
-            <span className="text-[10px] text-muted-foreground">总收益</span>
+            <span className="text-[10px] text-muted-foreground">{t("orders.total_income")}</span>
           </div>
           <div className="font-black text-lg" style={{ color: "#C9A227" }}>
             {totalEarnings.toFixed(6)}
@@ -98,7 +98,7 @@ export default function OrdersPage() {
               : { color: "rgba(255,255,255,0.5)" }}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === "orders" ? t("orders.tab_orders") : "收益明细"}
+            {tab === "orders" ? t("orders.tab_orders") : t("orders.earnings_detail")}
           </button>
         ))}
       </div>
@@ -109,9 +109,9 @@ export default function OrdersPage() {
           {/* Order status filter */}
           <div className="flex rounded-lg p-1 gap-1" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
             {([
-              { key: "all" as const, label: "全部" },
-              { key: "active" as const, label: "进行中" },
-              { key: "completed" as const, label: "已完成" },
+              { key: "all" as const, label: t("orders.all") },
+              { key: "active" as const, label: t("orders.active") },
+              { key: "completed" as const, label: t("orders.completed") },
             ]).map(({ key, label }) => (
               <button key={key}
                 className="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all"
@@ -140,7 +140,7 @@ export default function OrdersPage() {
             }).length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <ClipboardList size={40} className="mx-auto mb-3 opacity-30" />
-              <p>没有{orderFilter === "active" ? "进行中" : "已完成"}的订单</p>
+              <p>{t("orders.no_orders")}</p>
             </div>
           ) : (
             (orderList as any[]).filter((order: any) => {

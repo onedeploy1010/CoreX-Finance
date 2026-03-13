@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { t } from "@/lib/i18n";
 import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, ArrowRight, Users, BarChart3 } from "lucide-react";
 import { LangSwitch } from "@/components/LangSwitch";
 
@@ -70,8 +71,17 @@ function MediaSlider({ items }: { items: any[] }) {
           <img src={item.url} alt={item.title || ""} className="w-full h-full object-cover transition-opacity duration-700" />
         )}
         {item.type === "video" && (
-          <video src={item.url} controls className="w-full h-full object-contain" style={{ background: "#000" }}
-            onPlay={() => setIsAutoPlay(false)} onEnded={() => setIsAutoPlay(true)} />
+          <video
+            src={item.url}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-contain"
+            style={{ background: "#000" }}
+            onPlay={() => setIsAutoPlay(false)}
+            onPause={() => setIsAutoPlay(true)}
+            onEnded={() => { setIsAutoPlay(true); next(); }}
+          />
         )}
         {item.type === "youtube" && <YouTubeEmbed url={item.url} />}
         <div className="absolute inset-0" style={{ background: "linear-gradient(0deg, rgba(12,10,8,0.8) 0%, transparent 50%)" }} />
@@ -163,8 +173,8 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
         {/* Tagline */}
         <div className="mt-4 text-center max-w-xs">
           <p className="text-sm font-medium text-foreground/50 leading-relaxed">
-            新一代去中心化AI算力投资平台<br />
-            <span style={{ color: "rgba(201,162,39,0.7)" }}>安全 · 透明 · 高效</span>
+            {t("landing.tagline")}<br />
+            <span style={{ color: "rgba(201,162,39,0.7)" }}>{t("landing.keywords")}</span>
           </p>
         </div>
       </div>
@@ -182,9 +192,9 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             border: "1px solid rgba(201,162,39,0.1)",
           }}>
           {[
-            { icon: Shield, value: "BSC", label: "安全区块链", color: "#22c55e" },
-            { icon: BarChart3, value: "24/7", label: "自动结算", color: "#C9A227" },
-            { icon: Users, value: "USDT", label: "稳定币质押", color: "#3b82f6" },
+            { icon: Shield, value: "BSC", label: t("landing.blockchain"), color: "#22c55e" },
+            { icon: BarChart3, value: "24/7", label: t("landing.auto_settle"), color: "#C9A227" },
+            { icon: Users, value: "USDT", label: t("landing.stablecoin"), color: "#3b82f6" },
           ].map((s) => (
             <div key={s.label} className="text-center space-y-1.5">
               <div className="w-9 h-9 rounded-xl mx-auto flex items-center justify-center"
@@ -213,7 +223,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
                 style={{ background: "radial-gradient(circle at top right, rgba(201,162,39,0.06), transparent 70%)" }} />
               <div className="flex items-center gap-2.5">
                 <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #F5E6A3, #9A7A1A)" }} />
-                <h2 className="font-bold text-base" style={{ color: "#C9A227" }}>关于 CoreX</h2>
+                <h2 className="font-bold text-base" style={{ color: "#C9A227" }}>{t("landing.about")}</h2>
               </div>
               <p className="text-[13px] text-foreground/50 leading-[1.8] whitespace-pre-line">{companyIntro}</p>
             </div>
@@ -224,15 +234,15 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
         <div className="space-y-3">
           <div className="flex items-center gap-2 px-1 mb-1">
             <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-            <span className="text-sm font-bold text-foreground/70">核心优势</span>
+            <span className="text-sm font-bold text-foreground/70">{t("landing.advantages")}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             {[
-              { icon: Shield, title: "安全可靠", desc: "智能合约保障\n链上透明可查", color: "#22c55e" },
-              { icon: TrendingUp, title: "稳定收益", desc: "AI算力驱动\n每日自动结算", color: "#C9A227" },
-              { icon: Zap, title: "即时提现", desc: "链上自动执行\n到账快速", color: "#3b82f6" },
-              { icon: Globe, title: "全球节点", desc: "分布式算力网络\n覆盖全球", color: "#a855f7" },
+              { icon: Shield, title: t("landing.feat_secure"), desc: t("landing.feat_secure_desc"), color: "#22c55e" },
+              { icon: TrendingUp, title: t("landing.feat_profit"), desc: t("landing.feat_profit_desc"), color: "#C9A227" },
+              { icon: Zap, title: t("landing.feat_withdraw"), desc: t("landing.feat_withdraw_desc"), color: "#3b82f6" },
+              { icon: Globe, title: t("landing.feat_global"), desc: t("landing.feat_global_desc"), color: "#a855f7" },
             ].map((f) => (
               <div key={f.title} className="rounded-2xl p-4 relative overflow-hidden group"
                 style={{
@@ -256,10 +266,10 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
 
         {/* Trust indicators */}
         <div className="flex items-center justify-center gap-6 py-2">
-          {["BSC Chain", "Smart Contract", "USDT", "Auto Settlement"].map((t) => (
-            <div key={t} className="flex items-center gap-1.5">
+          {["BSC Chain", "Smart Contract", "USDT", "Auto Settlement"].map((label) => (
+            <div key={label} className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#22c55e" }} />
-              <span className="text-[10px] text-foreground/25">{t}</span>
+              <span className="text-[10px] text-foreground/25">{label}</span>
             </div>
           ))}
         </div>
@@ -280,7 +290,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity"
               style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), transparent)" }} />
             <span className="relative z-10 flex items-center gap-2">
-              进入平台 <ArrowRight size={18} strokeWidth={2.5} />
+              {t("landing.enter")} <ArrowRight size={18} strokeWidth={2.5} />
             </span>
           </button>
 

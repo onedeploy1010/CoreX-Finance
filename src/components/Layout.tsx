@@ -3,12 +3,13 @@ import { Home, ClipboardList, Users, User } from "lucide-react";
 import { ConnectButton } from "thirdweb/react";
 import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { LangSwitch } from "@/components/LangSwitch";
+import { t } from "@/lib/i18n";
 
 const NAV_ITEMS = [
-  { path: "/", label: "首页", icon: Home },
-  { path: "/orders", label: "订单", icon: ClipboardList },
-  { path: "/invite", label: "邀请", icon: Users },
-  { path: "/profile", label: "我的", icon: User },
+  { path: "/", labelKey: "nav.home", icon: Home },
+  { path: "/orders", labelKey: "nav.orders", icon: ClipboardList },
+  { path: "/invite", labelKey: "nav.invite", icon: Users },
+  { path: "/profile", labelKey: "nav.profile", icon: User },
 ];
 
 export function AppHeader() {
@@ -33,7 +34,7 @@ export function AppHeader() {
             showThirdwebBranding: false,
           }}
           connectButton={{
-            label: "连接钱包",
+            label: t("nav.connect_wallet"),
             style: {
               background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
               color: "#0c0a08",
@@ -70,12 +71,12 @@ export function BottomNav() {
 
   return (
     <nav className="bottom-nav fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around py-2 pb-safe">
-      {NAV_ITEMS.map(({ path, label, icon: Icon }) => {
+      {NAV_ITEMS.map(({ path, labelKey, icon: Icon }) => {
         const isActive = location === path;
         return (
           <Link key={path} href={path}>
             <div
-              data-testid={`nav-${label}`}
+              data-testid={`nav-${labelKey}`}
               className="flex flex-col items-center gap-0.5 px-5 py-1.5 cursor-pointer transition-all duration-200"
               style={{ minWidth: "56px", minHeight: "44px" }}
             >
@@ -88,7 +89,7 @@ export function BottomNav() {
                 className="text-[11px] font-medium transition-all duration-200"
                 style={{ color: isActive ? "#C9A227" : "rgba(255,255,255,0.4)" }}
               >
-                {label}
+                {t(labelKey)}
               </span>
               {isActive && (
                 <div
