@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, ArrowRight, Users, BarChart3 } from "lucide-react";
+import { LangSwitch } from "@/components/LangSwitch";
 
 async function getMedia() {
   const { data } = await supabase
@@ -130,6 +131,11 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
         {/* Grid pattern */}
         <div className="absolute inset-0 opacity-[0.015]"
           style={{ backgroundImage: "linear-gradient(rgba(201,162,39,1) 1px, transparent 1px), linear-gradient(90deg, rgba(201,162,39,1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+      </div>
+
+      {/* Language Switch - top right */}
+      <div className="absolute top-4 right-4 z-20">
+        <LangSwitch />
       </div>
 
       {/* Hero Section */}
