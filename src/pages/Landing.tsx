@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useActiveAccount, useConnectModal } from "thirdweb/react";
 import { supabase } from "@/lib/supabase";
+import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { t, getLang } from "@/lib/i18n";
-import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, ArrowRight, Users, BarChart3 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, ArrowRight, Users, BarChart3, Wallet } from "lucide-react";
 import { LangSwitch } from "@/components/LangSwitch";
 
 async function getMedia() {
@@ -299,9 +301,34 @@ function ScanLine() {
 export default function LandingPage({ onEnter }: { onEnter: () => void }) {
   const { data: media = [] } = useQuery({ queryKey: ["/api/media"], queryFn: getMedia });
   const { data: companyIntro = "" } = useQuery({ queryKey: ["/api/company-intro", getLang()], queryFn: getCompanyIntro });
+  const account = useActiveAccount();
+  const { connect } = useConnectModal();
+  const [connecting, setConnecting] = useState(false);
 
   const [visible, setVisible] = useState(false);
   useEffect(() => { requestAnimationFrame(() => setVisible(true)); }, []);
+
+  const handleEnterClick = async () => {
+    if (account?.address) {
+      onEnter();
+      return;
+    }
+    try {
+      setConnecting(true);
+      await connect({
+        client,
+        chain: bscChain,
+        wallets,
+        size: "compact",
+        showThirdwebBranding: false,
+      });
+      // onEnter will be called automatically via useEffect in App.tsx
+    } catch {
+      // User cancelled or error
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col overflow-hidden" style={{ background: "#080604" }}>
@@ -464,14 +491,20 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
               color: "#0c0a08",
               boxShadow: "0 8px 32px rgba(201,162,39,0.25), 0 2px 8px rgba(201,162,39,0.2)",
               padding: "18px 0",
+              opacity: connecting ? 0.7 : 1,
             }}
-            onClick={onEnter}
+            onClick={handleEnterClick}
+            disabled={connecting}
           >
             {/* Shine effect */}
             <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity"
               style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), transparent)" }} />
             <span className="relative z-10 flex items-center gap-2">
-              {t("landing.enter")} <ArrowRight size={18} strokeWidth={2.5} />
+              {account?.address ? (
+                <>{t("landing.enter")} <ArrowRight size={18} strokeWidth={2.5} /></>
+              ) : (
+                <>{connecting ? t("landing.connecting") || "连接中..." : t("landing.connect_wallet") || "连接钱包"} <Wallet size={18} strokeWidth={2.5} /></>
+              )}
             </span>
           </button>
 
