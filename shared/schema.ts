@@ -76,6 +76,6 @@ export const LEVEL_CONFIG = [
 ];
 
 export const EQUAL_LEVEL_BONUS = 10;
-export const WITHDRAW_MIN = 30;
+export const WITHDRAW_MIN = 10;
 export const WITHDRAW_FEE = 1;
 export const WITHDRAW_MULTIPLE = 10;
