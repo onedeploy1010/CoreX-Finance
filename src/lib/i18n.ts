@@ -1,6 +1,6 @@
 // Lightweight i18n system using localStorage key "corex_lang"
 
-export type Lang = "zh" | "en" | "ja" | "ko" | "vi";
+export type Lang = "zh" | "en" | "ja" | "ko" | "vi" | "th" | "ms" | "id" | "es" | "fr" | "ru" | "ar" | "pt" | "de" | "hi" | "tr";
 
 export function getLang(): Lang {
   try {
@@ -10,7 +10,7 @@ export function getLang(): Lang {
   }
 }
 
-const translations: Record<string, Record<Lang, string>> = {
+const translations: Record<string, Partial<Record<Lang, string>>> = {
   // --- Reward types ---
   "reward.daily": {
     zh: "产品收益", en: "Daily Earnings", ja: "日次収益", ko: "일일 수익", vi: "Thu nhập hàng ngày",
@@ -302,7 +302,7 @@ const translations: Record<string, Record<Lang, string>> = {
 
 export function t(key: string, lang?: Lang, vars?: Record<string, string | number>): string {
   const l = lang || getLang();
-  let text = translations[key]?.[l] || translations[key]?.["zh"] || key;
+  let text = translations[key]?.[l] || translations[key]?.["en"] || translations[key]?.["zh"] || key;
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
       text = text.replace(`{${k}}`, String(v));
