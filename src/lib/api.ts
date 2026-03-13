@@ -485,6 +485,32 @@ export async function adminLogin(username: string, password: string) {
   return session;
 }
 
+export async function adminChangePassword(oldPassword: string, newPassword: string) {
+  const session = getAdminSession();
+  if (!session) throw new Error("未登录");
+  const { data, error } = await supabase.rpc("admin_change_password", {
+    p_admin_id: session.id,
+    p_old_password: oldPassword,
+    p_new_password: newPassword,
+  });
+  if (error) throw new Error(error.message);
+  if (!data?.success) throw new Error(data?.message || "修改失败");
+  return data;
+}
+
+export async function adminResetPassword(targetId: number, newPassword: string) {
+  const session = getAdminSession();
+  if (!session) throw new Error("未登录");
+  const { data, error } = await supabase.rpc("admin_reset_password", {
+    p_caller_id: session.id,
+    p_target_id: targetId,
+    p_new_password: newPassword,
+  });
+  if (error) throw new Error(error.message);
+  if (!data?.success) throw new Error(data?.message || "重置失败");
+  return data;
+}
+
 export function adminLogout() {
   localStorage.removeItem("corex_admin");
 }

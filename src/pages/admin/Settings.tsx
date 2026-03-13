@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { getSettlementConfig, updateSettlementTime, adminAddLog, getAutoApproveWithdrawal, setAutoApproveWithdrawal, getAutoWithdrawLimit, setAutoWithdrawLimit, triggerAutoWithdraw, getWithdrawalContractMinBalance, setWithdrawalContractMinBalance, getAutoWithdrawExecMin, setAutoWithdrawExecMin } from "@/lib/api";
-import { Settings, Clock, Save, Loader2, ShieldCheck, Zap, AlertTriangle, Send, DollarSign, Wallet, BarChart3 } from "lucide-react";
+import { getSettlementConfig, updateSettlementTime, adminAddLog, getAutoApproveWithdrawal, setAutoApproveWithdrawal, getAutoWithdrawLimit, setAutoWithdrawLimit, getWithdrawalContractMinBalance, setWithdrawalContractMinBalance, getAutoWithdrawExecMin, setAutoWithdrawExecMin } from "@/lib/api";
+import { Settings, Clock, Save, Loader2, ShieldCheck, Zap, AlertTriangle, DollarSign, Wallet, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const TIMEZONES = [
@@ -29,7 +29,6 @@ export default function AdminSettings() {
   // Auto-withdraw limit
   const [withdrawLimit, setWithdrawLimit] = useState<string>("");
   const [savingLimit, setSavingLimit] = useState(false);
-  const [autoWithdrawRunning, setAutoWithdrawRunning] = useState(false);
 
   // Contract min balance
   const [contractMinBal, setContractMinBal] = useState<string>("");
@@ -80,7 +79,8 @@ export default function AdminSettings() {
   };
 
   const cfg = config as any;
-  const currentOffset = tzOffset ?? 8; // Default to UTC+8
+  const savedOffset = cfg?.tzOffset ? parseInt(cfg.tzOffset) : 8;
+  const currentOffset = tzOffset ?? savedOffset;
   const displayHour = hour ?? (cfg ? ((parseInt(cfg.utcHour) + currentOffset + 24) % 24) : 0);
   const displayMinute = minute ?? (cfg ? parseInt(cfg.utcMinute) : 0);
   const utcHour = (displayHour - currentOffset + 24) % 24;
@@ -88,6 +88,11 @@ export default function AdminSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Update timezone offset in DB so the SQL function uses the correct offset
+      await supabase.from("system_settings").upsert(
+        { key: "settlement_tz_offset", value: currentOffset.toString() },
+        { onConflict: "key" }
+      );
       await updateSettlementTime(displayHour, displayMinute);
       await adminAddLog("修改结算时间", "settings", "settlement_time", { hour: displayHour, minute: displayMinute, tzOffset: currentOffset });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement-config"] });
@@ -105,10 +110,31 @@ export default function AdminSettings() {
   const handleDebugSettle = async () => {
     setDebugRunning(true);
     try {
-      const { data, error } = await supabase.rpc("process_daily");
+      // Count active orders before settlement
+      const { count: activeOrders } = await supabase
+        .from("orders")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "active");
+
+      const { error } = await supabase.rpc("process_daily");
       if (error) throw new Error(error.message);
-      await adminAddLog("手动触发结算", "settings", "debug_settlement");
-      toast({ title: "结算完成", description: "已手动执行一次全局结算" });
+
+      // Check what was processed
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { count: todayRewards } = await supabase
+        .from("rewards")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", todayStr);
+
+      await adminAddLog("手动触发结算", "settings", "debug_settlement", {
+        activeOrders: activeOrders || 0,
+        rewardsGenerated: todayRewards || 0,
+      });
+
+      toast({
+        title: "结算完成",
+        description: `已结算 ${activeOrders || 0} 个活跃订单，产生 ${todayRewards || 0} 条收益记录`,
+      });
       // Invalidate all related queries
       queryClient.invalidateQueries();
     } catch (err: any) {
@@ -492,75 +518,6 @@ export default function AdminSettings() {
         </Button>
       </div>
 
-      {/* Manual Trigger Auto-Withdraw */}
-      <div
-        className="rounded-xl p-5 space-y-4"
-        style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}
-      >
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)" }}>
-            <Send size={16} style={{ color: "#C9A227" }} />
-          </div>
-          <div>
-            <div className="font-semibold text-sm">手动触发链上提现</div>
-            <div className="text-xs text-muted-foreground">立即处理所有已审批的提现，通过服务端私钥执行链上转账</div>
-          </div>
-        </div>
-
-        <div className="rounded-lg p-3 space-y-2" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.08)" }}>
-          <div className="text-xs font-semibold" style={{ color: "#C9A227" }}>执行说明</div>
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <div>1. 获取所有已审批且未上链的提现记录</div>
-            <div>2. 使用服务端配置的操作员钱包私钥签名交易</div>
-            <div>3. 调用提现合约 batchWithdraw 执行批量转账</div>
-            <div>4. 自动更新数据库记录 (tx_hash, batch_id, 上链时间)</div>
-          </div>
-        </div>
-
-        <Button
-          className="w-full font-bold text-sm"
-          variant="outline"
-          style={{ border: "1px solid rgba(201,162,39,0.3)", color: "#C9A227", background: "rgba(201,162,39,0.06)" }}
-          disabled={autoWithdrawRunning}
-          onClick={async () => {
-            setAutoWithdrawRunning(true);
-            try {
-              const result = await triggerAutoWithdraw();
-              await adminAddLog("手动触发链上提现", "settings", "auto_withdraw", result);
-              queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawals"] });
-              if (result?.processed === 0) {
-                toast({ title: "没有待处理的提现" });
-              } else {
-                toast({
-                  title: `链上提现成功`,
-                  description: `${result.processed} 笔提现已上链 | TX: ${(result.txHash || "").slice(0, 14)}...`,
-                });
-              }
-            } catch (err: any) {
-              toast({ title: "链上提现失败", description: err.message, variant: "destructive" });
-            } finally {
-              setAutoWithdrawRunning(false);
-            }
-          }}
-        >
-          {autoWithdrawRunning ? (
-            <><Loader2 size={14} className="mr-2 animate-spin" />处理中...</>
-          ) : (
-            <><Send size={14} className="mr-2" />立即执行链上提现</>
-          )}
-        </Button>
-
-        <div className="rounded-lg p-3 space-y-1" style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.1)" }}>
-          <div className="text-xs font-semibold" style={{ color: "#ef4444" }}>重要配置</div>
-          <div className="text-xs text-muted-foreground">
-            需要在 Supabase Edge Function 环境变量中配置:
-          </div>
-          <div className="text-[10px] font-mono text-muted-foreground mt-1 space-y-0.5">
-            <div>WITHDRAWAL_PRIVATE_KEY = 操作员钱包私钥</div>
-            <div>BSC_RPC_URL = BSC节点RPC地址 (可选)</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

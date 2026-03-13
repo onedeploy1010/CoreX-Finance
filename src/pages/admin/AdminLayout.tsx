@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { getAdminSession, adminLogout } from "@/lib/api";
+import { getAdminSession, adminLogout, adminChangePassword, adminAddLog } from "@/lib/api";
 import {
   LayoutDashboard, Users, ShoppingCart, ArrowDownToLine,
   MessageSquare, DollarSign, LogOut, Menu, X, Network, Settings,
-  Shield, ScrollText, FileCode, Image, Package
+  Shield, ScrollText, FileCode, Image, Package, KeyRound, Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // Each nav item requires a specific permission to be visible
 const NAV_ITEMS: { path: string; label: string; icon: any; perm: string }[] = [
@@ -58,10 +60,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [pwdOpen, setPwdOpen] = useState(false);
+  const [oldPwd, setOldPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [changingPwd, setChangingPwd] = useState(false);
+
   const handleLogout = () => {
     adminLogout();
     toast({ title: "已退出登录" });
     setLocation("/admin");
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPwd || newPwd.length < 6) {
+      toast({ title: "新密码至少6位", variant: "destructive" });
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      toast({ title: "两次密码不一致", variant: "destructive" });
+      return;
+    }
+    setChangingPwd(true);
+    try {
+      await adminChangePassword(oldPwd, newPwd);
+      await adminAddLog("修改密码", "admin_user", admin?.id?.toString() || "");
+      toast({ title: "密码修改成功" });
+      setPwdOpen(false);
+      setOldPwd("");
+      setNewPwd("");
+      setConfirmPwd("");
+    } catch (err: any) {
+      toast({ title: "修改失败", description: err.message, variant: "destructive" });
+    } finally {
+      setChangingPwd(false);
+    }
   };
 
   const filteredNav = isSuperAdmin ? NAV_ITEMS : NAV_ITEMS.filter(item => perms.includes(item.perm));
@@ -118,7 +151,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div className="p-3" style={{ borderTop: "1px solid rgba(201,162,39,0.15)" }}>
+        <div className="p-3 space-y-1" style={{ borderTop: "1px solid rgba(201,162,39,0.15)" }}>
+          <button
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-all"
+            style={{ color: "#C9A227" }}
+            onClick={() => setPwdOpen(true)}
+          >
+            <KeyRound size={14} />
+            修改密码
+          </button>
           <button
             data-testid="button-admin-logout"
             className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-all"
@@ -129,6 +170,59 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             退出登录
           </button>
         </div>
+
+        {/* Change Password Dialog */}
+        <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
+          <DialogContent className="max-w-sm" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}>
+            <DialogHeader>
+              <DialogTitle style={{ color: "#C9A227" }}>修改密码</DialogTitle>
+              <DialogDescription className="text-muted-foreground text-xs">修改后需重新登录</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">旧密码</label>
+                <input
+                  type="password"
+                  value={oldPwd}
+                  onChange={e => setOldPwd(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#fff" }}
+                  placeholder="输入当前密码"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">新密码</label>
+                <input
+                  type="password"
+                  value={newPwd}
+                  onChange={e => setNewPwd(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#fff" }}
+                  placeholder="至少6位"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">确认新密码</label>
+                <input
+                  type="password"
+                  value={confirmPwd}
+                  onChange={e => setConfirmPwd(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#fff" }}
+                  placeholder="再次输入新密码"
+                />
+              </div>
+              <Button
+                className="w-full font-bold text-sm"
+                style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+                disabled={changingPwd || !oldPwd || !newPwd || !confirmPwd}
+                onClick={handleChangePassword}
+              >
+                {changingPwd ? <><Loader2 size={14} className="mr-1.5 animate-spin" /> 修改中...</> : "确认修改"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </aside>
 
       <div className="flex-1 flex flex-col min-h-screen">

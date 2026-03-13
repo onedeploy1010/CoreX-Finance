@@ -6,9 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient } from "@/lib/queryClient";
-import { getAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, adminAddLog } from "@/lib/api";
+import { getAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, adminAddLog, adminResetPassword, getAdminSession } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, UserCog } from "lucide-react";
+import { Plus, Edit, Trash2, UserCog, KeyRound, Loader2 } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   superadmin: "超级管理员",
@@ -60,7 +60,12 @@ export default function AdminManagement() {
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ username: "", password: "", role: "custom" });
   const [perms, setPerms] = useState<string[]>([]);
+  const [resetTarget, setResetTarget] = useState<any>(null);
+  const [resetPwd, setResetPwd] = useState("");
+  const [resetting, setResetting] = useState(false);
   const { toast } = useToast();
+  const currentAdmin = getAdminSession();
+  const isSuperAdmin = currentAdmin?.role === "superadmin";
 
   const { data: admins = [], isLoading } = useQuery({
     queryKey: ["/api/admin/admins"],
@@ -201,6 +206,16 @@ export default function AdminManagement() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => { setResetTarget(a); setResetPwd(""); }}
+                      className="p-2 rounded-lg flex items-center justify-center"
+                      style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", minWidth: "36px", minHeight: "36px" }}
+                      title="重置密码"
+                    >
+                      <KeyRound size={16} />
+                    </button>
+                  )}
                   <button onClick={() => openEdit(a)} className="p-2 rounded-lg flex items-center justify-center" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227", minWidth: "36px", minHeight: "36px" }}>
                     <Edit size={16} />
                   </button>
@@ -217,6 +232,48 @@ export default function AdminManagement() {
           })}
         </div>
       )}
+
+      {/* Reset Password Dialog */}
+      <Dialog open={!!resetTarget} onOpenChange={() => setResetTarget(null)}>
+        <DialogContent className="max-w-sm mx-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: "#C9A227" }}>重置密码 - {resetTarget?.username}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">新密码</Label>
+              <Input
+                type="password"
+                value={resetPwd}
+                onChange={e => setResetPwd(e.target.value)}
+                placeholder="输入新密码（至少6位）"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "40px" }}
+              />
+            </div>
+            <Button
+              className="w-full font-bold"
+              style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff", minHeight: "40px" }}
+              disabled={resetting || !resetPwd || resetPwd.length < 6}
+              onClick={async () => {
+                setResetting(true);
+                try {
+                  await adminResetPassword(resetTarget.id, resetPwd);
+                  await adminAddLog("重置管理员密码", "admin", resetTarget.id.toString(), { targetUsername: resetTarget.username });
+                  toast({ title: "密码已重置" });
+                  setResetTarget(null);
+                  setResetPwd("");
+                } catch (err: any) {
+                  toast({ title: "重置失败", description: err.message, variant: "destructive" });
+                } finally {
+                  setResetting(false);
+                }
+              }}
+            >
+              {resetting ? <><Loader2 size={14} className="mr-1.5 animate-spin" /> 重置中...</> : "确认重置"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={() => { setDialogOpen(false); setEditing(null); }}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto mx-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}>

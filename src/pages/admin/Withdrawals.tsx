@@ -9,7 +9,7 @@ import {
 import { readContract } from "thirdweb";
 import { useActiveAccount, useSendTransaction, ConnectButton } from "thirdweb/react";
 import { client, bscChain, wallets } from "@/lib/thirdweb";
-import { getWithdrawalContract, getUSDTContract, formatUSDT, prepareApproveUSDTForWithdrawal, getWithdrawalAllowance, COREX_WITHDRAWAL_ADDRESS } from "@/lib/contracts";
+import { getWithdrawalContract, getUSDTContract, formatUSDT, prepareApproveUSDTForWithdrawal, getWithdrawalAllowance, getFundingWallet, COREX_WITHDRAWAL_ADDRESS } from "@/lib/contracts";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck } from "lucide-react";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
@@ -135,27 +135,49 @@ function AuthorizationPanel() {
 
   const connectedAddr = account?.address || "";
 
-  // Check current allowance from connected wallet to withdrawal contract
-  const { data: allowance, refetch: refetchAllowance } = useQuery({
-    queryKey: ["/api/withdrawal-allowance", connectedAddr],
-    queryFn: () => connectedAddr ? getWithdrawalAllowance(connectedAddr) : Promise.resolve(BigInt(0)),
-    enabled: !!connectedAddr,
+  // Fetch the funding wallet address from the contract (this is the wallet that pullFunds() pulls from)
+  const { data: fundingWallet, isLoading: loadingFunding } = useQuery({
+    queryKey: ["/api/funding-wallet"],
+    queryFn: getFundingWallet,
+    refetchInterval: 30000,
+  });
+
+  const fundingAddr = fundingWallet || "";
+  const isZeroAddr = !fundingAddr || fundingAddr === "0x0000000000000000000000000000000000000000";
+
+  // Check allowance of the FUNDING wallet (not the connected wallet) — this is what pullFunds() actually uses
+  const { data: fundingAllowance, refetch: refetchFundingAllowance } = useQuery({
+    queryKey: ["/api/withdrawal-allowance-funding", fundingAddr],
+    queryFn: () => fundingAddr && !isZeroAddr ? getWithdrawalAllowance(fundingAddr) : Promise.resolve(BigInt(0)),
+    enabled: !!fundingAddr && !isZeroAddr,
     refetchInterval: 15000,
   });
 
-  const allowanceNum = allowance ? parseFloat(formatUSDT(allowance as bigint)) : 0;
-  const isAuthorized = allowanceNum > 1000000; // Consider authorized if > 1M USDT allowance
+  const fundingAllowanceNum = fundingAllowance ? parseFloat(formatUSDT(fundingAllowance as bigint)) : 0;
+  const isFundingAuthorized = fundingAllowanceNum > 1000000;
+
+  // Check if connected wallet matches the funding wallet
+  const isCorrectWallet = connectedAddr && fundingAddr
+    ? connectedAddr.toLowerCase() === fundingAddr.toLowerCase()
+    : false;
+
+  // Already authorized — hide the entire panel
+  if (isFundingAuthorized) return null;
 
   const handleApprove = async () => {
     if (!account) {
       toast({ title: "请先连接提现钱包", variant: "destructive" });
       return;
     }
+    if (!isCorrectWallet) {
+      toast({ title: "钱包地址不匹配", description: `请连接合约指定的提现钱包: ${shortAddr(fundingAddr)}`, variant: "destructive" });
+      return;
+    }
     setApproving(true);
     try {
       const tx = prepareApproveUSDTForWithdrawal(BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
       await sendTx(tx);
-      await refetchAllowance();
+      await refetchFundingAllowance();
       await adminAddLog("授权提现合约USDT", "withdrawal_contract", COREX_WITHDRAWAL_ADDRESS, { wallet: connectedAddr });
       toast({ title: "授权成功", description: "提现合约已获得 USDT 无限授权，系统可自动从此钱包拉取资金" });
     } catch (err: any) {
@@ -168,17 +190,38 @@ function AuthorizationPanel() {
   return (
     <div className="rounded-xl p-4 space-y-3" style={{
       background: "linear-gradient(145deg, #1a1510, #110e0a)",
-      border: isAuthorized ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(234,179,8,0.2)",
+      border: isFundingAuthorized ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(234,179,8,0.2)",
     }}>
       <div className="flex items-center gap-2">
-        <ShieldCheck size={16} style={{ color: isAuthorized ? "#22c55e" : "#eab308" }} />
+        <ShieldCheck size={16} style={{ color: isFundingAuthorized ? "#22c55e" : "#eab308" }} />
         <span className="text-sm font-bold text-foreground">提现钱包授权</span>
       </div>
 
-      {!connectedAddr ? (
+      {/* Funding wallet info */}
+      <div className="p-2 rounded-lg space-y-1" style={{ background: "rgba(201,162,39,0.06)" }}>
+        <div className="text-[10px] text-muted-foreground">合约指定提现钱包</div>
+        {loadingFunding ? (
+          <span className="text-xs text-muted-foreground">加载中...</span>
+        ) : isZeroAddr ? (
+          <span className="text-xs" style={{ color: "#ef4444" }}>未设置</span>
+        ) : (
+          <CopyableAddress address={fundingAddr} className="text-xs text-foreground" />
+        )}
+      </div>
+
+      {isZeroAddr && !loadingFunding && (
+        <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+          <AlertTriangle size={12} style={{ color: "#ef4444" }} />
+          <span className="text-[11px]" style={{ color: "#ef4444" }}>
+            合约未设置提现钱包地址，请先通过合约 setFundingWallet 设置
+          </span>
+        </div>
+      )}
+
+      {!isZeroAddr && !connectedAddr && (
         <div className="space-y-3">
           <div className="text-xs text-muted-foreground p-2 rounded-lg" style={{ background: "rgba(234,179,8,0.06)" }}>
-            请连接提现钱包进行授权。连接后点击「授权」按钮，签名一次即可永久生效。
+            请使用上方显示的提现钱包地址连接 MetaMask，点击「授权」签名一次即可永久生效。
           </div>
           <ConnectButton
             client={client}
@@ -214,22 +257,33 @@ function AuthorizationPanel() {
             theme="dark"
           />
         </div>
-      ) : (
+      )}
+
+      {!isZeroAddr && connectedAddr && (
         <div className="space-y-2">
           <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.06)" }}>
             <div>
-              <div className="text-[10px] text-muted-foreground">当前钱包</div>
+              <div className="text-[10px] text-muted-foreground">已连接钱包</div>
               <CopyableAddress address={connectedAddr} className="text-xs text-foreground" />
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-muted-foreground">授权状态</div>
-              <span className="text-xs font-bold" style={{ color: isAuthorized ? "#22c55e" : "#ef4444" }}>
-                {isAuthorized ? "已授权" : "未授权"}
+              <div className="text-[10px] text-muted-foreground">匹配</div>
+              <span className="text-xs font-bold" style={{ color: isCorrectWallet ? "#22c55e" : "#ef4444" }}>
+                {isCorrectWallet ? "匹配" : "不匹配"}
               </span>
             </div>
           </div>
 
-          {!isAuthorized && (
+          {!isCorrectWallet && (
+            <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <AlertTriangle size={12} style={{ color: "#ef4444" }} />
+              <span className="text-[11px]" style={{ color: "#ef4444" }}>
+                当前钱包与合约指定的提现钱包不一致，请切换到正确的钱包
+              </span>
+            </div>
+          )}
+
+          {isCorrectWallet && (
             <Button
               className="w-full font-bold text-sm"
               style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
@@ -245,9 +299,7 @@ function AuthorizationPanel() {
           )}
 
           <div className="text-[10px] text-muted-foreground/50">
-            {isAuthorized
-              ? "已授权：系统可自动从此钱包拉取 USDT 充值到提现合约"
-              : "点击授权后，系统在合约余额不足时自动从此钱包拉取 USDT（无需私钥）"}
+            点击授权后，系统在合约余额不足时自动从此钱包拉取 USDT（无需私钥）
           </div>
         </div>
       )}
