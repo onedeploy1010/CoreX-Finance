@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -68,30 +67,6 @@ function AdminRoutes() {
 function AppRouter() {
   const [location] = useLocation();
   const account = useActiveAccount();
-  const [entered, setEntered] = useState(() => {
-    try { return sessionStorage.getItem("corex_entered") === "1"; } catch { return false; }
-  });
-
-  // Auto-enter when wallet connects
-  useEffect(() => {
-    if (account?.address && !entered) {
-      setEntered(true);
-      try { sessionStorage.setItem("corex_entered", "1"); } catch {}
-    }
-  }, [account?.address]);
-
-  // Auto-exit when wallet disconnects
-  useEffect(() => {
-    if (!account && entered) {
-      setEntered(false);
-      try { sessionStorage.removeItem("corex_entered"); } catch {}
-    }
-  }, [account]);
-
-  const handleEnter = () => {
-    setEntered(true);
-    try { sessionStorage.setItem("corex_entered", "1"); } catch {}
-  };
 
   if (location === "/admin") {
     return <AdminLogin />;
@@ -99,8 +74,9 @@ function AppRouter() {
   if (location.startsWith("/admin/")) {
     return <AdminRoutes />;
   }
-  if (!entered) {
-    return <LandingPage onEnter={handleEnter} />;
+  // Must connect wallet to enter platform
+  if (!account?.address) {
+    return <LandingPage />;
   }
   return <FrontendRoutes />;
 }

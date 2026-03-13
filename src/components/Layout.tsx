@@ -17,7 +17,6 @@ export function AppHeader() {
     <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-2.5"
       style={{ background: "linear-gradient(180deg, #0d0b07 0%, rgba(13,11,7,0.95) 100%)", borderBottom: "1px solid rgba(201,162,39,0.15)" }}>
       <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
-        try { sessionStorage.removeItem("corex_entered"); } catch {}
         window.location.href = "/";
       }}>
         <img src="/corex.png" alt="CoreX" className="w-8 h-8" />
