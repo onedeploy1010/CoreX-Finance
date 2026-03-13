@@ -7,22 +7,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { getLang } from "@/lib/i18n";
 
 const LANGUAGES = [
-  { code: "zh", label: "中文", flag: "🇨🇳" },
+  { code: "zh", label: "简体中文", flag: "🇨🇳" },
+  { code: "zh-TW", label: "繁體中文", flag: "🇹🇼" },
   { code: "en", label: "English", flag: "🇺🇸" },
-  { code: "ja", label: "日本語", flag: "🇯🇵" },
   { code: "ko", label: "한국어", flag: "🇰🇷" },
+  { code: "ja", label: "日本語", flag: "🇯🇵" },
   { code: "vi", label: "Tiếng Việt", flag: "🇻🇳" },
   { code: "th", label: "ไทย", flag: "🇹🇭" },
-  { code: "ms", label: "Bahasa Melayu", flag: "🇲🇾" },
   { code: "id", label: "Bahasa Indonesia", flag: "🇮🇩" },
-  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "ms", label: "Bahasa Melayu", flag: "🇲🇾" },
   { code: "fr", label: "Français", flag: "🇫🇷" },
-  { code: "ru", label: "Русский", flag: "🇷🇺" },
   { code: "ar", label: "العربية", flag: "🇸🇦" },
-  { code: "pt", label: "Português", flag: "🇧🇷" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
-  { code: "hi", label: "हिन्दी", flag: "🇮🇳" },
-  { code: "tr", label: "Türkçe", flag: "🇹🇷" },
 ];
 
 const NAV_ITEMS = [
