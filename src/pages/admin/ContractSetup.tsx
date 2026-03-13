@@ -8,7 +8,7 @@ import {
   FUND_DISTRIBUTOR_ADDRESS,
   COREX_WITHDRAWAL_ADDRESS,
 } from "@/lib/contracts";
-import { PRODUCTS } from "@shared/schema";
+import { getProducts, DBProduct } from "@/lib/api";
 
 function shortAddr(addr: string) {
   if (!addr) return "";
@@ -20,6 +20,7 @@ export default function ContractSetup() {
   const [investAuthorized, setInvestAuthorized] = useState<boolean | null>(null);
   const [productCount, setProductCount] = useState<number>(0);
   const [loadingData, setLoadingData] = useState(true);
+  const [dbProducts, setDbProducts] = useState<DBProduct[]>([]);
 
   useEffect(() => {
     loadContractData();
@@ -28,14 +29,16 @@ export default function ContractSetup() {
   const loadContractData = async () => {
     setLoadingData(true);
     try {
-      const [recs, authStatus, pCount] = await Promise.all([
+      const [recs, authStatus, pCount, products] = await Promise.all([
         getDistributorRecipients().catch(() => []),
         isAuthorizedCaller(COREX_INVESTMENT_ADDRESS).catch(() => null),
         getProductCount().catch(() => 0),
+        getProducts().catch(() => []),
       ]);
       setRecipients(Array.isArray(recs) ? recs as any[] : []);
       setInvestAuthorized(authStatus);
       setProductCount(pCount);
+      setDbProducts(products);
     } catch {}
     setLoadingData(false);
   };
@@ -123,13 +126,13 @@ export default function ContractSetup() {
             <Loader2 size={14} className="animate-spin text-muted-foreground" />
           ) : (
             <StatusBadge
-              ok={productCount >= PRODUCTS.length}
-              label={`${productCount}/${PRODUCTS.length} 已添加`}
+              ok={productCount >= dbProducts.length}
+              label={`${productCount}/${dbProducts.length} 已添加`}
             />
           )}
         </div>
         <div className="space-y-1.5">
-          {PRODUCTS.map((p, i) => {
+          {dbProducts.map((p, i) => {
             const added = i < productCount;
             return (
               <div key={p.id} className="flex items-center justify-between text-xs py-1.5" style={{ borderBottom: "1px solid rgba(201,162,39,0.08)" }}>

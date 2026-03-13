@@ -132,6 +132,170 @@ function AnimatedNum({ value, suffix = "" }: { value: string; suffix?: string })
   return <span className="tabular-nums">{value}{suffix}</span>;
 }
 
+// Floating particles animation
+function TechParticles() {
+  const particles = Array.from({ length: 20 }, (_, i) => ({
+    id: i,
+    left: `${(i * 17 + 7) % 100}%`,
+    top: `${(i * 23 + 13) % 100}%`,
+    size: 1.5 + (i % 3),
+    delay: i * 0.4,
+    duration: 6 + (i % 5) * 2,
+  }));
+
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute rounded-full"
+          style={{
+            left: p.left,
+            top: p.top,
+            width: p.size,
+            height: p.size,
+            background: `rgba(201,162,39,${0.15 + (p.id % 4) * 0.08})`,
+            boxShadow: `0 0 ${p.size * 3}px rgba(201,162,39,${0.1 + (p.id % 3) * 0.05})`,
+            animation: `techFloat ${p.duration}s ease-in-out ${p.delay}s infinite`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Circuit board SVG pattern
+function CircuitPattern() {
+  return (
+    <svg className="absolute inset-0 w-full h-full opacity-[0.04]" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="circuit" x="0" y="0" width="120" height="120" patternUnits="userSpaceOnUse">
+          {/* Horizontal lines */}
+          <line x1="0" y1="30" x2="50" y2="30" stroke="#C9A227" strokeWidth="0.5" />
+          <line x1="70" y1="30" x2="120" y2="30" stroke="#C9A227" strokeWidth="0.5" />
+          <line x1="0" y1="90" x2="40" y2="90" stroke="#C9A227" strokeWidth="0.5" />
+          <line x1="80" y1="90" x2="120" y2="90" stroke="#C9A227" strokeWidth="0.5" />
+          {/* Vertical lines */}
+          <line x1="60" y1="0" x2="60" y2="25" stroke="#C9A227" strokeWidth="0.5" />
+          <line x1="60" y1="35" x2="60" y2="85" stroke="#C9A227" strokeWidth="0.5" />
+          <line x1="60" y1="95" x2="60" y2="120" stroke="#C9A227" strokeWidth="0.5" />
+          {/* Corner connections */}
+          <polyline points="50,30 60,30 60,25" fill="none" stroke="#C9A227" strokeWidth="0.5" />
+          <polyline points="60,95 60,90 80,90" fill="none" stroke="#C9A227" strokeWidth="0.5" />
+          {/* Nodes (junction dots) */}
+          <circle cx="60" cy="30" r="2" fill="#C9A227" />
+          <circle cx="60" cy="90" r="2" fill="#C9A227" />
+          <circle cx="50" cy="30" r="1.2" fill="#C9A227" />
+          <circle cx="70" cy="30" r="1.2" fill="#C9A227" />
+          <circle cx="40" cy="90" r="1.2" fill="#C9A227" />
+          <circle cx="80" cy="90" r="1.2" fill="#C9A227" />
+          {/* IC chip shapes */}
+          <rect x="52" y="52" width="16" height="16" rx="1" fill="none" stroke="#C9A227" strokeWidth="0.5" />
+          <line x1="55" y1="52" x2="55" y2="48" stroke="#C9A227" strokeWidth="0.4" />
+          <line x1="60" y1="52" x2="60" y2="48" stroke="#C9A227" strokeWidth="0.4" />
+          <line x1="65" y1="52" x2="65" y2="48" stroke="#C9A227" strokeWidth="0.4" />
+          <line x1="55" y1="68" x2="55" y2="72" stroke="#C9A227" strokeWidth="0.4" />
+          <line x1="60" y1="68" x2="60" y2="72" stroke="#C9A227" strokeWidth="0.4" />
+          <line x1="65" y1="68" x2="65" y2="72" stroke="#C9A227" strokeWidth="0.4" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#circuit)" />
+    </svg>
+  );
+}
+
+// Server rack silhouettes at bottom
+function ServerRacks() {
+  return (
+    <div className="absolute bottom-0 left-0 right-0 h-[280px] overflow-hidden opacity-[0.06]">
+      <svg className="absolute bottom-0 w-full" viewBox="0 0 400 140" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+        {/* Rack 1 */}
+        <rect x="20" y="20" width="35" height="120" rx="2" fill="none" stroke="#C9A227" strokeWidth="0.6" />
+        {[0,1,2,3,4,5].map(i => (
+          <g key={`r1-${i}`}>
+            <rect x="24" y={25 + i * 18} width="27" height="12" rx="1" fill="#C9A227" fillOpacity="0.15" />
+            <circle cx="46" cy={31 + i * 18} r="1.5" fill="#22c55e" fillOpacity="0.6" />
+            <line x1="26" y1={29 + i * 18} x2="38" y2={29 + i * 18} stroke="#C9A227" strokeWidth="0.3" />
+            <line x1="26" y1={33 + i * 18} x2="34" y2={33 + i * 18} stroke="#C9A227" strokeWidth="0.3" />
+          </g>
+        ))}
+        {/* Rack 2 */}
+        <rect x="70" y="10" width="40" height="130" rx="2" fill="none" stroke="#C9A227" strokeWidth="0.6" />
+        {[0,1,2,3,4,5,6].map(i => (
+          <g key={`r2-${i}`}>
+            <rect x="74" y={15 + i * 17} width="32" height="11" rx="1" fill="#C9A227" fillOpacity="0.1" />
+            <circle cx="101" cy={20 + i * 17} r="1.5" fill={i % 3 === 0 ? "#C9A227" : "#22c55e"} fillOpacity="0.5" />
+            <rect x="76" y={18 + i * 17} width="8" height="4" rx="0.5" fill="#C9A227" fillOpacity="0.08" />
+          </g>
+        ))}
+        {/* Rack 3 - taller */}
+        <rect x="130" y="5" width="45" height="135" rx="2" fill="none" stroke="#C9A227" strokeWidth="0.6" />
+        {[0,1,2,3,4,5,6,7].map(i => (
+          <g key={`r3-${i}`}>
+            <rect x="134" y={10 + i * 16} width="37" height="10" rx="1" fill="#C9A227" fillOpacity={i % 2 === 0 ? "0.12" : "0.06"} />
+            <circle cx="165" cy={15 + i * 16} r="1.2" fill="#3b82f6" fillOpacity="0.5" />
+            <circle cx="160" cy={15 + i * 16} r="1.2" fill="#22c55e" fillOpacity="0.4" />
+          </g>
+        ))}
+        {/* Rack 4 */}
+        <rect x="195" y="15" width="38" height="125" rx="2" fill="none" stroke="#C9A227" strokeWidth="0.6" />
+        {[0,1,2,3,4,5,6].map(i => (
+          <g key={`r4-${i}`}>
+            <rect x="199" y={20 + i * 16} width="30" height="10" rx="1" fill="#C9A227" fillOpacity="0.08" />
+            <circle cx="224" cy={25 + i * 16} r="1.5" fill="#C9A227" fillOpacity="0.4" />
+          </g>
+        ))}
+        {/* Rack 5 */}
+        <rect x="250" y="8" width="42" height="132" rx="2" fill="none" stroke="#C9A227" strokeWidth="0.6" />
+        {[0,1,2,3,4,5,6,7].map(i => (
+          <g key={`r5-${i}`}>
+            <rect x="254" y={13 + i * 15} width="34" height="9" rx="1" fill="#C9A227" fillOpacity={i % 3 === 0 ? "0.15" : "0.07"} />
+            <circle cx="282" cy={17 + i * 15} r="1" fill="#22c55e" fillOpacity="0.5" />
+            <circle cx="278" cy={17 + i * 15} r="1" fill="#C9A227" fillOpacity="0.3" />
+          </g>
+        ))}
+        {/* Rack 6 */}
+        <rect x="310" y="18" width="35" height="122" rx="2" fill="none" stroke="#C9A227" strokeWidth="0.6" />
+        {[0,1,2,3,4,5].map(i => (
+          <g key={`r6-${i}`}>
+            <rect x="314" y={23 + i * 18} width="27" height="12" rx="1" fill="#C9A227" fillOpacity="0.1" />
+            <circle cx="336" cy={29 + i * 18} r="1.5" fill="#3b82f6" fillOpacity="0.4" />
+          </g>
+        ))}
+        {/* Rack 7 */}
+        <rect x="360" y="12" width="30" height="128" rx="2" fill="none" stroke="#C9A227" strokeWidth="0.6" />
+        {[0,1,2,3,4,5,6].map(i => (
+          <g key={`r7-${i}`}>
+            <rect x="363" y={17 + i * 16} width="24" height="10" rx="1" fill="#C9A227" fillOpacity="0.09" />
+            <circle cx="383" cy={22 + i * 16} r="1" fill="#22c55e" fillOpacity="0.5" />
+          </g>
+        ))}
+        {/* Connection cables between racks */}
+        <path d="M55 130 Q75 145 110 130" fill="none" stroke="#C9A227" strokeWidth="0.3" strokeDasharray="2,3" />
+        <path d="M175 135 Q210 150 250 135" fill="none" stroke="#C9A227" strokeWidth="0.3" strokeDasharray="2,3" />
+        <path d="M292 138 Q320 148 345 138" fill="none" stroke="#C9A227" strokeWidth="0.3" strokeDasharray="2,3" />
+      </svg>
+      {/* Fade gradient overlay */}
+      <div className="absolute inset-x-0 top-0 h-24" style={{ background: "linear-gradient(180deg, #080604, transparent)" }} />
+    </div>
+  );
+}
+
+// Horizontal scanning line effect
+function ScanLine() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div
+        className="absolute left-0 right-0 h-[1px]"
+        style={{
+          background: "linear-gradient(90deg, transparent 0%, rgba(201,162,39,0.08) 20%, rgba(201,162,39,0.15) 50%, rgba(201,162,39,0.08) 80%, transparent 100%)",
+          animation: "scanDown 8s linear infinite",
+        }}
+      />
+    </div>
+  );
+}
+
 export default function LandingPage({ onEnter }: { onEnter: () => void }) {
   const { data: media = [] } = useQuery({ queryKey: ["/api/media"], queryFn: getMedia });
   const { data: companyIntro = "" } = useQuery({ queryKey: ["/api/company-intro", getLang()], queryFn: getCompanyIntro });
@@ -143,15 +307,21 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     <div className="min-h-screen flex flex-col overflow-hidden" style={{ background: "#080604" }}>
       {/* Background effects */}
       <div className="fixed inset-0 pointer-events-none">
+        {/* Ambient glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px]"
           style={{ background: "radial-gradient(ellipse, rgba(201,162,39,0.06) 0%, transparent 70%)" }} />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px]"
           style={{ background: "radial-gradient(circle, rgba(201,162,39,0.03) 0%, transparent 60%)" }} />
         <div className="absolute top-1/3 right-0 w-[300px] h-[300px]"
           style={{ background: "radial-gradient(circle, rgba(201,162,39,0.02) 0%, transparent 60%)" }} />
-        {/* Grid pattern */}
-        <div className="absolute inset-0 opacity-[0.015]"
-          style={{ backgroundImage: "linear-gradient(rgba(201,162,39,1) 1px, transparent 1px), linear-gradient(90deg, rgba(201,162,39,1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+        {/* Circuit board pattern */}
+        <CircuitPattern />
+        {/* Floating tech particles */}
+        <TechParticles />
+        {/* Scanning line */}
+        <ScanLine />
+        {/* Server rack silhouettes */}
+        <ServerRacks />
       </div>
 
       {/* Language Switch - top right */}

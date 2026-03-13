@@ -1,5 +1,121 @@
 import { supabase } from "./supabase";
 
+// ============ Products ============
+
+export interface DBProduct {
+  id: number;
+  name: string;
+  nameEn: string;
+  days: number;
+  dailyRate: number;
+  minAmount: number;
+  description: string;
+  totalShares: number;
+  usedShares: number;
+  dailyGrowth: number;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export async function getProducts(): Promise<DBProduct[]> {
+  const { data } = await supabase
+    .from("products")
+    .select("*")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  return (data || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    nameEn: p.name_en,
+    days: p.days,
+    dailyRate: parseFloat(p.daily_rate),
+    minAmount: parseFloat(p.min_amount),
+    description: p.description || "",
+    totalShares: p.total_shares,
+    usedShares: p.used_shares,
+    dailyGrowth: p.daily_growth,
+    isActive: p.is_active,
+    sortOrder: p.sort_order,
+  }));
+}
+
+export async function getAdminProducts(): Promise<DBProduct[]> {
+  const { data } = await supabase
+    .from("products")
+    .select("*")
+    .order("sort_order", { ascending: true });
+  return (data || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    nameEn: p.name_en,
+    days: p.days,
+    dailyRate: parseFloat(p.daily_rate),
+    minAmount: parseFloat(p.min_amount),
+    description: p.description || "",
+    totalShares: p.total_shares,
+    usedShares: p.used_shares,
+    dailyGrowth: p.daily_growth,
+    isActive: p.is_active,
+    sortOrder: p.sort_order,
+  }));
+}
+
+export async function adminCreateProduct(params: {
+  name: string; nameEn: string; days: number; dailyRate: number;
+  minAmount: number; description: string; totalShares: number;
+  usedShares: number; dailyGrowth: number;
+}) {
+  const { data: maxOrder } = await supabase.from("products").select("sort_order").order("sort_order", { ascending: false }).limit(1);
+  const sortOrder = maxOrder && maxOrder.length > 0 ? maxOrder[0].sort_order + 1 : 0;
+  const { data, error } = await supabase.from("products").insert({
+    name: params.name, name_en: params.nameEn, days: params.days,
+    daily_rate: params.dailyRate, min_amount: params.minAmount,
+    description: params.description, total_shares: params.totalShares,
+    used_shares: params.usedShares, daily_growth: params.dailyGrowth,
+    sort_order: sortOrder,
+  }).select().single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function adminUpdateProduct(id: number, params: Partial<{
+  name: string; nameEn: string; days: number; dailyRate: number;
+  minAmount: number; description: string; totalShares: number;
+  usedShares: number; dailyGrowth: number; isActive: boolean; sortOrder: number;
+}>) {
+  const updates: any = {};
+  if (params.name !== undefined) updates.name = params.name;
+  if (params.nameEn !== undefined) updates.name_en = params.nameEn;
+  if (params.days !== undefined) updates.days = params.days;
+  if (params.dailyRate !== undefined) updates.daily_rate = params.dailyRate;
+  if (params.minAmount !== undefined) updates.min_amount = params.minAmount;
+  if (params.description !== undefined) updates.description = params.description;
+  if (params.totalShares !== undefined) updates.total_shares = params.totalShares;
+  if (params.usedShares !== undefined) updates.used_shares = params.usedShares;
+  if (params.dailyGrowth !== undefined) updates.daily_growth = params.dailyGrowth;
+  if (params.isActive !== undefined) updates.is_active = params.isActive;
+  if (params.sortOrder !== undefined) updates.sort_order = params.sortOrder;
+  const { error } = await supabase.from("products").update(updates).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function adminDeleteProduct(id: number) {
+  const { error } = await supabase.from("products").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function incrementProductShares(productId: number, amount: number) {
+  const { error } = await supabase.rpc("increment_product_shares", { p_product_id: productId, p_amount: amount });
+  if (error) {
+    // Fallback: direct update
+    const { data: product } = await supabase.from("products").select("used_shares, total_shares").eq("id", productId).single();
+    if (product) {
+      const newUsed = Math.min(product.used_shares + amount, product.total_shares);
+      await supabase.from("products").update({ used_shares: newUsed }).eq("id", productId);
+    }
+  }
+}
+
 // ============ Members ============
 
 export async function registerMember(walletAddress: string, referrerAddress?: string | null) {
@@ -825,30 +941,40 @@ export async function deleteAdminUser(id: number) {
 }
 
 export async function adminCreateOrderForMember(walletAddress: string, productId: number, amount: number) {
-  const { PRODUCTS } = await import("../../shared/schema");
-  const product = PRODUCTS.find(p => p.id === productId);
-  if (!product) throw new Error("产品不存在");
-  if (amount < product.minAmount) throw new Error(`最低投资 ${product.minAmount} USDT`);
-  if (amount % product.minAmount !== 0) throw new Error(`金额必须是 ${product.minAmount} 的倍数`);
+  // Fetch product from DB
+  const { data: dbProduct } = await supabase.from("products").select("*").eq("id", productId).single();
+  if (!dbProduct) throw new Error("产品不存在");
+  const minAmount = parseFloat(dbProduct.min_amount);
+  if (amount < minAmount) throw new Error(`最低投资 ${minAmount} USDT`);
+  if (amount % minAmount !== 0) throw new Error(`金额必须是 ${minAmount} 的倍数`);
+
+  // Check shares availability
+  const sharesNeeded = Math.floor(amount / minAmount);
+  if (dbProduct.used_shares + sharesNeeded > dbProduct.total_shares) {
+    throw new Error("份数不足，无法投资");
+  }
 
   const endDate = new Date();
-  endDate.setDate(endDate.getDate() + product.days);
+  endDate.setDate(endDate.getDate() + dbProduct.days);
 
   const { data, error } = await supabase
     .from("orders")
     .insert({
       wallet_address: walletAddress.toLowerCase(),
       product_id: productId,
-      product_name: product.name,
+      product_name: dbProduct.name,
       amount: amount.toString(),
-      daily_rate: product.dailyRate.toString(),
-      days: product.days,
+      daily_rate: dbProduct.daily_rate.toString(),
+      days: dbProduct.days,
       end_date: endDate.toISOString(),
       tx_hash: null,
     })
     .select()
     .single();
   if (error) throw new Error(error.message);
+
+  // Increment used shares
+  await incrementProductShares(productId, sharesNeeded);
 
   await supabase.rpc("process_wallet_orders", { p_wallet_address: walletAddress.toLowerCase() }).then(() => {});
   await supabase.rpc("check_and_upgrade_level", { p_wallet_address: walletAddress.toLowerCase() }).then(() => {});

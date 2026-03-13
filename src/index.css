@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Landing page tech animations */
+@keyframes techFloat {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+  25% { transform: translateY(-15px) translateX(5px); opacity: 0.7; }
+  50% { transform: translateY(-5px) translateX(-8px); opacity: 0.4; }
+  75% { transform: translateY(-20px) translateX(3px); opacity: 0.8; }
+}
+
+@keyframes scanDown {
+  0% { top: -2%; }
+  100% { top: 102%; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
 /* DARK GOLD THEME - CoreX */
 :root {
   --button-outline: rgba(201,162,39, .20);

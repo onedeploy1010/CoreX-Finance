@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { adminAddLog } from "@/lib/api";
-import { Plus, Trash2, ArrowUp, ArrowDown, Image, Video, Youtube, Save, Loader2, Edit2 } from "lucide-react";
+import { Plus, Trash2, ArrowUp, ArrowDown, Image, Video, Youtube, Save, Loader2, Edit2, Upload, Link } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 async function getMedia() {
@@ -18,11 +18,31 @@ async function getCompanyIntro() {
   return data?.value || "";
 }
 
+async function uploadToStorage(file: File, folder: string): Promise<string> {
+  const ext = file.name.split(".").pop() || "mp4";
+  const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const { data, error } = await supabase.storage
+    .from("media")
+    .upload(fileName, file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
+  if (error) throw new Error(`上传失败: ${error.message}`);
+
+  const { data: urlData } = supabase.storage.from("media").getPublicUrl(data.path);
+  return urlData.publicUrl;
+}
+
 export default function AdminMedia() {
   const [addOpen, setAddOpen] = useState(false);
   const [editIntro, setEditIntro] = useState(false);
   const [introText, setIntroText] = useState("");
   const [form, setForm] = useState({ type: "image", url: "", title: "", description: "" });
+  const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const { data: media = [], isLoading } = useQuery({
@@ -35,8 +55,49 @@ export default function AdminMedia() {
     queryFn: getCompanyIntro,
   });
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const isVideo = file.type.startsWith("video/");
+    const isImage = file.type.startsWith("image/");
+    if (form.type === "video" && !isVideo) {
+      toast({ title: "请选择视频文件", variant: "destructive" });
+      return;
+    }
+    if (form.type === "image" && !isImage) {
+      toast({ title: "请选择图片文件", variant: "destructive" });
+      return;
+    }
+
+    // 100MB limit for videos, 10MB for images
+    const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({ title: `文件过大，最大 ${isVideo ? "100MB" : "10MB"}`, variant: "destructive" });
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(`上传中... ${(file.size / 1024 / 1024).toFixed(1)}MB`);
+
+    try {
+      const folder = isVideo ? "videos" : "images";
+      const publicUrl = await uploadToStorage(file, folder);
+      setForm({ ...form, url: publicUrl });
+      setUploadProgress("上传完成");
+      toast({ title: "文件上传成功" });
+    } catch (err: any) {
+      toast({ title: "上传失败", description: err.message, variant: "destructive" });
+      setUploadProgress("");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const addMutation = useMutation({
     mutationFn: async () => {
+      if (!form.url) throw new Error("请提供媒体文件或URL");
       const maxSort = media.length > 0 ? Math.max(...media.map((m: any) => m.sort_order)) + 1 : 0;
       const { error } = await supabase.from("media").insert({
         type: form.type,
@@ -52,13 +113,21 @@ export default function AdminMedia() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/media"] });
       toast({ title: "添加成功" });
       setAddOpen(false);
-      setForm({ type: "image", url: "", title: "", description: "" });
+      resetForm();
     },
     onError: (err: any) => toast({ title: "添加失败", description: err.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
+      // Try to delete from storage if it's a supabase storage URL
+      const item = (media as any[]).find((m: any) => m.id === id);
+      if (item?.url?.includes("/storage/v1/object/public/media/")) {
+        const path = item.url.split("/storage/v1/object/public/media/")[1];
+        if (path) {
+          await supabase.storage.from("media").remove([path]);
+        }
+      }
       const { error } = await supabase.from("media").delete().eq("id", id);
       if (error) throw new Error(error.message);
       await adminAddLog("删除媒体", "media", id.toString());
@@ -105,6 +174,13 @@ export default function AdminMedia() {
     onError: (err: any) => toast({ title: "保存失败", description: err.message, variant: "destructive" }),
   });
 
+  const resetForm = () => {
+    setForm({ type: "image", url: "", title: "", description: "" });
+    setUploadMode("file");
+    setUploadProgress("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const typeIcon = (type: string) => {
     if (type === "image") return <Image size={14} />;
     if (type === "video") return <Video size={14} />;
@@ -117,6 +193,8 @@ export default function AdminMedia() {
     return "YouTube";
   };
 
+  const fileAccept = form.type === "video" ? "video/mp4,video/webm,video/mov,video/quicktime" : "image/jpeg,image/png,image/webp,image/gif";
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -124,7 +202,7 @@ export default function AdminMedia() {
           <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
           <h2 className="font-bold text-lg text-foreground">Landing Page 管理</h2>
         </div>
-        <Button size="sm" style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }} onClick={() => setAddOpen(true)}>
+        <Button size="sm" style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }} onClick={() => { resetForm(); setAddOpen(true); }}>
           <Plus size={14} className="mr-1" /> 添加媒体
         </Button>
       </div>
@@ -162,6 +240,8 @@ export default function AdminMedia() {
               <div className="w-16 h-12 rounded-lg overflow-hidden shrink-0" style={{ background: "#000" }}>
                 {m.type === "image" ? (
                   <img src={m.url} alt="" className="w-full h-full object-cover" />
+                ) : m.type === "video" ? (
+                  <video src={m.url} className="w-full h-full object-cover" muted preload="metadata" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     {typeIcon(m.type)}
@@ -203,13 +283,14 @@ export default function AdminMedia() {
       )}
 
       {/* Add Media Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={addOpen} onOpenChange={(open) => { if (!open) resetForm(); setAddOpen(open); }}>
         <DialogContent className="max-w-sm mx-auto" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}>
           <DialogHeader>
             <DialogTitle className="text-center" style={{ color: "#C9A227" }}>添加媒体</DialogTitle>
-            <DialogDescription className="text-center text-xs text-muted-foreground">添加图片、视频或YouTube链接</DialogDescription>
+            <DialogDescription className="text-center text-xs text-muted-foreground">上传文件或输入URL</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            {/* Type selector */}
             <div>
               <label className="text-xs text-muted-foreground mb-1.5 block">类型</label>
               <div className="flex gap-2">
@@ -217,33 +298,131 @@ export default function AdminMedia() {
                   { value: "image", label: "图片", icon: Image },
                   { value: "video", label: "视频", icon: Video },
                   { value: "youtube", label: "YouTube", icon: Youtube },
-                ].map((t) => (
-                  <button key={t.value}
+                ].map((tp) => (
+                  <button key={tp.value}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all"
                     style={{
-                      background: form.type === t.value ? "rgba(201,162,39,0.15)" : "rgba(255,255,255,0.03)",
-                      border: form.type === t.value ? "1px solid rgba(201,162,39,0.3)" : "1px solid rgba(255,255,255,0.06)",
-                      color: form.type === t.value ? "#C9A227" : "rgba(255,255,255,0.5)",
+                      background: form.type === tp.value ? "rgba(201,162,39,0.15)" : "rgba(255,255,255,0.03)",
+                      border: form.type === tp.value ? "1px solid rgba(201,162,39,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                      color: form.type === tp.value ? "#C9A227" : "rgba(255,255,255,0.5)",
                     }}
-                    onClick={() => setForm({ ...form, type: t.value })}
+                    onClick={() => { setForm({ ...form, type: tp.value, url: "" }); setUploadProgress(""); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                   >
-                    <t.icon size={12} /> {t.label}
+                    <tp.icon size={12} /> {tp.label}
                   </button>
                 ))}
               </div>
             </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block">
-                {form.type === "youtube" ? "YouTube URL" : form.type === "video" ? "视频 URL" : "图片 URL"}
-              </label>
-              <input
-                className="w-full rounded-lg px-3 py-2 text-sm"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(201,162,39,0.2)", color: "#fff" }}
-                placeholder={form.type === "youtube" ? "https://youtube.com/watch?v=..." : "https://..."}
-                value={form.url}
-                onChange={(e) => setForm({ ...form, url: e.target.value })}
-              />
-            </div>
+
+            {/* Upload mode toggle (for image & video only) */}
+            {form.type !== "youtube" && (
+              <div>
+                <div className="flex gap-2 mb-2">
+                  <button
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium"
+                    style={{
+                      background: uploadMode === "file" ? "rgba(201,162,39,0.12)" : "rgba(255,255,255,0.03)",
+                      border: uploadMode === "file" ? "1px solid rgba(201,162,39,0.25)" : "1px solid rgba(255,255,255,0.06)",
+                      color: uploadMode === "file" ? "#C9A227" : "rgba(255,255,255,0.4)",
+                    }}
+                    onClick={() => setUploadMode("file")}
+                  >
+                    <Upload size={11} /> 上传文件
+                  </button>
+                  <button
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium"
+                    style={{
+                      background: uploadMode === "url" ? "rgba(201,162,39,0.12)" : "rgba(255,255,255,0.03)",
+                      border: uploadMode === "url" ? "1px solid rgba(201,162,39,0.25)" : "1px solid rgba(255,255,255,0.06)",
+                      color: uploadMode === "url" ? "#C9A227" : "rgba(255,255,255,0.4)",
+                    }}
+                    onClick={() => setUploadMode("url")}
+                  >
+                    <Link size={11} /> 输入URL
+                  </button>
+                </div>
+
+                {uploadMode === "file" ? (
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept={fileAccept}
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <button
+                      className="w-full rounded-lg py-4 flex flex-col items-center gap-2 transition-all"
+                      style={{
+                        background: form.url ? "rgba(34,197,94,0.06)" : "rgba(201,162,39,0.04)",
+                        border: form.url ? "2px dashed rgba(34,197,94,0.3)" : "2px dashed rgba(201,162,39,0.2)",
+                      }}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 size={20} className="animate-spin" style={{ color: "#C9A227" }} />
+                          <span className="text-xs" style={{ color: "#C9A227" }}>{uploadProgress}</span>
+                        </>
+                      ) : form.url ? (
+                        <>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(34,197,94,0.1)" }}>
+                            <Upload size={14} style={{ color: "#22c55e" }} />
+                          </div>
+                          <span className="text-xs" style={{ color: "#22c55e" }}>已上传，点击重新选择</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={20} style={{ color: "rgba(201,162,39,0.5)" }} />
+                          <span className="text-xs text-muted-foreground">
+                            点击选择{form.type === "video" ? "视频" : "图片"}文件
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/50">
+                            {form.type === "video" ? "MP4/WebM · 最大100MB" : "JPG/PNG/WebP · 最大10MB"}
+                          </span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Video preview */}
+                    {form.url && form.type === "video" && (
+                      <div className="mt-2 rounded-lg overflow-hidden" style={{ border: "1px solid rgba(201,162,39,0.15)" }}>
+                        <video src={form.url} controls className="w-full" style={{ maxHeight: "160px", background: "#000" }} />
+                      </div>
+                    )}
+                    {form.url && form.type === "image" && (
+                      <div className="mt-2 rounded-lg overflow-hidden" style={{ border: "1px solid rgba(201,162,39,0.15)" }}>
+                        <img src={form.url} alt="preview" className="w-full object-contain" style={{ maxHeight: "160px", background: "#000" }} />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <input
+                    className="w-full rounded-lg px-3 py-2 text-sm"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(201,162,39,0.2)", color: "#fff" }}
+                    placeholder={form.type === "video" ? "https://example.com/video.mp4" : "https://example.com/image.jpg"}
+                    value={form.url}
+                    onChange={(e) => setForm({ ...form, url: e.target.value })}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* YouTube URL input */}
+            {form.type === "youtube" && (
+              <div>
+                <label className="text-xs text-muted-foreground mb-1.5 block">YouTube URL</label>
+                <input
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(201,162,39,0.2)", color: "#fff" }}
+                  placeholder="https://youtube.com/watch?v=..."
+                  value={form.url}
+                  onChange={(e) => setForm({ ...form, url: e.target.value })}
+                />
+              </div>
+            )}
+
             <div>
               <label className="text-xs text-muted-foreground mb-1.5 block">标题 (可选)</label>
               <input
@@ -264,7 +443,7 @@ export default function AdminMedia() {
             </div>
             <Button
               className="w-full font-bold text-sm"
-              disabled={!form.url || addMutation.isPending}
+              disabled={!form.url || addMutation.isPending || uploading}
               style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
               onClick={() => addMutation.mutate()}
             >

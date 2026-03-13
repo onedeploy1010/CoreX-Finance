@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, hasPermission, adminCreateOrderForMember, adminCancelOrder } from "@/lib/api";
-import { PRODUCTS } from "../../../shared/schema";
+import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, hasPermission, adminCreateOrderForMember, adminCancelOrder, getProducts, DBProduct } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
@@ -74,11 +73,24 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
   const [showTree, setShowTree] = useState(false);
   const [editLevel, setEditLevel] = useState<number | null>(null);
   const [showAddOrder, setShowAddOrder] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0].id);
+  const [selectedProduct, setSelectedProduct] = useState<number>(0);
   const [orderAmount, setOrderAmount] = useState("");
   const { toast } = useToast();
   const m = data.member;
   const canWrite = hasPermission("members.write");
+
+  const { data: dbProducts = [] } = useQuery({
+    queryKey: ["/api/products"],
+    queryFn: getProducts,
+  });
+
+  useEffect(() => {
+    if (dbProducts.length > 0 && selectedProduct === 0) {
+      setSelectedProduct(dbProducts[0].id);
+    }
+  }, [dbProducts]);
+
+  const currentProduct = dbProducts.find((p: DBProduct) => p.id === selectedProduct);
 
   const levelMutation = useMutation({
     mutationFn: async (newLevel: number) => {
@@ -120,8 +132,6 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
     },
     onError: (err: any) => toast({ title: "取消失败", description: err.message, variant: "destructive" }),
   });
-
-  const currentProduct = PRODUCTS.find(p => p.id === selectedProduct);
 
   return (
     <div className="space-y-4 text-sm">
@@ -222,7 +232,7 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
                 className="w-full text-xs rounded px-2 py-1.5"
                 style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
               >
-                {PRODUCTS.map(p => (
+                {dbProducts.map((p: DBProduct) => (
                   <option key={p.id} value={p.id}>{p.name} - {p.days}天 {p.dailyRate}%/日</option>
                 ))}
               </select>

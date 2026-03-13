@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminOrders } from "@/lib/api";
-import { PRODUCTS } from "../../../shared/schema";
+import { getAdminOrders, getProducts, DBProduct } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -67,6 +66,11 @@ export default function AdminOrders() {
   const [status, setStatus] = useState("all");
   const [detailId, setDetailId] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+
+  const { data: dbProducts = [] } = useQuery({
+    queryKey: ["/api/products"],
+    queryFn: getProducts,
+  });
 
   // Filter states
   const [searchInput, setSearchInput] = useState("");
@@ -172,7 +176,7 @@ export default function AdminOrders() {
               style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "36px" }}
             >
               <option value="all">全部产品</option>
-              {PRODUCTS.map(p => (
+              {dbProducts.map((p: DBProduct) => (
                 <option key={p.id} value={p.id}>{p.name} ({p.days}天)</option>
               ))}
             </select>
@@ -239,7 +243,7 @@ export default function AdminOrders() {
           )}
           {appliedProductFilter && (
             <span className="text-[10px] px-2 py-1 rounded-full" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.2)" }}>
-              {PRODUCTS.find(p => p.id === appliedProductFilter)?.name}
+              {dbProducts.find((p: DBProduct) => p.id === appliedProductFilter)?.name}
             </span>
           )}
           {appliedDateFrom && (

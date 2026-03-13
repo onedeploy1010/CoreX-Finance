@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -6,9 +7,8 @@ import { useActiveAccount } from "thirdweb/react";
 import { useSendTransaction } from "thirdweb/react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { registerMember, createOrder, getMember } from "@/lib/api";
+import { registerMember, createOrder, getMember, getProducts, DBProduct } from "@/lib/api";
 import { TrendingUp, Clock, DollarSign, Shield, UserPlus, Loader2 } from "lucide-react";
-import { PRODUCTS } from "@shared/schema";
 import { t, getLang } from "@/lib/i18n";
 import {
   prepareApproveUSDT,
@@ -17,15 +17,7 @@ import {
   parseUSDT,
 } from "@/lib/contracts";
 
-interface Product {
-  id: number;
-  name: string;
-  nameEn: string;
-  days: number;
-  dailyRate: number;
-  minAmount: number;
-  description: string;
-}
+type Product = DBProduct;
 
 function getProductName(product: Product): string {
   const lang = getLang();
@@ -118,6 +110,7 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
       queryClient.invalidateQueries({ queryKey: ["/api/earnings", account.address.toLowerCase()] });
       queryClient.invalidateQueries({ queryKey: ["/api/members", account.address.toLowerCase()] });
       queryClient.invalidateQueries({ queryKey: ["/api/members", account.address.toLowerCase(), "team-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
 
       toast({
         title: t("invest.success"),
@@ -282,6 +275,12 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
   );
 }
 
+function formatShares(n: number): string {
+  if (n >= 1000000) return (n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 1) + "万";
+  if (n >= 10000) return (n / 10000).toFixed(n % 10000 === 0 ? 0 : 1) + "万";
+  return n.toLocaleString();
+}
+
 export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -290,6 +289,11 @@ export default function HomePage() {
   const [registerLoading, setRegisterLoading] = useState(false);
   const account = useActiveAccount();
   const { toast } = useToast();
+
+  const { data: products = [] } = useQuery({
+    queryKey: ["/api/products"],
+    queryFn: getProducts,
+  });
 
   useEffect(() => {
     if (!account?.address) return;
@@ -361,8 +365,9 @@ export default function HomePage() {
         <h2 className="font-bold text-base text-foreground">{t("home.products")}</h2>
       </div>
 
-      {PRODUCTS.map((product, index) => {
+      {products.map((product, index) => {
         const color = COLORS[index % COLORS.length];
+        const sharePercent = product.totalShares > 0 ? Math.min(100, (product.usedShares / product.totalShares) * 100) : 0;
         return (
           <div
             key={product.id}
@@ -383,6 +388,20 @@ export default function HomePage() {
               >
                 {t("home.invest")}
               </Button>
+            </div>
+
+            {/* 投资份数 */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-muted-foreground">{t("home.shares") || "投资份数"}</span>
+                <span className="text-[10px] font-semibold" style={{ color }}>{formatShares(product.usedShares)}/{formatShares(product.totalShares)}</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(201,162,39,0.1)" }}>
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${sharePercent}%`, background: `linear-gradient(90deg, ${color}, #9A7A1A)` }}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
@@ -439,7 +458,7 @@ export default function HomePage() {
         product={selectedProduct}
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        color={selectedProduct ? COLORS[PRODUCTS.indexOf(selectedProduct) % COLORS.length] : "#C9A227"}
+        color={selectedProduct ? COLORS[products.indexOf(selectedProduct) % COLORS.length] : "#C9A227"}
       />
 
       {/* Registration Confirmation Dialog */}
