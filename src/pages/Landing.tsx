@@ -167,7 +167,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           textShadow: "none",
         }}>CoreX</h1>
         <p className="text-[11px] tracking-[0.4em] uppercase font-medium" style={{ color: "rgba(201,162,39,0.4)" }}>
-          AI Computing Infrastructure
+          {t("landing.subtitle")}
         </p>
 
         {/* Tagline */}
@@ -266,7 +266,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
 
         {/* Trust indicators */}
         <div className="flex items-center justify-center gap-6 py-2">
-          {["BSC Chain", "Smart Contract", "USDT", "Auto Settlement"].map((label) => (
+          {[t("landing.trust_bsc"), t("landing.trust_contract"), "USDT", t("landing.auto_settle")].map((label) => (
             <div key={label} className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#22c55e" }} />
               <span className="text-[10px] text-foreground/25">{label}</span>
@@ -301,7 +301,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
               <span className="text-[10px] font-medium" style={{ color: "rgba(201,162,39,0.2)" }}>CoreX Finance</span>
               <div className="h-[1px] w-8" style={{ background: "linear-gradient(90deg, rgba(201,162,39,0.15), transparent)" }} />
             </div>
-            <div className="text-[9px] text-foreground/10">BSC Chain · USDT Staking · Decentralized Platform</div>
+            <div className="text-[9px] text-foreground/10">{t("landing.footer_desc")}</div>
           </div>
         </div>
       </main>

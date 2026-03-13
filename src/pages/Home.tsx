@@ -27,6 +27,17 @@ interface Product {
   description: string;
 }
 
+function getProductName(product: Product): string {
+  const lang = getLang();
+  return (lang === "zh" || lang === "zh-TW") ? product.name : product.nameEn;
+}
+
+function getProductDesc(product: { id: number; description: string }): string {
+  const lang = getLang();
+  if (lang === "zh" || lang === "zh-TW") return product.description;
+  return t(`product.desc_${product.id}`);
+}
+
 const COLORS = ["#C9A227", "#E8C547", "#D4A832", "#C9A227", "#E8C547"];
 
 function InvestDialog({ product, open, onClose, color }: { product: Product | null; open: boolean; onClose: () => void; color: string }) {
@@ -110,7 +121,7 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
 
       toast({
         title: t("invest.success"),
-        description: t("invest.success_desc", undefined, { amount, product: product.name }),
+        description: t("invest.success_desc", undefined, { amount, product: getProductName(product) }),
       });
       onClose();
       setAmount("");
@@ -144,10 +155,10 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
       >
         <DialogHeader>
           <DialogTitle className="text-center" style={{ color }}>
-            {product.name}
+            {getProductName(product)}
           </DialogTitle>
           <DialogDescription className="text-center text-xs text-muted-foreground">
-            {`${product.description} · ${product.days}${t("home.day_cycle")} · ${t("home.daily_rate")}${product.dailyRate}%`}
+            {`${getProductDesc(product)} · ${product.days}${t("home.day_cycle")} · ${t("home.daily_rate")}${product.dailyRate}%`}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -361,7 +372,7 @@ export default function HomePage() {
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
                 <h3 className="font-black text-base" style={{ color }}>{product.nameEn}</h3>
-                <div className="text-xs text-muted-foreground mt-0.5">{product.name} · {product.description}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{getProductName(product)} · {getProductDesc(product)}</div>
               </div>
               <Button
                 data-testid={`button-invest-${product.id}`}
