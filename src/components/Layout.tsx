@@ -18,10 +18,7 @@ export function AppHeader() {
         try { sessionStorage.removeItem("corex_entered"); } catch {}
         window.location.href = "/";
       }}>
-        <div className="w-8 h-8 rounded-full flex items-center justify-center"
-          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", boxShadow: "0 0 12px rgba(201,162,39,0.4)" }}>
-          <span className="text-black font-black text-sm">C</span>
-        </div>
+        <img src="/corex.png" alt="CoreX" className="w-8 h-8" />
         <span className="font-bold text-lg tracking-wide gold-text">CoreX</span>
       </div>
       <ConnectButton

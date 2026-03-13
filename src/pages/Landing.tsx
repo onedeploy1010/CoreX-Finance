@@ -148,13 +148,8 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
       {/* Header */}
       <header className="relative z-10 flex items-center justify-center px-6 pt-10 pb-6">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center rotate-3 transition-transform hover:rotate-0"
-            style={{
-              background: "linear-gradient(135deg, #C9A227, #E8D48B, #9A7A1A)",
-              boxShadow: "0 8px 32px rgba(201,162,39,0.4), 0 0 0 1px rgba(201,162,39,0.2)",
-            }}>
-            <span className="text-black font-black text-2xl -rotate-3">C</span>
-          </div>
+          <img src="/corex.png" alt="CoreX" className="w-20 h-20 drop-shadow-lg"
+            style={{ filter: "drop-shadow(0 8px 24px rgba(201,162,39,0.4))" }} />
           <div className="text-center">
             <h1 className="font-black text-3xl tracking-wider" style={{
               background: "linear-gradient(135deg, #E8D48B, #C9A227, #9A7A1A)",

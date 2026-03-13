@@ -80,10 +80,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         style={{ background: "linear-gradient(180deg, #1a1510, #0e0c08)", borderRight: "1px solid rgba(201,162,39,0.15)" }}
       >
         <div className="p-4 flex items-center gap-3" style={{ borderBottom: "1px solid rgba(201,162,39,0.15)" }}>
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)" }}>
-            <LayoutDashboard size={18} className="text-black" />
-          </div>
+          <img src="/corex.png" alt="CoreX" className="w-9 h-9 rounded-lg" />
           <div>
             <div className="font-bold text-sm" style={{ color: "#C9A227" }}>CoreX Admin</div>
             <div className="flex items-center gap-1.5">
