@@ -44,6 +44,8 @@ function ForecastTab({ fc }: { fc: any }) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
 
   const dailyTotal = fmtN(fc.dailyTotal);
   const expirationByDay: any[] = fc.expirationByDay || [];
@@ -331,6 +333,100 @@ function ForecastTab({ fc }: { fc: any }) {
         </>
       ) : (
         <>
+          {/* Date range filter */}
+          <div className="rounded-xl p-4" style={cardBg}>
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar size={13} style={{ color: "#C9A227" }} />
+              <span className="text-xs font-bold text-foreground">区间统计</span>
+            </div>
+            <div className="flex items-center gap-2 mb-3">
+              <input
+                type="date"
+                value={rangeFrom}
+                onChange={e => setRangeFrom(e.target.value)}
+                className="flex-1 text-[11px] rounded-lg px-2.5 py-2"
+                style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227", colorScheme: "dark" }}
+              />
+              <span className="text-xs text-muted-foreground">至</span>
+              <input
+                type="date"
+                value={rangeTo}
+                onChange={e => setRangeTo(e.target.value)}
+                className="flex-1 text-[11px] rounded-lg px-2.5 py-2"
+                style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227", colorScheme: "dark" }}
+              />
+              {(rangeFrom || rangeTo) && (
+                <button
+                  onClick={() => { setRangeFrom(""); setRangeTo(""); }}
+                  className="text-[10px] px-2 py-2 rounded-lg"
+                  style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}
+                >
+                  清除
+                </button>
+              )}
+            </div>
+
+            {/* Range summary */}
+            {(rangeFrom || rangeTo) && (() => {
+              const filtered = allDayList.filter(d =>
+                (!rangeFrom || d.date >= rangeFrom) && (!rangeTo || d.date <= rangeTo)
+              );
+              const rangeDays = filtered.length;
+              const rangeRewards = filtered.reduce((s, d) => s + d.daily, 0);
+              const rangePrincipal = filtered.reduce((s, d) => s + d.principal, 0);
+              const rangeTotal = rangeRewards + rangePrincipal;
+              const rangeOrders = filtered.reduce((s, d) => {
+                const dd = dayMap.get(d.date);
+                return s + (dd?.order_count || 0);
+              }, 0);
+              const startCum = filtered.length > 0 ? (filtered[0].cumulative - filtered[0].daily - filtered[0].principal) : 0;
+              const endCum = filtered.length > 0 ? filtered[filtered.length - 1].cumulative : 0;
+
+              return (
+                <div className="space-y-2">
+                  <div className="rounded-lg p-3" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-foreground">
+                        {rangeFrom || "起始"} ~ {rangeTo || "结束"} ({rangeDays}天)
+                      </span>
+                      <span className="font-black text-base" style={{ color: "#ef4444" }}>{fmt(rangeTotal)} U</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">期间奖励支出</span>
+                        <span className="font-semibold" style={{ color: "#E8C547" }}>{fmt(rangeRewards)} U</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">期间本金返还</span>
+                        <span className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(rangePrincipal)} U</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">到期订单数</span>
+                        <span className="font-semibold text-foreground">{rangeOrders} 笔</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">日均支出</span>
+                        <span className="font-semibold text-foreground">{fmt(rangeDays > 0 ? rangeTotal / rangeDays : 0)} U/日</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">期初累积</span>
+                        <span className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(startCum)} U</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">期末累积</span>
+                        <span className="font-bold" style={{ color: "#ef4444" }}>{fmt(endCum)} U</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {!rangeFrom && !rangeTo && (
+              <div className="text-[10px] text-muted-foreground text-center py-1">选择日期区间查看期间预测汇总</div>
+            )}
+          </div>
+
           {/* List view */}
           <div className="rounded-xl p-4" style={cardBg}>
             {/* Table header */}
@@ -341,7 +437,7 @@ function ForecastTab({ fc }: { fc: any }) {
               <span className="w-20 text-right font-semibold" style={{ color: "#ef4444" }}>累积总额</span>
             </div>
             <div className="space-y-0.5 max-h-[500px] overflow-y-auto">
-              {allDayList.map(entry => {
+              {allDayList.filter(d => (!rangeFrom || d.date >= rangeFrom) && (!rangeTo || d.date <= rangeTo)).map(entry => {
                 const isExpanded = selectedDate === entry.date;
                 const dayData = dayMap.get(entry.date);
                 const hasExpiration = entry.principal > 0;
