@@ -13,9 +13,8 @@ contract CoreXWithdrawal is Ownable, ReentrancyGuard, Pausable {
     IERC20 public immutable usdt;
     address public feeCollector;
 
-    uint256 public constant MIN_WITHDRAWAL = 30 * 1e18;
-    uint256 public constant WITHDRAWAL_MULTIPLE = 10 * 1e18;
-    uint256 public constant FEE_PER_WITHDRAWAL = 1 * 1e18;
+    uint256 public minWithdrawal = 10 * 1e18;
+    uint256 public feePerWithdrawal = 1 * 1e18;
     uint256 public constant MAX_BATCH_SIZE = 100;
 
     mapping(address => bool) public operators;
@@ -73,19 +72,18 @@ contract CoreXWithdrawal is Ownable, ReentrancyGuard, Pausable {
 
         for (uint256 i = 0; i < _recipients.length; i++) {
             require(_recipients[i] != address(0), "Invalid recipient");
-            require(_amounts[i] >= MIN_WITHDRAWAL, "Below minimum withdrawal");
-            require(_amounts[i] % WITHDRAWAL_MULTIPLE == 0, "Must be multiple of 10 USDT");
+            require(_amounts[i] >= minWithdrawal, "Below minimum withdrawal");
 
-            uint256 netAmount = _amounts[i] - FEE_PER_WITHDRAWAL;
+            uint256 netAmount = _amounts[i] - feePerWithdrawal;
             totalAmount += netAmount;
-            totalFee += FEE_PER_WITHDRAWAL;
+            totalFee += feePerWithdrawal;
 
             usdt.safeTransfer(_recipients[i], netAmount);
 
             emit WithdrawalProcessed(
                 _recipients[i],
                 netAmount,
-                FEE_PER_WITHDRAWAL,
+                feePerWithdrawal,
                 _batchId,
                 block.timestamp
             );
@@ -127,6 +125,14 @@ contract CoreXWithdrawal is Ownable, ReentrancyGuard, Pausable {
         require(_newCollector != address(0), "Invalid address");
         feeCollector = _newCollector;
         emit FeeCollectorSet(_newCollector);
+    }
+
+    function setMinWithdrawal(uint256 _min) external onlyOwner {
+        minWithdrawal = _min;
+    }
+
+    function setFeePerWithdrawal(uint256 _fee) external onlyOwner {
+        feePerWithdrawal = _fee;
     }
 
     function getContractBalance() external view returns (uint256) {

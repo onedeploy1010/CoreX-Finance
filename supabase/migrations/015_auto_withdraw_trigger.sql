@@ -30,7 +30,7 @@ BEGIN
 
   -- Call edge function via pg_net (async, non-blocking)
   BEGIN
-    PERFORM extensions.http_post(
+    PERFORM net.http_post(
       url := v_supabase_url || '/functions/v1/auto-withdraw',
       body := '{}',
       headers := jsonb_build_object(
