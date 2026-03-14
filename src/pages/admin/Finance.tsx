@@ -53,6 +53,39 @@ function ForecastTab({ fc }: { fc: any }) {
   const dayMap = new Map<string, any>();
   expirationByDay.forEach((d: any) => dayMap.set(d.exp_date, d));
 
+  // Build cumulative day-by-day timeline: each day = rewards + principal, accumulates if not withdrawn
+  const cumulativeMap = new Map<string, { daily: number; principal: number; cumulative: number }>();
+  const allDayList: { date: string; daily: number; principal: number; cumulative: number; orders?: any[] }[] = [];
+  {
+    // Determine timeline range: today to last expiration or +90 days, whichever is further
+    const today = new Date();
+    const lastExpDate = expirationByDay.length > 0
+      ? expirationByDay.reduce((max: string, d: any) => d.exp_date > max ? d.exp_date : max, "")
+      : "";
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + 90);
+    if (lastExpDate) {
+      const lastExp = new Date(lastExpDate);
+      if (lastExp > endDate) endDate.setTime(lastExp.getTime());
+    }
+
+    let cumulative = 0;
+    // Add existing unrealized balance as starting cumulative
+    cumulative = fmtN(fc.unrealizedBalance || 0);
+    const cursor = new Date(today);
+    while (cursor <= endDate) {
+      const dateStr = cursor.toISOString().slice(0, 10);
+      const dayData = dayMap.get(dateStr);
+      const principal = dayData ? fmtN(dayData.principal) : 0;
+      const dayNew = dailyTotal + principal;
+      cumulative += dayNew;
+      const entry = { date: dateStr, daily: dailyTotal, principal, cumulative, orders: dayData?.orders };
+      cumulativeMap.set(dateStr, entry);
+      allDayList.push(entry);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
+
   // Calendar helpers
   const [calY, calM] = calMonth.split("-").map(Number);
   const daysInMonth = new Date(calY, calM, 0).getDate();
@@ -79,13 +112,17 @@ function ForecastTab({ fc }: { fc: any }) {
   const monthRewards = dailyTotal * daysInMonth;
   const monthTotal = monthPrincipal + monthRewards;
 
-  // Max principal in current month for heat intensity
-  const monthDayPrincipals = expirationByDay
-    .filter((d: any) => d.exp_date.startsWith(calMonth))
-    .map((d: any) => fmtN(d.principal));
-  const maxDayPrincipal = Math.max(...monthDayPrincipals, 1);
+  // Max cumulative in current month for heat intensity
+  const monthCumulatives = allDayList
+    .filter(d => d.date.startsWith(calMonth))
+    .map(d => d.cumulative);
+  const maxMonthCumulative = Math.max(...monthCumulatives, 1);
+  // Month-end cumulative
+  const monthEndEntry = [...allDayList].reverse().find(d => d.date.startsWith(calMonth));
+  const monthEndCumulative = monthEndEntry?.cumulative || 0;
 
   // Selected date details
+  const selectedEntry = selectedDate ? cumulativeMap.get(selectedDate) : null;
   const selectedDayData = selectedDate ? dayMap.get(selectedDate) : null;
 
   // Today string
@@ -151,8 +188,11 @@ function ForecastTab({ fc }: { fc: any }) {
               <div className="text-center">
                 <div className="text-sm font-bold text-foreground">{calY}年{calM}月</div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">
-                  预计支出 <span style={{ color: "#ef4444" }}>{fmt(monthTotal)} U</span>
-                  {monthPrincipal > 0 && <span> · 本金返还 <span style={{ color: "#f59e0b" }}>{fmt(monthPrincipal)}</span></span>}
+                  当月新增 <span style={{ color: "#ef4444" }}>{fmt(monthTotal)} U</span>
+                  {monthPrincipal > 0 && <span> · 本金 <span style={{ color: "#f59e0b" }}>{fmt(monthPrincipal)}</span></span>}
+                </div>
+                <div className="text-[10px] mt-0.5">
+                  月末累积 <span className="font-bold" style={{ color: "#ef4444" }}>{fmt(monthEndCumulative)} U</span>
                 </div>
               </div>
               <button onClick={nextMonth} className="p-1.5 rounded-lg" style={{ color: "#C9A227" }}>
@@ -172,12 +212,15 @@ function ForecastTab({ fc }: { fc: any }) {
               {calDays.map((day, i) => {
                 if (day === null) return <div key={`e${i}`} className="aspect-square" />;
                 const dateStr = `${calMonth}-${String(day).padStart(2, "0")}`;
-                const dayData = dayMap.get(dateStr);
-                const principal = dayData ? fmtN(dayData.principal) : 0;
+                const entry = cumulativeMap.get(dateStr);
+                const hasData = !!entry;
+                const principal = entry?.principal || 0;
+                const cumulative = entry?.cumulative || 0;
                 const hasExpiration = principal > 0;
                 const isToday = dateStr === todayStr;
                 const isSelected = dateStr === selectedDate;
-                const intensity = hasExpiration ? Math.max(0.08, (principal / maxDayPrincipal) * 0.5) : 0;
+                // Heat by cumulative intensity within month
+                const intensity = hasData ? Math.max(0.04, (cumulative / maxMonthCumulative) * 0.4) : 0;
 
                 return (
                   <button
@@ -186,8 +229,8 @@ function ForecastTab({ fc }: { fc: any }) {
                     style={{
                       background: isSelected
                         ? "rgba(201,162,39,0.2)"
-                        : hasExpiration
-                        ? `rgba(245,158,11,${intensity})`
+                        : hasData
+                        ? `rgba(239,68,68,${intensity})`
                         : "rgba(255,255,255,0.015)",
                       border: isSelected
                         ? "1.5px solid rgba(201,162,39,0.6)"
@@ -197,16 +240,16 @@ function ForecastTab({ fc }: { fc: any }) {
                     }}
                     onClick={() => setSelectedDate(isSelected ? null : dateStr)}
                   >
-                    <span className={`text-[11px] ${isToday ? "font-bold" : ""}`} style={{ color: isToday ? "#C9A227" : hasExpiration ? "#f59e0b" : "rgba(255,255,255,0.4)" }}>
+                    <span className={`text-[10px] ${isToday ? "font-bold" : ""}`} style={{ color: isToday ? "#C9A227" : hasExpiration ? "#f59e0b" : "rgba(255,255,255,0.4)" }}>
                       {day}
                     </span>
-                    {hasExpiration && (
-                      <span className="text-[7px] font-bold mt-0.5" style={{ color: "#f59e0b" }}>
-                        {principal >= 1000 ? `${(principal / 1000).toFixed(0)}k` : fmt(principal)}
+                    {hasData && (
+                      <span className="text-[6px] font-bold mt-0.5" style={{ color: "#ef4444" }}>
+                        {cumulative >= 10000 ? `${(cumulative / 1000).toFixed(0)}k` : cumulative >= 1000 ? `${(cumulative / 1000).toFixed(1)}k` : fmt(cumulative)}
                       </span>
                     )}
                     {hasExpiration && (
-                      <div className="absolute top-1 right-1 w-1 h-1 rounded-full" style={{ background: "#f59e0b" }} />
+                      <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full" style={{ background: "#f59e0b" }} />
                     )}
                   </button>
                 );
@@ -216,13 +259,13 @@ function ForecastTab({ fc }: { fc: any }) {
             {/* Legend */}
             <div className="flex items-center justify-center gap-4 mt-3 text-[9px] text-muted-foreground">
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded" style={{ background: "rgba(245,158,11,0.15)" }} />浅=少量本金
+                <div className="w-2 h-2 rounded" style={{ background: "rgba(239,68,68,0.1)" }} />累积少
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded" style={{ background: "rgba(245,158,11,0.5)" }} />深=大量本金
+                <div className="w-2 h-2 rounded" style={{ background: "rgba(239,68,68,0.4)" }} />累积多
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded" style={{ border: "1px solid rgba(201,162,39,0.3)" }} />今日
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#f59e0b" }} />有到期本金
               </div>
             </div>
           </div>
@@ -233,28 +276,30 @@ function ForecastTab({ fc }: { fc: any }) {
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-bold text-foreground">{selectedDate}</span>
                 <div className="text-right">
-                  <div className="text-[10px] text-muted-foreground">当日总支出</div>
-                  <div className="font-black text-base" style={{ color: "#ef4444" }}>
-                    {fmt((selectedDayData ? fmtN(selectedDayData.principal) : 0) + dailyTotal)} U
+                  <div className="text-[10px] text-muted-foreground">累积待提现</div>
+                  <div className="font-black text-lg" style={{ color: "#ef4444" }}>
+                    {fmt(selectedEntry?.cumulative || 0)} U
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                <div className="rounded-lg p-2 text-center" style={{ background: "rgba(232,197,71,0.06)" }}>
-                  <div className="text-[9px] text-muted-foreground">奖励支出</div>
-                  <div className="text-xs font-bold" style={{ color: "#E8C547" }}>{fmt(dailyTotal)}</div>
-                </div>
-                <div className="rounded-lg p-2 text-center" style={{ background: "rgba(245,158,11,0.06)" }}>
-                  <div className="text-[9px] text-muted-foreground">到期本金</div>
-                  <div className="text-xs font-bold" style={{ color: "#f59e0b" }}>
-                    {selectedDayData ? fmt(selectedDayData.principal) : "0.00"}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="rounded-lg p-2.5" style={{ background: "rgba(232,197,71,0.06)" }}>
+                  <div className="text-[9px] text-muted-foreground">当日新增</div>
+                  <div className="text-xs font-bold" style={{ color: "#E8C547" }}>
+                    +{fmt((selectedEntry?.daily || 0) + (selectedEntry?.principal || 0))} U
+                  </div>
+                  <div className="text-[9px] text-muted-foreground mt-1">
+                    奖励 {fmt(selectedEntry?.daily || 0)} + 本金 {fmt(selectedEntry?.principal || 0)}
                   </div>
                 </div>
-                <div className="rounded-lg p-2 text-center" style={{ background: "rgba(239,68,68,0.06)" }}>
+                <div className="rounded-lg p-2.5" style={{ background: "rgba(239,68,68,0.06)" }}>
                   <div className="text-[9px] text-muted-foreground">到期订单</div>
                   <div className="text-xs font-bold text-foreground">
                     {selectedDayData ? selectedDayData.order_count : 0} 笔
+                  </div>
+                  <div className="text-[9px] text-muted-foreground mt-1">
+                    {(selectedEntry?.principal || 0) > 0 ? "有本金返还" : "仅奖励累积"}
                   </div>
                 </div>
               </div>
@@ -279,7 +324,7 @@ function ForecastTab({ fc }: { fc: any }) {
               )}
 
               {(!selectedDayData || (selectedDayData.orders || []).length === 0) && (
-                <div className="text-xs text-muted-foreground text-center py-3">当日无到期订单，仅有奖励支出</div>
+                <div className="text-xs text-muted-foreground text-center py-3">当日无到期订单，奖励 +{fmt(dailyTotal)} U 累积至总额</div>
               )}
             </div>
           )}
@@ -288,48 +333,62 @@ function ForecastTab({ fc }: { fc: any }) {
         <>
           {/* List view */}
           <div className="rounded-xl p-4" style={cardBg}>
-            <div className="text-xs text-muted-foreground mb-3">
-              共 {expirationByDay.length} 天有到期本金返还
+            {/* Table header */}
+            <div className="flex items-center justify-between px-3 py-2 mb-1 text-[10px] text-muted-foreground" style={{ borderBottom: "1px solid rgba(201,162,39,0.1)" }}>
+              <span className="w-24">日期</span>
+              <span className="w-16 text-right">当日新增</span>
+              <span className="w-16 text-right">到期本金</span>
+              <span className="w-20 text-right font-semibold" style={{ color: "#ef4444" }}>累积总额</span>
             </div>
-            <div className="space-y-1.5 max-h-[480px] overflow-y-auto">
-              {expirationByDay.map((day: any) => {
-                const principal = fmtN(day.principal);
-                const total = principal + dailyTotal;
-                const isExpanded = selectedDate === day.exp_date;
+            <div className="space-y-0.5 max-h-[500px] overflow-y-auto">
+              {allDayList.map(entry => {
+                const isExpanded = selectedDate === entry.date;
+                const dayData = dayMap.get(entry.date);
+                const hasExpiration = entry.principal > 0;
                 return (
-                  <div key={day.exp_date}>
+                  <div key={entry.date}>
                     <button
-                      className="w-full rounded-lg px-3 py-2.5 text-left transition-all"
+                      className="w-full rounded-lg px-3 py-2 text-left transition-all"
                       style={{
-                        background: isExpanded ? "rgba(201,162,39,0.08)" : "rgba(255,255,255,0.02)",
-                        border: isExpanded ? "1px solid rgba(201,162,39,0.2)" : "1px solid rgba(255,255,255,0.05)",
+                        background: isExpanded
+                          ? "rgba(201,162,39,0.08)"
+                          : hasExpiration
+                          ? "rgba(245,158,11,0.04)"
+                          : "transparent",
+                        border: isExpanded ? "1px solid rgba(201,162,39,0.2)" : "1px solid transparent",
                       }}
-                      onClick={() => setSelectedDate(isExpanded ? null : day.exp_date)}
+                      onClick={() => setSelectedDate(isExpanded ? null : entry.date)}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <ChevronRight
-                            size={10}
-                            style={{ color: "#C9A227", transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}
-                          />
-                          <span className="text-xs font-mono" style={{ color: day.exp_date === todayStr ? "#C9A227" : "rgba(255,255,255,0.7)" }}>
-                            {day.exp_date}
+                        <div className="flex items-center gap-1.5 w-24">
+                          {hasExpiration && (
+                            <ChevronRight
+                              size={9}
+                              style={{ color: "#f59e0b", transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}
+                            />
+                          )}
+                          <span className="text-[11px] font-mono" style={{ color: entry.date === todayStr ? "#C9A227" : "rgba(255,255,255,0.6)" }}>
+                            {entry.date.slice(5)}
                           </span>
-                          {day.exp_date === todayStr && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227" }}>今日</span>
+                          {entry.date === todayStr && (
+                            <span className="text-[8px] px-1 rounded" style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227" }}>今</span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-[10px] text-muted-foreground">{day.order_count}笔</span>
-                          <span className="text-xs font-bold" style={{ color: "#f59e0b" }}>{fmt(principal)}</span>
-                          <span className="text-xs font-black" style={{ color: "#ef4444" }}>{fmt(total)}</span>
-                        </div>
+                        <span className="w-16 text-right text-[11px]" style={{ color: "#E8C547" }}>
+                          +{fmt(entry.daily + entry.principal)}
+                        </span>
+                        <span className="w-16 text-right text-[11px]" style={{ color: hasExpiration ? "#f59e0b" : "rgba(255,255,255,0.2)" }}>
+                          {hasExpiration ? fmt(entry.principal) : "-"}
+                        </span>
+                        <span className="w-20 text-right text-[11px] font-bold" style={{ color: "#ef4444" }}>
+                          {fmt(entry.cumulative)}
+                        </span>
                       </div>
                     </button>
 
-                    {isExpanded && (day.orders || []).length > 0 && (
+                    {isExpanded && dayData && (dayData.orders || []).length > 0 && (
                       <div className="ml-5 mt-1 space-y-1 mb-2">
-                        {(day.orders || []).map((order: any) => (
+                        {(dayData.orders || []).map((order: any) => (
                           <div key={order.id} className="rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
                             <div className="flex items-center justify-between">
                               <span className="text-[11px] font-semibold text-foreground">{order.product}</span>
@@ -348,15 +407,15 @@ function ForecastTab({ fc }: { fc: any }) {
               })}
             </div>
 
-            {expirationByDay.length === 0 && (
-              <div className="text-xs text-muted-foreground text-center py-6">暂无到期数据</div>
+            {allDayList.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-6">暂无数据</div>
             )}
           </div>
 
-          {/* List header legend */}
+          {/* Legend */}
           <div className="flex items-center justify-center gap-4 text-[9px] text-muted-foreground">
-            <span><span style={{ color: "#f59e0b" }}>橙色</span> = 到期本金</span>
-            <span><span style={{ color: "#ef4444" }}>红色</span> = 本金+奖励合计</span>
+            <span><span style={{ color: "#E8C547" }}>黄色</span> = 当日新增(奖励+本金)</span>
+            <span><span style={{ color: "#ef4444" }}>红色</span> = 累积未提现总额</span>
           </div>
         </>
       )}
@@ -365,43 +424,45 @@ function ForecastTab({ fc }: { fc: any }) {
       <div className="rounded-xl p-4" style={cardBg}>
         <div className="flex items-center gap-2 mb-3">
           <TrendingDown size={14} style={{ color: "#C9A227" }} />
-          <span className="text-sm font-semibold text-foreground">综合支出预测</span>
+          <span className="text-sm font-semibold text-foreground">累积预测（假设全不提现）</span>
         </div>
         <div className="space-y-2">
           {[30, 60, 90].map(days => {
-            const rewardPayout = dailyTotal * days;
             const cutoff = new Date();
             cutoff.setDate(cutoff.getDate() + days);
             const cutoffStr = cutoff.toISOString().slice(0, 10);
+            // Get cumulative at that date
+            const targetEntry = [...allDayList].reverse().find(d => d.date <= cutoffStr);
+            const cumulative = targetEntry?.cumulative || 0;
+            const rewardPayout = dailyTotal * days;
             const principal = expirationByDay
               .filter((d: any) => d.exp_date <= cutoffStr)
               .reduce((sum: number, d: any) => sum + fmtN(d.principal), 0);
-            const total = rewardPayout + principal;
             const expiringOrders = expirationByDay
               .filter((d: any) => d.exp_date <= cutoffStr)
               .reduce((sum: number, d: any) => sum + d.order_count, 0);
             return (
               <div key={days} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-foreground">{days}天预测</span>
-                  <span className="font-black text-base" style={{ color: "#ef4444" }}>{fmt(total)} U</span>
+                  <span className="text-xs font-bold text-foreground">{days}天后累积</span>
+                  <span className="font-black text-base" style={{ color: "#ef4444" }}>{fmt(cumulative)} U</span>
                 </div>
                 <div className="grid grid-cols-4 gap-2 text-[10px]">
                   <div>
-                    <span className="text-muted-foreground">奖励</span>
+                    <span className="text-muted-foreground">期间奖励</span>
                     <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(rewardPayout)}</div>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">本金</span>
+                    <span className="text-muted-foreground">期间本金</span>
                     <div className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(principal)}</div>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">到期</span>
+                    <span className="text-muted-foreground">到期订单</span>
                     <div className="font-semibold text-foreground">{expiringOrders}笔</div>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">日均</span>
-                    <div className="font-semibold text-foreground">{fmt(total / days)}/日</div>
+                    <span className="text-muted-foreground">日均增长</span>
+                    <div className="font-semibold text-foreground">{fmt((cumulative - fmtN(fc.unrealizedBalance || 0)) / days)}/日</div>
                   </div>
                 </div>
               </div>
