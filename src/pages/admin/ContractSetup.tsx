@@ -16,7 +16,7 @@ import {
   formatUSDT,
   getUSDTBalance,
 } from "@/lib/contracts";
-import { getProducts, DBProduct } from "@/lib/api";
+import { getProducts, DBProduct, adminAddLog } from "@/lib/api";
 
 function shortAddr(addr: string) {
   if (!addr) return "";
@@ -85,6 +85,10 @@ export default function ContractSetup() {
       const tx = prepareApproveUSDTForWithdrawal(MAX_UINT256);
       await sendTx(tx);
       toast({ title: "授权成功", description: "提现钱包已授权新提现合约" });
+      await adminAddLog("授权提现合约USDT", "withdrawal_contract", COREX_WITHDRAWAL_ADDRESS, {
+        fundingWallet,
+        connectedWallet: account.address,
+      });
       // Refresh data
       if (fundingWallet) {
         const allowance = await getWithdrawalAllowance(fundingWallet).catch(() => BigInt(0));
