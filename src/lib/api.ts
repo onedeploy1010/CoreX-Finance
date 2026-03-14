@@ -802,6 +802,12 @@ export async function getAdminFinanceMonthly() {
   return data;
 }
 
+export async function getAdminWithdrawalForecast() {
+  const { data, error } = await supabase.rpc("admin_withdrawal_forecast");
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // ============ Settlement Settings ============
 
 export async function getSettlementConfig() {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminFinance, getAdminFinanceMonthly } from "@/lib/api";
-import { DollarSign, TrendingUp, TrendingDown, ArrowDownToLine, Wallet, Percent, AlertTriangle, Calendar, BarChart3, Users, Star, Loader2 } from "lucide-react";
+import { getAdminFinance, getAdminFinanceMonthly, getAdminWithdrawalForecast } from "@/lib/api";
+import { DollarSign, TrendingUp, TrendingDown, ArrowDownToLine, Wallet, Percent, AlertTriangle, Calendar, BarChart3, Loader2, Clock, Banknote } from "lucide-react";
 
 const cardBg = { background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" };
 
@@ -37,11 +37,13 @@ export default function AdminFinance() {
   const [activeSection, setActiveSection] = useState<"overview" | "monthly" | "forecast">("overview");
   const { data, isLoading } = useQuery({ queryKey: ["/api/admin/finance"], queryFn: getAdminFinance });
   const { data: monthlyData, isLoading: monthlyLoading } = useQuery({ queryKey: ["/api/admin/finance/monthly"], queryFn: getAdminFinanceMonthly });
+  const { data: forecastData, isLoading: forecastLoading } = useQuery({ queryKey: ["/api/admin/finance/forecast"], queryFn: getAdminWithdrawalForecast });
 
   if (isLoading) return <div className="text-muted-foreground text-center py-20">加载中...</div>;
   if (!data) return null;
   const d = data as any;
   const m = monthlyData as any;
+  const fc = forecastData as any;
 
   const sections = [
     { key: "overview" as const, label: "总览" },
@@ -77,17 +79,6 @@ export default function AdminFinance() {
     });
   }
   const monthlyRows = Array.from(monthMap.values()).sort((a, b) => b.month.localeCompare(a.month));
-
-  // Forecast calculations
-  const activeOrders = m?.activeOrders;
-  const dailyPayout = fmtN(activeOrders?.dailyPayout || 0);
-  const rewardRatios = m?.rewardRatios || {};
-  const directRatio = fmtN(rewardRatios.directToDaily || 0);
-  const indirectRatio = fmtN(rewardRatios.indirectToDaily || 0);
-  const teamRatio = fmtN(rewardRatios.teamToDaily || 0);
-  const totalDailyAll = dailyPayout * (1 + directRatio + indirectRatio + teamRatio);
-  const unrealized = fmtN(m?.unrealizedBalance || 0);
-  const pendingW = m?.pendingWithdrawals || {};
 
   return (
     <div className="space-y-5">
@@ -198,7 +189,6 @@ export default function AdminFinance() {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Monthly profit/loss table */}
             <div className="rounded-xl p-4" style={cardBg}>
               <div className="flex items-center gap-2 mb-4">
                 <Calendar size={14} style={{ color: "#C9A227" }} />
@@ -222,14 +212,13 @@ export default function AdminFinance() {
                       {monthlyRows.map(row => {
                         const deposits = row.deposits || 0;
                         const totalOut = (row.rewardTotal || 0);
-                        const withdrawn = row.withdrawn || 0;
                         const profit = deposits - totalOut;
                         return (
                           <tr key={row.month} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                             <td className="py-2.5 px-2 text-muted-foreground"><MonthLabel month={row.month} /></td>
                             <td className="py-2.5 px-2 text-right font-semibold" style={{ color: "#22c55e" }}>{fmt(deposits)}</td>
                             <td className="py-2.5 px-2 text-right font-semibold" style={{ color: "#ef4444" }}>{fmt(totalOut)}</td>
-                            <td className="py-2.5 px-2 text-right font-semibold" style={{ color: "#f59e0b" }}>{fmt(withdrawn)}</td>
+                            <td className="py-2.5 px-2 text-right font-semibold" style={{ color: "#f59e0b" }}>{fmt(row.withdrawn || 0)}</td>
                             <td className="py-2.5 px-2 text-right font-bold" style={{ color: profit >= 0 ? "#22c55e" : "#ef4444" }}>
                               {profit >= 0 ? "+" : ""}{fmt(profit)}
                             </td>
@@ -242,7 +231,6 @@ export default function AdminFinance() {
               )}
             </div>
 
-            {/* Monthly reward breakdown */}
             <div className="rounded-xl p-4" style={cardBg}>
               <div className="flex items-center gap-2 mb-4">
                 <BarChart3 size={14} style={{ color: "#C9A227" }} />
@@ -282,7 +270,6 @@ export default function AdminFinance() {
               )}
             </div>
 
-            {/* Monthly bar chart visual */}
             {monthlyRows.length > 0 && (
               <div className="rounded-xl p-4" style={cardBg}>
                 <div className="text-sm font-semibold text-foreground mb-3">月度入金 vs 支出</div>
@@ -318,93 +305,139 @@ export default function AdminFinance() {
 
       {/* ===== WITHDRAWAL FORECAST ===== */}
       {activeSection === "forecast" && (
-        monthlyLoading ? (
+        forecastLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={24} className="animate-spin" style={{ color: "#C9A227" }} />
           </div>
-        ) : (
+        ) : !fc ? null : (
           <div className="space-y-4">
-            {/* Withdrawal pressure warning */}
+            {/* Daily payout breakdown - real calculated */}
+            <div className="rounded-xl p-4" style={cardBg}>
+              <div className="flex items-center gap-2 mb-3">
+                <Clock size={14} style={{ color: "#C9A227" }} />
+                <span className="text-sm font-semibold text-foreground">每日预计支出 (精算)</span>
+              </div>
+              <div className="text-xs text-muted-foreground mb-3">
+                基于 {fc.activeOrderCount || 0} 笔活跃订单 / 总质押 {fmt(fc.activeStaking)} U
+              </div>
+              <div className="space-y-2">
+                {[
+                  { label: "日利息", value: fc.dailyInterest, color: "#E8C547", desc: "所有活跃订单的每日收益" },
+                  { label: "直推奖励", value: fc.dailyDirect, color: "#F0D060", desc: "10% 日利息 (有推荐人的订单)" },
+                  { label: "间推奖励", value: fc.dailyIndirect, color: "#D4AF37", desc: "5% 日利息 (有二级推荐人的订单)" },
+                  { label: "团队分红", value: fc.dailyTeam, color: "#FFD700", desc: "团队质押 x 利率 x 等级比例" },
+                  { label: "同级奖励", value: fc.dailyEqualLevel, color: "#FF8C00", desc: "团队分红的10% (同级递推)" },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div>
+                      <div className="text-xs font-semibold" style={{ color: item.color }}>{item.label}</div>
+                      <div className="text-[10px] text-muted-foreground">{item.desc}</div>
+                    </div>
+                    <div className="font-bold text-sm" style={{ color: item.color }}>{fmt(item.value)}</div>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between py-3 px-3 rounded-lg" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                  <div className="text-xs font-bold" style={{ color: "#ef4444" }}>每日总支出</div>
+                  <div className="font-black text-lg" style={{ color: "#ef4444" }}>{fmt(fc.dailyTotal)} U</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pending withdrawals */}
             <div className="rounded-xl p-4" style={{ ...cardBg, borderColor: "rgba(245,158,11,0.3)" }}>
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle size={16} style={{ color: "#f59e0b" }} />
-                <span className="text-sm font-bold" style={{ color: "#f59e0b" }}>提现压力预警</span>
+                <span className="text-sm font-bold" style={{ color: "#f59e0b" }}>提现压力</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg p-3" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
                   <div className="text-[10px] text-muted-foreground mb-1">待处理提现</div>
-                  <div className="font-black text-lg" style={{ color: "#ef4444" }}>{fmt(pendingW.totalAmount || 0)}</div>
-                  <div className="text-[10px] text-muted-foreground">{pendingW.count || 0} 笔</div>
+                  <div className="font-black text-lg" style={{ color: "#ef4444" }}>{fmt(fc.pendingWithdrawals?.totalAmount || 0)}</div>
+                  <div className="text-[10px] text-muted-foreground">{fc.pendingWithdrawals?.count || 0} 笔</div>
                 </div>
                 <div className="rounded-lg p-3" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
                   <div className="text-[10px] text-muted-foreground mb-1">未提现余额</div>
-                  <div className="font-black text-lg" style={{ color: "#f59e0b" }}>{fmt(unrealized)}</div>
+                  <div className="font-black text-lg" style={{ color: "#f59e0b" }}>{fmt(fc.unrealizedBalance)}</div>
                   <div className="text-[10px] text-muted-foreground">所有用户可提总额</div>
                 </div>
               </div>
             </div>
 
-            {/* Daily payout projection */}
+            {/* Principal return schedule */}
             <div className="rounded-xl p-4" style={cardBg}>
               <div className="flex items-center gap-2 mb-3">
-                <TrendingDown size={14} style={{ color: "#C9A227" }} />
-                <span className="text-sm font-semibold text-foreground">每日预计产出</span>
+                <Banknote size={14} style={{ color: "#C9A227" }} />
+                <span className="text-sm font-semibold text-foreground">到期本金返还</span>
               </div>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="rounded-lg p-3 text-center" style={{ background: "rgba(232,197,71,0.06)", border: "1px solid rgba(232,197,71,0.15)" }}>
-                  <div className="text-[10px] text-muted-foreground mb-1">日收益</div>
-                  <div className="font-bold text-base" style={{ color: "#E8C547" }}>{fmt(dailyPayout)}</div>
-                </div>
-                <div className="rounded-lg p-3 text-center" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
-                  <div className="text-[10px] text-muted-foreground mb-1">日推荐奖励(估)</div>
-                  <div className="font-bold text-base" style={{ color: "#C9A227" }}>{fmt(dailyPayout * (directRatio + indirectRatio))}</div>
-                </div>
-                <div className="rounded-lg p-3 text-center" style={{ background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.15)" }}>
-                  <div className="text-[10px] text-muted-foreground mb-1">日团队奖励(估)</div>
-                  <div className="font-bold text-base" style={{ color: "#FFD700" }}>{fmt(dailyPayout * teamRatio)}</div>
-                </div>
-                <div className="rounded-lg p-3 text-center" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
-                  <div className="text-[10px] text-muted-foreground mb-1">日总支出(估)</div>
-                  <div className="font-bold text-base" style={{ color: "#ef4444" }}>{fmt(totalDailyAll)}</div>
-                </div>
-              </div>
-              <div className="text-[10px] text-muted-foreground px-1">
-                * 推荐/团队奖励按历史比率估算: 直推{(directRatio * 100).toFixed(1)}% 间推{(indirectRatio * 100).toFixed(1)}% 团队{(teamRatio * 100).toFixed(1)}%
+              <div className="space-y-2">
+                {(fc.principalReturn || []).map((p: any) => (
+                  <div key={p.period_key} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div className="text-xs text-muted-foreground">{p.period}</div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-muted-foreground">{p.order_count} 笔</span>
+                      <span className="font-bold text-sm" style={{ color: fmtN(p.principal) > 0 ? "#f59e0b" : "rgba(255,255,255,0.3)" }}>{fmt(p.principal)} U</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* 30/60/90 day forecast */}
+            {/* Day-by-day expiration schedule */}
+            {(fc.expirationSchedule || []).length > 0 && (
+              <div className="rounded-xl p-4" style={cardBg}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Calendar size={14} style={{ color: "#C9A227" }} />
+                  <span className="text-sm font-semibold text-foreground">30天到期日历</span>
+                </div>
+                <div className="space-y-1.5">
+                  {(fc.expirationSchedule || []).map((e: any) => (
+                    <div key={e.exp_date} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.1)" }}>
+                      <span className="text-xs text-muted-foreground font-mono">{e.exp_date}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-muted-foreground">{e.order_count} 笔</span>
+                        <span className="font-bold text-sm" style={{ color: "#f59e0b" }}>{fmt(e.principal)} U</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 30/60/90 day total forecast */}
             <div className="rounded-xl p-4" style={cardBg}>
               <div className="flex items-center gap-2 mb-3">
-                <Calendar size={14} style={{ color: "#C9A227" }} />
-                <span className="text-sm font-semibold text-foreground">未来支出预测</span>
+                <TrendingDown size={14} style={{ color: "#C9A227" }} />
+                <span className="text-sm font-semibold text-foreground">综合支出预测</span>
               </div>
               <div className="space-y-2">
-                {[
-                  { label: "30天", days: 30, expiring: activeOrders?.expiring30d || 0, expiringAmt: activeOrders?.expiringAmount30d || 0 },
-                  { label: "60天", days: 60, expiring: activeOrders?.expiring60d || 0, expiringAmt: activeOrders?.expiringAmount60d || 0 },
-                  { label: "90天", days: 90, expiring: activeOrders?.expiring90d || 0, expiringAmt: activeOrders?.expiringAmount90d || 0 },
-                ].map(({ label, days, expiring, expiringAmt }) => {
-                  const projectedPayout = totalDailyAll * days;
-                  const principalReturn = fmtN(expiringAmt);
+                {[30, 60, 90].map(days => {
+                  const dailyTotal = fmtN(fc.dailyTotal);
+                  const rewardPayout = dailyTotal * days;
+                  const pr = (fc.principalReturn || []).find((p: any) =>
+                    (days === 30 && p.period_key === "month") ||
+                    (days === 60 && p.period_key === "month2") ||
+                    (days === 90 && p.period_key === "month3")
+                  );
+                  const principal = fmtN(pr?.principal || 0);
+                  const total = rewardPayout + principal;
                   return (
-                    <div key={label} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div key={days} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-foreground">{label}预测</span>
-                        <span className="text-xs font-black" style={{ color: "#ef4444" }}>{fmt(projectedPayout + principalReturn)}</span>
+                        <span className="text-xs font-bold text-foreground">{days}天预测</span>
+                        <span className="font-black text-base" style={{ color: "#ef4444" }}>{fmt(total)} U</span>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-[10px]">
                         <div>
                           <span className="text-muted-foreground">奖励支出</span>
-                          <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(projectedPayout)}</div>
+                          <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(rewardPayout)}</div>
                         </div>
                         <div>
                           <span className="text-muted-foreground">到期本金</span>
-                          <div className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(principalReturn)}</div>
+                          <div className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(principal)}</div>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">到期订单</span>
-                          <div className="font-semibold text-foreground">{expiring} 笔</div>
+                          <span className="text-muted-foreground">日均支出</span>
+                          <div className="font-semibold text-foreground">{fmt(dailyTotal)}/日</div>
                         </div>
                       </div>
                     </div>
@@ -413,28 +446,24 @@ export default function AdminFinance() {
               </div>
             </div>
 
-            {/* Active order breakdown by product */}
+            {/* Active order by product */}
             <div className="rounded-xl p-4" style={cardBg}>
               <div className="flex items-center gap-2 mb-3">
                 <DollarSign size={14} style={{ color: "#C9A227" }} />
                 <span className="text-sm font-semibold text-foreground">活跃配套分布</span>
               </div>
-              <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground px-1">
-                <span>共 {activeOrders?.count || 0} 笔活跃订单</span>
-                <span>总质押 {fmt(activeOrders?.totalAmount || 0)} U</span>
-              </div>
-              {(activeOrders?.byProduct || []).length === 0 ? (
+              {(fc.byProduct || []).length === 0 ? (
                 <div className="text-xs text-muted-foreground text-center py-6">暂无活跃订单</div>
               ) : (
                 <div className="space-y-2">
-                  {(activeOrders?.byProduct || []).map((p: any, i: number) => {
-                    const totalAmt = fmtN(activeOrders?.totalAmount || 1);
-                    const pAmt = fmtN(p.total_amount);
+                  {(fc.byProduct || []).map((p: any, i: number) => {
+                    const totalAmt = fmtN(fc.activeStaking || 1);
+                    const pAmt = fmtN(p.staking);
                     const pct = totalAmt > 0 ? (pAmt / totalAmt * 100) : 0;
                     return (
                       <div key={i} className="rounded-lg p-3" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-foreground">{p.product_name}</span>
+                          <span className="text-xs font-bold text-foreground">{p.name}</span>
                           <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>{p.rate}%/日</span>
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-[10px] mb-2">
@@ -444,7 +473,7 @@ export default function AdminFinance() {
                           </div>
                           <div>
                             <span className="text-muted-foreground">总金额</span>
-                            <div className="font-semibold" style={{ color: "#C9A227" }}>{fmt(p.total_amount)}</div>
+                            <div className="font-semibold" style={{ color: "#C9A227" }}>{fmt(p.staking)}</div>
                           </div>
                           <div>
                             <span className="text-muted-foreground">日产出</span>
