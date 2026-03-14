@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAdminFinance, getAdminFinanceMonthly, getAdminWithdrawalForecast } from "@/lib/api";
-import { DollarSign, TrendingUp, TrendingDown, ArrowDownToLine, Wallet, Percent, AlertTriangle, Calendar, BarChart3, Loader2, Clock, Banknote } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, ArrowDownToLine, Wallet, Percent, AlertTriangle, Calendar, BarChart3, Loader2, Clock, Banknote, ChevronDown, ChevronRight } from "lucide-react";
 
 const cardBg = { background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" };
 
@@ -31,6 +31,303 @@ function fmtN(v: string | number) {
 function MonthLabel({ month }: { month: string }) {
   const [y, m] = month.split("-");
   return <span>{y}年{parseInt(m)}月</span>;
+}
+
+function shortAddr(addr: string) {
+  return addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "";
+}
+
+function ForecastTab({ fc }: { fc: any }) {
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+
+  const toggleDay = (date: string) => {
+    setExpandedDays(prev => {
+      const next = new Set(prev);
+      next.has(date) ? next.delete(date) : next.add(date);
+      return next;
+    });
+  };
+
+  const toggleMonth = (month: string) => {
+    setExpandedMonths(prev => {
+      const next = new Set(prev);
+      next.has(month) ? next.delete(month) : next.add(month);
+      return next;
+    });
+  };
+
+  const dailyTotal = fmtN(fc.dailyTotal);
+  const expirationByDay: any[] = fc.expirationByDay || [];
+  const expirationByMonth: any[] = fc.expirationByMonth || [];
+
+  // Build month -> days mapping
+  const monthDaysMap = new Map<string, any[]>();
+  expirationByDay.forEach((d: any) => {
+    const m = d.exp_date.substring(0, 7);
+    if (!monthDaysMap.has(m)) monthDaysMap.set(m, []);
+    monthDaysMap.get(m)!.push(d);
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Daily payout breakdown */}
+      <div className="rounded-xl p-4" style={cardBg}>
+        <div className="flex items-center gap-2 mb-3">
+          <Clock size={14} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-semibold text-foreground">每日预计支出 (精算)</span>
+        </div>
+        <div className="text-xs text-muted-foreground mb-3">
+          基于 {fc.activeOrderCount || 0} 笔活跃订单 / 总质押 {fmt(fc.activeStaking)} U
+        </div>
+        <div className="space-y-2">
+          {[
+            { label: "日利息", value: fc.dailyInterest, color: "#E8C547", desc: "所有活跃订单的每日收益" },
+            { label: "直推奖励", value: fc.dailyDirect, color: "#F0D060", desc: "10% 日利息" },
+            { label: "间推奖励", value: fc.dailyIndirect, color: "#D4AF37", desc: "5% 日利息" },
+            { label: "团队分红", value: fc.dailyTeam, color: "#FFD700", desc: "团队质押 x 利率 x 等级比例" },
+            { label: "同级奖励", value: fc.dailyEqualLevel, color: "#FF8C00", desc: "团队分红的10%" },
+          ].map(item => (
+            <div key={item.label} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div>
+                <div className="text-xs font-semibold" style={{ color: item.color }}>{item.label}</div>
+                <div className="text-[10px] text-muted-foreground">{item.desc}</div>
+              </div>
+              <div className="font-bold text-sm" style={{ color: item.color }}>{fmt(item.value)}</div>
+            </div>
+          ))}
+          <div className="flex items-center justify-between py-3 px-3 rounded-lg" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+            <div className="text-xs font-bold" style={{ color: "#ef4444" }}>每日总支出</div>
+            <div className="font-black text-lg" style={{ color: "#ef4444" }}>{fmt(fc.dailyTotal)} U</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pending withdrawals */}
+      <div className="rounded-xl p-4" style={{ ...cardBg, borderColor: "rgba(245,158,11,0.3)" }}>
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle size={16} style={{ color: "#f59e0b" }} />
+          <span className="text-sm font-bold" style={{ color: "#f59e0b" }}>提现压力</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg p-3" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+            <div className="text-[10px] text-muted-foreground mb-1">待处理提现</div>
+            <div className="font-black text-lg" style={{ color: "#ef4444" }}>{fmt(fc.pendingWithdrawals?.totalAmount || 0)}</div>
+            <div className="text-[10px] text-muted-foreground">{fc.pendingWithdrawals?.count || 0} 笔</div>
+          </div>
+          <div className="rounded-lg p-3" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
+            <div className="text-[10px] text-muted-foreground mb-1">未提现余额</div>
+            <div className="font-black text-lg" style={{ color: "#f59e0b" }}>{fmt(fc.unrealizedBalance)}</div>
+            <div className="text-[10px] text-muted-foreground">所有用户可提总额</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Monthly forecast calendar */}
+      <div className="rounded-xl p-4" style={cardBg}>
+        <div className="flex items-center gap-2 mb-3">
+          <Calendar size={14} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-semibold text-foreground">月度支出预测</span>
+        </div>
+        <div className="space-y-2">
+          {expirationByMonth.map((m: any) => {
+            const [y, mo] = m.month.split("-");
+            const monthLabel = `${y}年${parseInt(mo)}月`;
+            const principalAmt = fmtN(m.principal);
+            const daysInMonth = new Date(parseInt(y), parseInt(mo), 0).getDate();
+            const rewardsPayout = dailyTotal * daysInMonth;
+            const monthTotal = rewardsPayout + principalAmt;
+            const isExpanded = expandedMonths.has(m.month);
+            const dayEntries = monthDaysMap.get(m.month) || [];
+
+            return (
+              <div key={m.month}>
+                <button
+                  className="w-full rounded-lg p-3 text-left transition-all"
+                  style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.12)" }}
+                  onClick={() => toggleMonth(m.month)}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {isExpanded ? <ChevronDown size={12} style={{ color: "#C9A227" }} /> : <ChevronRight size={12} style={{ color: "#C9A227" }} />}
+                      <span className="text-xs font-bold text-foreground">{monthLabel}</span>
+                    </div>
+                    <span className="font-black text-sm" style={{ color: "#ef4444" }}>{fmt(monthTotal)} U</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[10px] pl-5">
+                    <div>
+                      <span className="text-muted-foreground">奖励支出</span>
+                      <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(rewardsPayout)}</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">到期本金</span>
+                      <div className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(principalAmt)}</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">到期订单</span>
+                      <div className="font-semibold text-foreground">{m.order_count} 笔</div>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Expanded: show day-by-day within this month */}
+                {isExpanded && dayEntries.length > 0 && (
+                  <div className="ml-3 mt-1 space-y-1">
+                    {dayEntries.map((day: any) => {
+                      const isDayExpanded = expandedDays.has(day.exp_date);
+                      const dayPrincipal = fmtN(day.principal);
+                      const dayRewards = dailyTotal;
+                      return (
+                        <div key={day.exp_date}>
+                          <button
+                            className="w-full rounded-lg px-3 py-2 text-left"
+                            style={{ background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.08)" }}
+                            onClick={() => toggleDay(day.exp_date)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {isDayExpanded ? <ChevronDown size={10} style={{ color: "#f59e0b" }} /> : <ChevronRight size={10} style={{ color: "#f59e0b" }} />}
+                                <span className="text-xs font-mono text-muted-foreground">{day.exp_date}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[10px] text-muted-foreground">{day.order_count} 笔到期</span>
+                                <span className="text-xs font-bold" style={{ color: "#f59e0b" }}>本金 {fmt(dayPrincipal)} U</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 mt-1 pl-5 text-[10px] text-muted-foreground">
+                              <span>奖励 <span style={{ color: "#E8C547" }}>{fmt(dayRewards)}</span></span>
+                              <span>合计 <span style={{ color: "#ef4444" }}>{fmt(dayPrincipal + dayRewards)}</span></span>
+                            </div>
+                          </button>
+
+                          {/* Expanded: show individual orders */}
+                          {isDayExpanded && (
+                            <div className="ml-6 mt-1 space-y-1">
+                              {(day.orders || []).map((order: any) => (
+                                <div key={order.id} className="rounded px-3 py-2 text-[10px]" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-foreground">{order.product}</span>
+                                    <span className="font-bold" style={{ color: "#f59e0b" }}>{fmt(order.amount)} U</span>
+                                  </div>
+                                  <div className="flex items-center justify-between mt-1 text-muted-foreground">
+                                    <span className="font-mono">{shortAddr(order.wallet)}</span>
+                                    <span>{order.rate}%/日 · {order.startDate} ~ {order.endDate}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {expirationByMonth.length === 0 && (
+          <div className="text-xs text-muted-foreground text-center py-6">暂无活跃订单</div>
+        )}
+      </div>
+
+      {/* 30/60/90 day summary */}
+      <div className="rounded-xl p-4" style={cardBg}>
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingDown size={14} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-semibold text-foreground">综合支出预测</span>
+        </div>
+        <div className="space-y-2">
+          {[30, 60, 90].map(days => {
+            const rewardPayout = dailyTotal * days;
+            // Sum principal returns within this period
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() + days);
+            const cutoffStr = cutoff.toISOString().slice(0, 10);
+            const principal = expirationByDay
+              .filter((d: any) => d.exp_date <= cutoffStr)
+              .reduce((sum: number, d: any) => sum + fmtN(d.principal), 0);
+            const total = rewardPayout + principal;
+            const expiringOrders = expirationByDay
+              .filter((d: any) => d.exp_date <= cutoffStr)
+              .reduce((sum: number, d: any) => sum + d.order_count, 0);
+            return (
+              <div key={days} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-foreground">{days}天预测</span>
+                  <span className="font-black text-base" style={{ color: "#ef4444" }}>{fmt(total)} U</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-[10px]">
+                  <div>
+                    <span className="text-muted-foreground">奖励支出</span>
+                    <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(rewardPayout)}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">到期本金</span>
+                    <div className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(principal)}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">到期订单</span>
+                    <div className="font-semibold text-foreground">{expiringOrders} 笔</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">日均</span>
+                    <div className="font-semibold text-foreground">{fmt(dailyTotal)}/日</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Active order by product */}
+      <div className="rounded-xl p-4" style={cardBg}>
+        <div className="flex items-center gap-2 mb-3">
+          <DollarSign size={14} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-semibold text-foreground">活跃配套分布</span>
+        </div>
+        {(fc.byProduct || []).length === 0 ? (
+          <div className="text-xs text-muted-foreground text-center py-6">暂无活跃订单</div>
+        ) : (
+          <div className="space-y-2">
+            {(fc.byProduct || []).map((p: any, i: number) => {
+              const totalAmt = fmtN(fc.activeStaking || 1);
+              const pAmt = fmtN(p.staking);
+              const pct = totalAmt > 0 ? (pAmt / totalAmt * 100) : 0;
+              return (
+                <div key={i} className="rounded-lg p-3" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-foreground">{p.name}</span>
+                    <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>{p.rate}%/日</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[10px] mb-2">
+                    <div>
+                      <span className="text-muted-foreground">订单数</span>
+                      <div className="font-semibold text-foreground">{p.count} 笔</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">总金额</span>
+                      <div className="font-semibold" style={{ color: "#C9A227" }}>{fmt(p.staking)}</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">日产出</span>
+                      <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(p.daily_payout)}</div>
+                    </div>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #C9A227, #E8C547)" }} />
+                  </div>
+                  <div className="text-[9px] text-muted-foreground mt-1">{pct.toFixed(1)}% 占比</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function AdminFinance() {
@@ -310,187 +607,7 @@ export default function AdminFinance() {
             <Loader2 size={24} className="animate-spin" style={{ color: "#C9A227" }} />
           </div>
         ) : !fc ? null : (
-          <div className="space-y-4">
-            {/* Daily payout breakdown - real calculated */}
-            <div className="rounded-xl p-4" style={cardBg}>
-              <div className="flex items-center gap-2 mb-3">
-                <Clock size={14} style={{ color: "#C9A227" }} />
-                <span className="text-sm font-semibold text-foreground">每日预计支出 (精算)</span>
-              </div>
-              <div className="text-xs text-muted-foreground mb-3">
-                基于 {fc.activeOrderCount || 0} 笔活跃订单 / 总质押 {fmt(fc.activeStaking)} U
-              </div>
-              <div className="space-y-2">
-                {[
-                  { label: "日利息", value: fc.dailyInterest, color: "#E8C547", desc: "所有活跃订单的每日收益" },
-                  { label: "直推奖励", value: fc.dailyDirect, color: "#F0D060", desc: "10% 日利息 (有推荐人的订单)" },
-                  { label: "间推奖励", value: fc.dailyIndirect, color: "#D4AF37", desc: "5% 日利息 (有二级推荐人的订单)" },
-                  { label: "团队分红", value: fc.dailyTeam, color: "#FFD700", desc: "团队质押 x 利率 x 等级比例" },
-                  { label: "同级奖励", value: fc.dailyEqualLevel, color: "#FF8C00", desc: "团队分红的10% (同级递推)" },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                    <div>
-                      <div className="text-xs font-semibold" style={{ color: item.color }}>{item.label}</div>
-                      <div className="text-[10px] text-muted-foreground">{item.desc}</div>
-                    </div>
-                    <div className="font-bold text-sm" style={{ color: item.color }}>{fmt(item.value)}</div>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between py-3 px-3 rounded-lg" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
-                  <div className="text-xs font-bold" style={{ color: "#ef4444" }}>每日总支出</div>
-                  <div className="font-black text-lg" style={{ color: "#ef4444" }}>{fmt(fc.dailyTotal)} U</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Pending withdrawals */}
-            <div className="rounded-xl p-4" style={{ ...cardBg, borderColor: "rgba(245,158,11,0.3)" }}>
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle size={16} style={{ color: "#f59e0b" }} />
-                <span className="text-sm font-bold" style={{ color: "#f59e0b" }}>提现压力</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg p-3" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
-                  <div className="text-[10px] text-muted-foreground mb-1">待处理提现</div>
-                  <div className="font-black text-lg" style={{ color: "#ef4444" }}>{fmt(fc.pendingWithdrawals?.totalAmount || 0)}</div>
-                  <div className="text-[10px] text-muted-foreground">{fc.pendingWithdrawals?.count || 0} 笔</div>
-                </div>
-                <div className="rounded-lg p-3" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
-                  <div className="text-[10px] text-muted-foreground mb-1">未提现余额</div>
-                  <div className="font-black text-lg" style={{ color: "#f59e0b" }}>{fmt(fc.unrealizedBalance)}</div>
-                  <div className="text-[10px] text-muted-foreground">所有用户可提总额</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Principal return schedule */}
-            <div className="rounded-xl p-4" style={cardBg}>
-              <div className="flex items-center gap-2 mb-3">
-                <Banknote size={14} style={{ color: "#C9A227" }} />
-                <span className="text-sm font-semibold text-foreground">到期本金返还</span>
-              </div>
-              <div className="space-y-2">
-                {(fc.principalReturn || []).map((p: any) => (
-                  <div key={p.period_key} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                    <div className="text-xs text-muted-foreground">{p.period}</div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-muted-foreground">{p.order_count} 笔</span>
-                      <span className="font-bold text-sm" style={{ color: fmtN(p.principal) > 0 ? "#f59e0b" : "rgba(255,255,255,0.3)" }}>{fmt(p.principal)} U</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Day-by-day expiration schedule */}
-            {(fc.expirationSchedule || []).length > 0 && (
-              <div className="rounded-xl p-4" style={cardBg}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Calendar size={14} style={{ color: "#C9A227" }} />
-                  <span className="text-sm font-semibold text-foreground">30天到期日历</span>
-                </div>
-                <div className="space-y-1.5">
-                  {(fc.expirationSchedule || []).map((e: any) => (
-                    <div key={e.exp_date} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.1)" }}>
-                      <span className="text-xs text-muted-foreground font-mono">{e.exp_date}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-muted-foreground">{e.order_count} 笔</span>
-                        <span className="font-bold text-sm" style={{ color: "#f59e0b" }}>{fmt(e.principal)} U</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 30/60/90 day total forecast */}
-            <div className="rounded-xl p-4" style={cardBg}>
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingDown size={14} style={{ color: "#C9A227" }} />
-                <span className="text-sm font-semibold text-foreground">综合支出预测</span>
-              </div>
-              <div className="space-y-2">
-                {[30, 60, 90].map(days => {
-                  const dailyTotal = fmtN(fc.dailyTotal);
-                  const rewardPayout = dailyTotal * days;
-                  const pr = (fc.principalReturn || []).find((p: any) =>
-                    (days === 30 && p.period_key === "month") ||
-                    (days === 60 && p.period_key === "month2") ||
-                    (days === 90 && p.period_key === "month3")
-                  );
-                  const principal = fmtN(pr?.principal || 0);
-                  const total = rewardPayout + principal;
-                  return (
-                    <div key={days} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-foreground">{days}天预测</span>
-                        <span className="font-black text-base" style={{ color: "#ef4444" }}>{fmt(total)} U</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-[10px]">
-                        <div>
-                          <span className="text-muted-foreground">奖励支出</span>
-                          <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(rewardPayout)}</div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">到期本金</span>
-                          <div className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(principal)}</div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">日均支出</span>
-                          <div className="font-semibold text-foreground">{fmt(dailyTotal)}/日</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Active order by product */}
-            <div className="rounded-xl p-4" style={cardBg}>
-              <div className="flex items-center gap-2 mb-3">
-                <DollarSign size={14} style={{ color: "#C9A227" }} />
-                <span className="text-sm font-semibold text-foreground">活跃配套分布</span>
-              </div>
-              {(fc.byProduct || []).length === 0 ? (
-                <div className="text-xs text-muted-foreground text-center py-6">暂无活跃订单</div>
-              ) : (
-                <div className="space-y-2">
-                  {(fc.byProduct || []).map((p: any, i: number) => {
-                    const totalAmt = fmtN(fc.activeStaking || 1);
-                    const pAmt = fmtN(p.staking);
-                    const pct = totalAmt > 0 ? (pAmt / totalAmt * 100) : 0;
-                    return (
-                      <div key={i} className="rounded-lg p-3" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-foreground">{p.name}</span>
-                          <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>{p.rate}%/日</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 text-[10px] mb-2">
-                          <div>
-                            <span className="text-muted-foreground">订单数</span>
-                            <div className="font-semibold text-foreground">{p.count} 笔</div>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">总金额</span>
-                            <div className="font-semibold" style={{ color: "#C9A227" }}>{fmt(p.staking)}</div>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">日产出</span>
-                            <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(p.daily_payout)}</div>
-                          </div>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #C9A227, #E8C547)" }} />
-                        </div>
-                        <div className="text-[9px] text-muted-foreground mt-1">{pct.toFixed(1)}% 占比</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+          <ForecastTab fc={fc} />
         )
       )}
     </div>
