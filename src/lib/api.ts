@@ -670,7 +670,10 @@ export async function getAdminOrders(page: number, limit: number, status: string
     const dailyEarning = parseFloat(o.amount) * parseFloat(o.daily_rate) / 100;
     const startDate = new Date(o.start_date);
     const now = new Date();
-    const elapsed = Math.min(Math.floor((now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)), o.days);
+    // Use calendar day difference (not timestamp) to match settlement logic
+    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const elapsed = Math.min(Math.round((today.getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000)), o.days);
 
     return {
       ...o,
