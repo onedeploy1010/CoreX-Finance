@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAdminFinance, getAdminFinanceMonthly, getAdminWithdrawalForecast } from "@/lib/api";
-import { DollarSign, TrendingUp, TrendingDown, ArrowDownToLine, Wallet, Percent, AlertTriangle, Calendar, BarChart3, Loader2, Clock, Banknote, ChevronDown, ChevronRight } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, ArrowDownToLine, Wallet, Percent, AlertTriangle, Calendar, BarChart3, Loader2, Clock, ChevronLeft, ChevronRight, List, LayoutGrid } from "lucide-react";
 
 const cardBg = { background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" };
 
@@ -38,199 +38,328 @@ function shortAddr(addr: string) {
 }
 
 function ForecastTab({ fc }: { fc: any }) {
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
-
-  const toggleDay = (date: string) => {
-    setExpandedDays(prev => {
-      const next = new Set(prev);
-      next.has(date) ? next.delete(date) : next.add(date);
-      return next;
-    });
-  };
-
-  const toggleMonth = (month: string) => {
-    setExpandedMonths(prev => {
-      const next = new Set(prev);
-      next.has(month) ? next.delete(month) : next.add(month);
-      return next;
-    });
-  };
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [calMonth, setCalMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const dailyTotal = fmtN(fc.dailyTotal);
   const expirationByDay: any[] = fc.expirationByDay || [];
   const expirationByMonth: any[] = fc.expirationByMonth || [];
 
-  // Build month -> days mapping
-  const monthDaysMap = new Map<string, any[]>();
-  expirationByDay.forEach((d: any) => {
-    const m = d.exp_date.substring(0, 7);
-    if (!monthDaysMap.has(m)) monthDaysMap.set(m, []);
-    monthDaysMap.get(m)!.push(d);
-  });
+  // Build lookup maps
+  const dayMap = new Map<string, any>();
+  expirationByDay.forEach((d: any) => dayMap.set(d.exp_date, d));
+
+  // Calendar helpers
+  const [calY, calM] = calMonth.split("-").map(Number);
+  const daysInMonth = new Date(calY, calM, 0).getDate();
+  const firstDayOfWeek = (new Date(calY, calM - 1, 1).getDay() + 6) % 7; // Mon=0
+  const calDays: (number | null)[] = [];
+  for (let i = 0; i < firstDayOfWeek; i++) calDays.push(null);
+  for (let d = 1; d <= daysInMonth; d++) calDays.push(d);
+  while (calDays.length % 7 !== 0) calDays.push(null);
+
+  const prevMonth = () => {
+    const d = new Date(calY, calM - 2, 1);
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    setSelectedDate(null);
+  };
+  const nextMonth = () => {
+    const d = new Date(calY, calM, 1);
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    setSelectedDate(null);
+  };
+
+  // Get month aggregate
+  const curMonthData = expirationByMonth.find((m: any) => m.month === calMonth);
+  const monthPrincipal = curMonthData ? fmtN(curMonthData.principal) : 0;
+  const monthRewards = dailyTotal * daysInMonth;
+  const monthTotal = monthPrincipal + monthRewards;
+
+  // Max principal in current month for heat intensity
+  const monthDayPrincipals = expirationByDay
+    .filter((d: any) => d.exp_date.startsWith(calMonth))
+    .map((d: any) => fmtN(d.principal));
+  const maxDayPrincipal = Math.max(...monthDayPrincipals, 1);
+
+  // Selected date details
+  const selectedDayData = selectedDate ? dayMap.get(selectedDate) : null;
+
+  // Today string
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-4">
-      {/* Daily payout breakdown */}
-      <div className="rounded-xl p-4" style={cardBg}>
-        <div className="flex items-center gap-2 mb-3">
-          <Clock size={14} style={{ color: "#C9A227" }} />
-          <span className="text-sm font-semibold text-foreground">每日预计支出 (精算)</span>
+      {/* Risk overview strip */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="rounded-xl p-3 text-center" style={cardBg}>
+          <div className="text-[10px] text-muted-foreground">日支出</div>
+          <div className="font-black text-sm" style={{ color: "#ef4444" }}>{fmt(dailyTotal)}</div>
         </div>
-        <div className="text-xs text-muted-foreground mb-3">
-          基于 {fc.activeOrderCount || 0} 笔活跃订单 / 总质押 {fmt(fc.activeStaking)} U
+        <div className="rounded-xl p-3 text-center" style={cardBg}>
+          <div className="text-[10px] text-muted-foreground">待提现</div>
+          <div className="font-black text-sm" style={{ color: "#f59e0b" }}>{fmt(fc.pendingWithdrawals?.totalAmount || 0)}</div>
+          <div className="text-[9px] text-muted-foreground">{fc.pendingWithdrawals?.count || 0}笔</div>
         </div>
-        <div className="space-y-2">
-          {[
-            { label: "日利息", value: fc.dailyInterest, color: "#E8C547", desc: "所有活跃订单的每日收益" },
-            { label: "直推奖励", value: fc.dailyDirect, color: "#F0D060", desc: "10% 日利息" },
-            { label: "间推奖励", value: fc.dailyIndirect, color: "#D4AF37", desc: "5% 日利息" },
-            { label: "团队分红", value: fc.dailyTeam, color: "#FFD700", desc: "团队质押 x 利率 x 等级比例" },
-            { label: "同级奖励", value: fc.dailyEqualLevel, color: "#FF8C00", desc: "团队分红的10%" },
-          ].map(item => (
-            <div key={item.label} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-              <div>
-                <div className="text-xs font-semibold" style={{ color: item.color }}>{item.label}</div>
-                <div className="text-[10px] text-muted-foreground">{item.desc}</div>
-              </div>
-              <div className="font-bold text-sm" style={{ color: item.color }}>{fmt(item.value)}</div>
-            </div>
-          ))}
-          <div className="flex items-center justify-between py-3 px-3 rounded-lg" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
-            <div className="text-xs font-bold" style={{ color: "#ef4444" }}>每日总支出</div>
-            <div className="font-black text-lg" style={{ color: "#ef4444" }}>{fmt(fc.dailyTotal)} U</div>
-          </div>
+        <div className="rounded-xl p-3 text-center" style={cardBg}>
+          <div className="text-[10px] text-muted-foreground">可提余额</div>
+          <div className="font-black text-sm" style={{ color: "#f59e0b" }}>{fmt(fc.unrealizedBalance)}</div>
+        </div>
+        <div className="rounded-xl p-3 text-center" style={cardBg}>
+          <div className="text-[10px] text-muted-foreground">活跃订单</div>
+          <div className="font-black text-sm" style={{ color: "#C9A227" }}>{fc.activeOrderCount || 0}</div>
+          <div className="text-[9px] text-muted-foreground">{fmt(fc.activeStaking)}U</div>
         </div>
       </div>
 
-      {/* Pending withdrawals */}
-      <div className="rounded-xl p-4" style={{ ...cardBg, borderColor: "rgba(245,158,11,0.3)" }}>
-        <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle size={16} style={{ color: "#f59e0b" }} />
-          <span className="text-sm font-bold" style={{ color: "#f59e0b" }}>提现压力</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-lg p-3" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
-            <div className="text-[10px] text-muted-foreground mb-1">待处理提现</div>
-            <div className="font-black text-lg" style={{ color: "#ef4444" }}>{fmt(fc.pendingWithdrawals?.totalAmount || 0)}</div>
-            <div className="text-[10px] text-muted-foreground">{fc.pendingWithdrawals?.count || 0} 笔</div>
-          </div>
-          <div className="rounded-lg p-3" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
-            <div className="text-[10px] text-muted-foreground mb-1">未提现余额</div>
-            <div className="font-black text-lg" style={{ color: "#f59e0b" }}>{fmt(fc.unrealizedBalance)}</div>
-            <div className="text-[10px] text-muted-foreground">所有用户可提总额</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Monthly forecast calendar */}
-      <div className="rounded-xl p-4" style={cardBg}>
-        <div className="flex items-center gap-2 mb-3">
+      {/* View mode toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
           <Calendar size={14} style={{ color: "#C9A227" }} />
-          <span className="text-sm font-semibold text-foreground">月度支出预测</span>
+          <span className="text-sm font-semibold text-foreground">支出预测</span>
         </div>
-        <div className="space-y-2">
-          {expirationByMonth.map((m: any) => {
-            const [y, mo] = m.month.split("-");
-            const monthLabel = `${y}年${parseInt(mo)}月`;
-            const principalAmt = fmtN(m.principal);
-            const daysInMonth = new Date(parseInt(y), parseInt(mo), 0).getDate();
-            const rewardsPayout = dailyTotal * daysInMonth;
-            const monthTotal = rewardsPayout + principalAmt;
-            const isExpanded = expandedMonths.has(m.month);
-            const dayEntries = monthDaysMap.get(m.month) || [];
+        <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid rgba(201,162,39,0.2)" }}>
+          <button
+            className="px-3 py-1.5 text-[11px] font-medium flex items-center gap-1 transition-all"
+            style={viewMode === "calendar" ? { background: "rgba(201,162,39,0.15)", color: "#C9A227" } : { color: "rgba(255,255,255,0.4)" }}
+            onClick={() => setViewMode("calendar")}
+          >
+            <LayoutGrid size={11} />日历
+          </button>
+          <button
+            className="px-3 py-1.5 text-[11px] font-medium flex items-center gap-1 transition-all"
+            style={viewMode === "list" ? { background: "rgba(201,162,39,0.15)", color: "#C9A227" } : { color: "rgba(255,255,255,0.4)" }}
+            onClick={() => setViewMode("list")}
+          >
+            <List size={11} />列表
+          </button>
+        </div>
+      </div>
 
-            return (
-              <div key={m.month}>
-                <button
-                  className="w-full rounded-lg p-3 text-left transition-all"
-                  style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.12)" }}
-                  onClick={() => toggleMonth(m.month)}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      {isExpanded ? <ChevronDown size={12} style={{ color: "#C9A227" }} /> : <ChevronRight size={12} style={{ color: "#C9A227" }} />}
-                      <span className="text-xs font-bold text-foreground">{monthLabel}</span>
-                    </div>
-                    <span className="font-black text-sm" style={{ color: "#ef4444" }}>{fmt(monthTotal)} U</span>
+      {viewMode === "calendar" ? (
+        <>
+          {/* Calendar view */}
+          <div className="rounded-xl p-4" style={cardBg}>
+            {/* Month navigation */}
+            <div className="flex items-center justify-between mb-4">
+              <button onClick={prevMonth} className="p-1.5 rounded-lg" style={{ color: "#C9A227" }}>
+                <ChevronLeft size={16} />
+              </button>
+              <div className="text-center">
+                <div className="text-sm font-bold text-foreground">{calY}年{calM}月</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  预计支出 <span style={{ color: "#ef4444" }}>{fmt(monthTotal)} U</span>
+                  {monthPrincipal > 0 && <span> · 本金返还 <span style={{ color: "#f59e0b" }}>{fmt(monthPrincipal)}</span></span>}
+                </div>
+              </div>
+              <button onClick={nextMonth} className="p-1.5 rounded-lg" style={{ color: "#C9A227" }}>
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            {/* Weekday headers */}
+            <div className="grid grid-cols-7 gap-1 mb-1">
+              {["一", "二", "三", "四", "五", "六", "日"].map(w => (
+                <div key={w} className="text-center text-[10px] text-muted-foreground py-1">{w}</div>
+              ))}
+            </div>
+
+            {/* Day cells */}
+            <div className="grid grid-cols-7 gap-1">
+              {calDays.map((day, i) => {
+                if (day === null) return <div key={`e${i}`} className="aspect-square" />;
+                const dateStr = `${calMonth}-${String(day).padStart(2, "0")}`;
+                const dayData = dayMap.get(dateStr);
+                const principal = dayData ? fmtN(dayData.principal) : 0;
+                const hasExpiration = principal > 0;
+                const isToday = dateStr === todayStr;
+                const isSelected = dateStr === selectedDate;
+                const intensity = hasExpiration ? Math.max(0.08, (principal / maxDayPrincipal) * 0.5) : 0;
+
+                return (
+                  <button
+                    key={dateStr}
+                    className="aspect-square rounded-lg flex flex-col items-center justify-center relative transition-all"
+                    style={{
+                      background: isSelected
+                        ? "rgba(201,162,39,0.2)"
+                        : hasExpiration
+                        ? `rgba(245,158,11,${intensity})`
+                        : "rgba(255,255,255,0.015)",
+                      border: isSelected
+                        ? "1.5px solid rgba(201,162,39,0.6)"
+                        : isToday
+                        ? "1.5px solid rgba(201,162,39,0.3)"
+                        : "1px solid rgba(255,255,255,0.04)",
+                    }}
+                    onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                  >
+                    <span className={`text-[11px] ${isToday ? "font-bold" : ""}`} style={{ color: isToday ? "#C9A227" : hasExpiration ? "#f59e0b" : "rgba(255,255,255,0.4)" }}>
+                      {day}
+                    </span>
+                    {hasExpiration && (
+                      <span className="text-[7px] font-bold mt-0.5" style={{ color: "#f59e0b" }}>
+                        {principal >= 1000 ? `${(principal / 1000).toFixed(0)}k` : fmt(principal)}
+                      </span>
+                    )}
+                    {hasExpiration && (
+                      <div className="absolute top-1 right-1 w-1 h-1 rounded-full" style={{ background: "#f59e0b" }} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-4 mt-3 text-[9px] text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded" style={{ background: "rgba(245,158,11,0.15)" }} />浅=少量本金
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded" style={{ background: "rgba(245,158,11,0.5)" }} />深=大量本金
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded" style={{ border: "1px solid rgba(201,162,39,0.3)" }} />今日
+              </div>
+            </div>
+          </div>
+
+          {/* Selected date detail panel */}
+          {selectedDate && (
+            <div className="rounded-xl p-4" style={{ ...cardBg, borderColor: "rgba(245,158,11,0.3)" }}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-bold text-foreground">{selectedDate}</span>
+                <div className="text-right">
+                  <div className="text-[10px] text-muted-foreground">当日总支出</div>
+                  <div className="font-black text-base" style={{ color: "#ef4444" }}>
+                    {fmt((selectedDayData ? fmtN(selectedDayData.principal) : 0) + dailyTotal)} U
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-[10px] pl-5">
-                    <div>
-                      <span className="text-muted-foreground">奖励支出</span>
-                      <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(rewardsPayout)}</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">到期本金</span>
-                      <div className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(principalAmt)}</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">到期订单</span>
-                      <div className="font-semibold text-foreground">{m.order_count} 笔</div>
-                    </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="rounded-lg p-2 text-center" style={{ background: "rgba(232,197,71,0.06)" }}>
+                  <div className="text-[9px] text-muted-foreground">奖励支出</div>
+                  <div className="text-xs font-bold" style={{ color: "#E8C547" }}>{fmt(dailyTotal)}</div>
+                </div>
+                <div className="rounded-lg p-2 text-center" style={{ background: "rgba(245,158,11,0.06)" }}>
+                  <div className="text-[9px] text-muted-foreground">到期本金</div>
+                  <div className="text-xs font-bold" style={{ color: "#f59e0b" }}>
+                    {selectedDayData ? fmt(selectedDayData.principal) : "0.00"}
                   </div>
-                </button>
+                </div>
+                <div className="rounded-lg p-2 text-center" style={{ background: "rgba(239,68,68,0.06)" }}>
+                  <div className="text-[9px] text-muted-foreground">到期订单</div>
+                  <div className="text-xs font-bold text-foreground">
+                    {selectedDayData ? selectedDayData.order_count : 0} 笔
+                  </div>
+                </div>
+              </div>
 
-                {/* Expanded: show day-by-day within this month */}
-                {isExpanded && dayEntries.length > 0 && (
-                  <div className="ml-3 mt-1 space-y-1">
-                    {dayEntries.map((day: any) => {
-                      const isDayExpanded = expandedDays.has(day.exp_date);
-                      const dayPrincipal = fmtN(day.principal);
-                      const dayRewards = dailyTotal;
-                      return (
-                        <div key={day.exp_date}>
-                          <button
-                            className="w-full rounded-lg px-3 py-2 text-left"
-                            style={{ background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.08)" }}
-                            onClick={() => toggleDay(day.exp_date)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                {isDayExpanded ? <ChevronDown size={10} style={{ color: "#f59e0b" }} /> : <ChevronRight size={10} style={{ color: "#f59e0b" }} />}
-                                <span className="text-xs font-mono text-muted-foreground">{day.exp_date}</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <span className="text-[10px] text-muted-foreground">{day.order_count} 笔到期</span>
-                                <span className="text-xs font-bold" style={{ color: "#f59e0b" }}>本金 {fmt(dayPrincipal)} U</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4 mt-1 pl-5 text-[10px] text-muted-foreground">
-                              <span>奖励 <span style={{ color: "#E8C547" }}>{fmt(dayRewards)}</span></span>
-                              <span>合计 <span style={{ color: "#ef4444" }}>{fmt(dayPrincipal + dayRewards)}</span></span>
-                            </div>
-                          </button>
+              {/* Order details */}
+              {selectedDayData && (selectedDayData.orders || []).length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] text-muted-foreground mb-1">到期订单明细</div>
+                  {(selectedDayData.orders || []).map((order: any) => (
+                    <div key={order.id} className="rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">{order.product}</span>
+                        <span className="text-xs font-bold" style={{ color: "#f59e0b" }}>{fmt(order.amount)} U</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
+                        <span className="font-mono">{shortAddr(order.wallet)}</span>
+                        <span>{order.rate}%/日 · {order.startDate} ~ {order.endDate}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-                          {/* Expanded: show individual orders */}
-                          {isDayExpanded && (
-                            <div className="ml-6 mt-1 space-y-1">
-                              {(day.orders || []).map((order: any) => (
-                                <div key={order.id} className="rounded px-3 py-2 text-[10px]" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-semibold text-foreground">{order.product}</span>
-                                    <span className="font-bold" style={{ color: "#f59e0b" }}>{fmt(order.amount)} U</span>
-                                  </div>
-                                  <div className="flex items-center justify-between mt-1 text-muted-foreground">
-                                    <span className="font-mono">{shortAddr(order.wallet)}</span>
-                                    <span>{order.rate}%/日 · {order.startDate} ~ {order.endDate}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+              {(!selectedDayData || (selectedDayData.orders || []).length === 0) && (
+                <div className="text-xs text-muted-foreground text-center py-3">当日无到期订单，仅有奖励支出</div>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* List view */}
+          <div className="rounded-xl p-4" style={cardBg}>
+            <div className="text-xs text-muted-foreground mb-3">
+              共 {expirationByDay.length} 天有到期本金返还
+            </div>
+            <div className="space-y-1.5 max-h-[480px] overflow-y-auto">
+              {expirationByDay.map((day: any) => {
+                const principal = fmtN(day.principal);
+                const total = principal + dailyTotal;
+                const isExpanded = selectedDate === day.exp_date;
+                return (
+                  <div key={day.exp_date}>
+                    <button
+                      className="w-full rounded-lg px-3 py-2.5 text-left transition-all"
+                      style={{
+                        background: isExpanded ? "rgba(201,162,39,0.08)" : "rgba(255,255,255,0.02)",
+                        border: isExpanded ? "1px solid rgba(201,162,39,0.2)" : "1px solid rgba(255,255,255,0.05)",
+                      }}
+                      onClick={() => setSelectedDate(isExpanded ? null : day.exp_date)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <ChevronRight
+                            size={10}
+                            style={{ color: "#C9A227", transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}
+                          />
+                          <span className="text-xs font-mono" style={{ color: day.exp_date === todayStr ? "#C9A227" : "rgba(255,255,255,0.7)" }}>
+                            {day.exp_date}
+                          </span>
+                          {day.exp_date === todayStr && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.15)", color: "#C9A227" }}>今日</span>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] text-muted-foreground">{day.order_count}笔</span>
+                          <span className="text-xs font-bold" style={{ color: "#f59e0b" }}>{fmt(principal)}</span>
+                          <span className="text-xs font-black" style={{ color: "#ef4444" }}>{fmt(total)}</span>
+                        </div>
+                      </div>
+                    </button>
 
-        {expirationByMonth.length === 0 && (
-          <div className="text-xs text-muted-foreground text-center py-6">暂无活跃订单</div>
-        )}
-      </div>
+                    {isExpanded && (day.orders || []).length > 0 && (
+                      <div className="ml-5 mt-1 space-y-1 mb-2">
+                        {(day.orders || []).map((order: any) => (
+                          <div key={order.id} className="rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-foreground">{order.product}</span>
+                              <span className="text-[11px] font-bold" style={{ color: "#f59e0b" }}>{fmt(order.amount)} U</span>
+                            </div>
+                            <div className="flex items-center justify-between mt-0.5 text-[9px] text-muted-foreground">
+                              <span className="font-mono">{shortAddr(order.wallet)}</span>
+                              <span>{order.rate}%/日 · {order.startDate}~{order.endDate}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {expirationByDay.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-6">暂无到期数据</div>
+            )}
+          </div>
+
+          {/* List header legend */}
+          <div className="flex items-center justify-center gap-4 text-[9px] text-muted-foreground">
+            <span><span style={{ color: "#f59e0b" }}>橙色</span> = 到期本金</span>
+            <span><span style={{ color: "#ef4444" }}>红色</span> = 本金+奖励合计</span>
+          </div>
+        </>
+      )}
 
       {/* 30/60/90 day summary */}
       <div className="rounded-xl p-4" style={cardBg}>
@@ -241,7 +370,6 @@ function ForecastTab({ fc }: { fc: any }) {
         <div className="space-y-2">
           {[30, 60, 90].map(days => {
             const rewardPayout = dailyTotal * days;
-            // Sum principal returns within this period
             const cutoff = new Date();
             cutoff.setDate(cutoff.getDate() + days);
             const cutoffStr = cutoff.toISOString().slice(0, 10);
@@ -260,25 +388,54 @@ function ForecastTab({ fc }: { fc: any }) {
                 </div>
                 <div className="grid grid-cols-4 gap-2 text-[10px]">
                   <div>
-                    <span className="text-muted-foreground">奖励支出</span>
+                    <span className="text-muted-foreground">奖励</span>
                     <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(rewardPayout)}</div>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">到期本金</span>
+                    <span className="text-muted-foreground">本金</span>
                     <div className="font-semibold" style={{ color: "#f59e0b" }}>{fmt(principal)}</div>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">到期订单</span>
-                    <div className="font-semibold text-foreground">{expiringOrders} 笔</div>
+                    <span className="text-muted-foreground">到期</span>
+                    <div className="font-semibold text-foreground">{expiringOrders}笔</div>
                   </div>
                   <div>
                     <span className="text-muted-foreground">日均</span>
-                    <div className="font-semibold text-foreground">{fmt(dailyTotal)}/日</div>
+                    <div className="font-semibold text-foreground">{fmt(total / days)}/日</div>
                   </div>
                 </div>
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Daily payout breakdown */}
+      <div className="rounded-xl p-4" style={cardBg}>
+        <div className="flex items-center gap-2 mb-3">
+          <Clock size={14} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-semibold text-foreground">每日奖励构成</span>
+        </div>
+        <div className="text-[10px] text-muted-foreground mb-3">
+          {fc.activeOrderCount || 0} 笔活跃订单 / 质押 {fmt(fc.activeStaking)} U
+        </div>
+        <div className="space-y-1.5">
+          {[
+            { label: "日利息", value: fc.dailyInterest, color: "#E8C547" },
+            { label: "直推奖励(10%)", value: fc.dailyDirect, color: "#F0D060" },
+            { label: "间推奖励(5%)", value: fc.dailyIndirect, color: "#D4AF37" },
+            { label: "团队分红", value: fc.dailyTeam, color: "#FFD700" },
+            { label: "同级奖励(10%)", value: fc.dailyEqualLevel, color: "#FF8C00" },
+          ].map(item => (
+            <div key={item.label} className="flex items-center justify-between py-1.5 px-3 rounded-lg" style={{ background: "rgba(255,255,255,0.02)" }}>
+              <span className="text-[11px]" style={{ color: item.color }}>{item.label}</span>
+              <span className="text-xs font-bold" style={{ color: item.color }}>{fmt(item.value)} U</span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between py-2 px-3 rounded-lg mt-1" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+            <span className="text-xs font-bold" style={{ color: "#ef4444" }}>每日总支出</span>
+            <span className="font-black text-base" style={{ color: "#ef4444" }}>{fmt(fc.dailyTotal)} U</span>
+          </div>
         </div>
       </div>
 
@@ -298,28 +455,18 @@ function ForecastTab({ fc }: { fc: any }) {
               const pct = totalAmt > 0 ? (pAmt / totalAmt * 100) : 0;
               return (
                 <div key={i} className="rounded-lg p-3" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold text-foreground">{p.name}</span>
-                    <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>{p.rate}%/日</span>
+                    <span className="text-[10px]" style={{ color: "#C9A227" }}>{p.rate}%/日</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-[10px] mb-2">
-                    <div>
-                      <span className="text-muted-foreground">订单数</span>
-                      <div className="font-semibold text-foreground">{p.count} 笔</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">总金额</span>
-                      <div className="font-semibold" style={{ color: "#C9A227" }}>{fmt(p.staking)}</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">日产出</span>
-                      <div className="font-semibold" style={{ color: "#E8C547" }}>{fmt(p.daily_payout)}</div>
-                    </div>
+                  <div className="flex items-center justify-between text-[10px] mb-2">
+                    <span className="text-muted-foreground">{p.count}笔 · {fmt(p.staking)} U</span>
+                    <span style={{ color: "#E8C547" }}>日产 {fmt(p.daily_payout)} U</span>
                   </div>
                   <div className="w-full h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #C9A227, #E8C547)" }} />
                   </div>
-                  <div className="text-[9px] text-muted-foreground mt-1">{pct.toFixed(1)}% 占比</div>
+                  <div className="text-[9px] text-muted-foreground mt-1">{pct.toFixed(1)}%</div>
                 </div>
               );
             })}
