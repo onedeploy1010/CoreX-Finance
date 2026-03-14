@@ -451,6 +451,25 @@ export default function LandingPage() {
             <span style={{ color: "rgba(201,162,39,0.7)" }}>{t("landing.keywords")}</span>
           </p>
         </div>
+
+        {/* Primary CTA */}
+        <button
+          className="mt-5 w-full max-w-xs py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.97] flex items-center justify-center gap-2.5 relative overflow-hidden group"
+          style={{
+            background: "linear-gradient(135deg, #F5E6A3, #C9A227, #9A7A1A)",
+            color: "#0c0a08",
+            boxShadow: "0 8px 32px rgba(201,162,39,0.25), 0 2px 8px rgba(201,162,39,0.2)",
+            opacity: connecting ? 0.7 : 1,
+          }}
+          onClick={handleConnectWallet}
+          disabled={connecting}
+        >
+          <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity"
+            style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), transparent)" }} />
+          <span className="relative z-10 flex items-center gap-2">
+            {connecting ? t("landing.connecting") : t("landing.connect_wallet")} <Wallet size={18} strokeWidth={2.5} />
+          </span>
+        </button>
       </div>
 
       <main className="flex-1 px-5 pb-10 space-y-7 relative z-10"
@@ -555,37 +574,29 @@ export default function LandingPage() {
           ))}
         </div>
 
-        {/* CTA */}
-        <div className="pt-1 space-y-5">
-          <button
-            className="w-full py-4.5 rounded-2xl font-bold text-base transition-all active:scale-[0.97] flex items-center justify-center gap-2.5 relative overflow-hidden group"
-            style={{
-              background: "linear-gradient(135deg, #F5E6A3, #C9A227, #9A7A1A)",
-              color: "#0c0a08",
-              boxShadow: "0 8px 32px rgba(201,162,39,0.25), 0 2px 8px rgba(201,162,39,0.2)",
-              padding: "18px 0",
-              opacity: connecting ? 0.7 : 1,
-            }}
-            onClick={handleConnectWallet}
-            disabled={connecting}
-          >
-            {/* Shine effect */}
-            <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity"
-              style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2), transparent)" }} />
-            <span className="relative z-10 flex items-center gap-2">
-              {connecting ? t("landing.connecting") : t("landing.connect_wallet")} <Wallet size={18} strokeWidth={2.5} />
-            </span>
-          </button>
+        {/* Bottom CTA */}
+        <button
+          className="w-full py-4 rounded-2xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2 relative overflow-hidden"
+          style={{
+            background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
+            color: "#0c0a08",
+            boxShadow: "0 4px 16px rgba(201,162,39,0.2)",
+            opacity: connecting ? 0.7 : 1,
+          }}
+          onClick={handleConnectWallet}
+          disabled={connecting}
+        >
+          {connecting ? t("landing.connecting") : t("landing.connect_wallet")} <Wallet size={16} strokeWidth={2.5} />
+        </button>
 
-          {/* Footer */}
-          <div className="text-center space-y-2 pb-4">
-            <div className="flex items-center justify-center gap-2">
-              <div className="h-[1px] w-8" style={{ background: "linear-gradient(90deg, transparent, rgba(201,162,39,0.15))" }} />
-              <span className="text-[10px] font-medium" style={{ color: "rgba(201,162,39,0.2)" }}>CoreX Finance</span>
-              <div className="h-[1px] w-8" style={{ background: "linear-gradient(90deg, rgba(201,162,39,0.15), transparent)" }} />
-            </div>
-            <div className="text-[9px] text-foreground/10">{t("landing.footer_desc")}</div>
+        {/* Footer */}
+        <div className="text-center space-y-2 pb-4">
+          <div className="flex items-center justify-center gap-2">
+            <div className="h-[1px] w-8" style={{ background: "linear-gradient(90deg, transparent, rgba(201,162,39,0.15))" }} />
+            <span className="text-[10px] font-medium" style={{ color: "rgba(201,162,39,0.2)" }}>CoreX Finance</span>
+            <div className="h-[1px] w-8" style={{ background: "linear-gradient(90deg, rgba(201,162,39,0.15), transparent)" }} />
           </div>
+          <div className="text-[9px] text-foreground/10">{t("landing.footer_desc")}</div>
         </div>
       </main>
     </div>
