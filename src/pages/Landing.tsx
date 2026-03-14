@@ -4,7 +4,7 @@ import { useConnectModal } from "thirdweb/react";
 import { supabase } from "@/lib/supabase";
 import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { t, getLang } from "@/lib/i18n";
-import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, Users, BarChart3, Wallet } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, Users, BarChart3, Wallet, Play, ImageIcon } from "lucide-react";
 import { LangSwitch } from "@/components/LangSwitch";
 
 async function getMedia() {
@@ -53,78 +53,134 @@ function YouTubeEmbed({ url }: { url: string }) {
   );
 }
 
-function MediaSlider({ items }: { items: any[] }) {
+function VideoSlider({ items }: { items: any[] }) {
   const [current, setCurrent] = useState(0);
-  const [isAutoPlay, setIsAutoPlay] = useState(true);
 
-  const next = useCallback(() => {
-    setCurrent((c) => (c + 1) % items.length);
-  }, [items.length]);
-
-  const prev = useCallback(() => {
-    setCurrent((c) => (c - 1 + items.length) % items.length);
-  }, [items.length]);
-
-  useEffect(() => {
-    if (!isAutoPlay || items.length <= 1) return;
-    const item = items[current];
-    if (item?.type !== "image") return;
-    const timer = setInterval(next, 5000);
-    return () => clearInterval(timer);
-  }, [current, isAutoPlay, items, next]);
+  const next = useCallback(() => setCurrent((c) => (c + 1) % items.length), [items.length]);
+  const prev = useCallback(() => setCurrent((c) => (c - 1 + items.length) % items.length), [items.length]);
 
   if (items.length === 0) return null;
   const item = items[current];
 
   return (
-    <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
-      <div className="absolute inset-0 rounded-2xl overflow-hidden"
-        style={{ border: "1px solid rgba(201,162,39,0.12)", boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }}>
-        {item.type === "image" && (
-          <img src={item.url} alt={item.title || ""} className="w-full h-full object-cover transition-opacity duration-700" />
-        )}
-        {item.type === "video" && (
-          <video
-            src={item.url}
-            controls
-            playsInline
-            preload="metadata"
-            className="w-full h-full object-contain"
-            style={{ background: "#000" }}
-            onPlay={() => setIsAutoPlay(false)}
-            onPause={() => setIsAutoPlay(true)}
-            onEnded={() => { setIsAutoPlay(true); next(); }}
-          />
-        )}
-        {item.type === "youtube" && <YouTubeEmbed url={item.url} />}
-        <div className="absolute inset-0" style={{ background: "linear-gradient(0deg, rgba(12,10,8,0.8) 0%, transparent 50%)" }} />
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 px-1">
+        <Play size={14} style={{ color: "#C9A227" }} />
+        <span className="text-sm font-bold" style={{ color: "#C9A227" }}>{t("landing.videos") || "视频介绍"}</span>
+        {items.length > 1 && <span className="text-[10px] text-foreground/30">{current + 1}/{items.length}</span>}
       </div>
+      <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
+        <div className="absolute inset-0 rounded-2xl overflow-hidden"
+          style={{ border: "1px solid rgba(201,162,39,0.15)", boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }}>
+          {item.type === "youtube" ? (
+            <YouTubeEmbed url={item.url} />
+          ) : (
+            <video
+              key={item.url}
+              src={item.url}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-contain"
+              style={{ background: "#000" }}
+            />
+          )}
+        </div>
 
-      {item.title && (
-        <div className="absolute bottom-0 left-0 right-0 p-5 rounded-b-2xl z-10">
-          <div className="text-base font-bold text-white">{item.title}</div>
-          {item.description && <div className="text-sm text-white/50 mt-1">{item.description}</div>}
+        {item.title && (
+          <div className="absolute bottom-0 left-0 right-0 p-4 rounded-b-2xl z-10" style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.8), transparent)" }}>
+            <div className="text-sm font-bold text-white">{item.title}</div>
+            {item.description && <div className="text-[11px] text-white/40 mt-0.5">{item.description}</div>}
+          </div>
+        )}
+
+        {items.length > 1 && (
+          <>
+            <button className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 z-10"
+              style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(201,162,39,0.2)" }} onClick={prev}>
+              <ChevronLeft size={16} style={{ color: "#C9A227" }} />
+            </button>
+            <button className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 z-10"
+              style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(201,162,39,0.2)" }} onClick={next}>
+              <ChevronRight size={16} style={{ color: "#C9A227" }} />
+            </button>
+          </>
+        )}
+      </div>
+      {items.length > 1 && (
+        <div className="flex gap-2 px-1">
+          {items.map((v, i) => (
+            <button key={i} onClick={() => setCurrent(i)}
+              className="flex-1 py-2 rounded-lg text-[10px] font-medium transition-all truncate px-2"
+              style={{
+                background: i === current ? "rgba(201,162,39,0.12)" : "rgba(255,255,255,0.03)",
+                border: i === current ? "1px solid rgba(201,162,39,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                color: i === current ? "#C9A227" : "rgba(255,255,255,0.35)",
+              }}>
+              {v.title || `视频 ${i + 1}`}
+            </button>
+          ))}
         </div>
       )}
+    </div>
+  );
+}
 
-      {items.length > 1 && (
-        <>
-          <button className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90 z-10"
-            style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(201,162,39,0.2)" }} onClick={prev}>
-            <ChevronLeft size={18} style={{ color: "#C9A227" }} />
-          </button>
-          <button className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90 z-10"
-            style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(201,162,39,0.2)" }} onClick={next}>
-            <ChevronRight size={18} style={{ color: "#C9A227" }} />
-          </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-            {items.map((_, i) => (
-              <button key={i} className="transition-all duration-300" onClick={() => setCurrent(i)}
-                style={{ width: i === current ? 24 : 6, height: 4, borderRadius: 2, background: i === current ? "#C9A227" : "rgba(255,255,255,0.25)" }} />
-            ))}
+function ImageSlider({ items }: { items: any[] }) {
+  const [current, setCurrent] = useState(0);
+
+  const next = useCallback(() => setCurrent((c) => (c + 1) % items.length), [items.length]);
+  const prev = useCallback(() => setCurrent((c) => (c - 1 + items.length) % items.length), [items.length]);
+
+  useEffect(() => {
+    if (items.length <= 1) return;
+    const timer = setInterval(next, 4000);
+    return () => clearInterval(timer);
+  }, [current, items.length, next]);
+
+  if (items.length === 0) return null;
+  const item = items[current];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 px-1">
+        <ImageIcon size={14} style={{ color: "#C9A227" }} />
+        <span className="text-sm font-bold" style={{ color: "#C9A227" }}>{t("landing.gallery") || "企业风采"}</span>
+        <span className="text-[10px] text-foreground/30">{current + 1}/{items.length}</span>
+      </div>
+      <div className="relative w-full" style={{ aspectRatio: "16/10" }}>
+        <div className="absolute inset-0 rounded-2xl overflow-hidden"
+          style={{ border: "1px solid rgba(201,162,39,0.12)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
+          <img src={item.url} alt={item.title || ""} className="w-full h-full object-cover transition-all duration-700" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(0deg, rgba(12,10,8,0.6) 0%, transparent 40%)" }} />
+        </div>
+
+        {item.title && (
+          <div className="absolute bottom-0 left-0 right-0 p-4 rounded-b-2xl z-10">
+            <div className="text-sm font-bold text-white">{item.title}</div>
+            {item.description && <div className="text-[11px] text-white/40 mt-0.5">{item.description}</div>}
           </div>
-        </>
-      )}
+        )}
+
+        {items.length > 1 && (
+          <>
+            <button className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 z-10"
+              style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(201,162,39,0.15)" }} onClick={prev}>
+              <ChevronLeft size={16} style={{ color: "#C9A227" }} />
+            </button>
+            <button className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 z-10"
+              style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(201,162,39,0.15)" }} onClick={next}>
+              <ChevronRight size={16} style={{ color: "#C9A227" }} />
+            </button>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+              {items.map((_, i) => (
+                <button key={i} className="transition-all duration-300" onClick={() => setCurrent(i)}
+                  style={{ width: i === current ? 20 : 5, height: 3, borderRadius: 2, background: i === current ? "#C9A227" : "rgba(255,255,255,0.2)" }} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -400,8 +456,15 @@ export default function LandingPage() {
       <main className="flex-1 px-5 pb-10 space-y-7 relative z-10"
         style={{ transition: "opacity 1s ease 0.3s, transform 1s ease 0.3s", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)" }}>
 
-        {/* Media Carousel */}
-        {media.length > 0 && <MediaSlider items={media} />}
+        {/* Video Carousel */}
+        {media.filter((m: any) => m.type === "video" || m.type === "youtube").length > 0 && (
+          <VideoSlider items={media.filter((m: any) => m.type === "video" || m.type === "youtube")} />
+        )}
+
+        {/* Image Gallery */}
+        {media.filter((m: any) => m.type === "image").length > 0 && (
+          <ImageSlider items={media.filter((m: any) => m.type === "image")} />
+        )}
 
         {/* Stats Strip */}
         <div className="rounded-2xl p-4 grid grid-cols-3 gap-4"
