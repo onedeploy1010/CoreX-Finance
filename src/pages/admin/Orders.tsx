@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminOrders, getProducts, DBProduct } from "@/lib/api";
+import { getAdminOrders, getProducts, getOrderShareStats, DBProduct } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Eye, Search, Filter, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Search, Filter, Calendar, BarChart3 } from "lucide-react";
 import { CopyableAddress } from "@/components/CopyableAddress";
 
 const STATUS_TABS = [
@@ -67,9 +67,16 @@ export default function AdminOrders() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
+  const [showStats, setShowStats] = useState(true);
+
   const { data: dbProducts = [] } = useQuery({
     queryKey: ["/api/products"],
     queryFn: getProducts,
+  });
+
+  const { data: shareStats } = useQuery({
+    queryKey: ["/api/admin/order-share-stats"],
+    queryFn: getOrderShareStats,
   });
 
   // Filter states
@@ -126,11 +133,109 @@ export default function AdminOrders() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-        <h2 className="font-bold text-lg text-foreground">订单管理</h2>
-        <span className="text-xs text-muted-foreground ml-2">共 {d?.total || 0} 条</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
+          <h2 className="font-bold text-lg text-foreground">订单管理</h2>
+          <span className="text-xs text-muted-foreground ml-2">共 {d?.total || 0} 条</span>
+        </div>
+        <button
+          onClick={() => setShowStats(!showStats)}
+          className="p-2 rounded-lg"
+          style={{ background: showStats ? "rgba(201,162,39,0.15)" : "rgba(255,255,255,0.04)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.2)" }}
+        >
+          <BarChart3 size={14} />
+        </button>
       </div>
+
+      {/* Product share statistics */}
+      {showStats && shareStats && dbProducts.length > 0 && (
+        <div className="rounded-xl p-4 space-y-3" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart3 size={13} style={{ color: "#C9A227" }} />
+            <span className="text-xs font-bold text-foreground">配套份数统计</span>
+            <span className="text-[9px] text-muted-foreground">（按最低金额为1份计算）</span>
+          </div>
+          <div className="space-y-2">
+            {dbProducts.map((p: DBProduct) => {
+              const stats = (shareStats as any[]).find(s => s.productId === p.id);
+              if (!stats) return (
+                <div key={p.id} className="rounded-lg px-3 py-2.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground">{p.name}</span>
+                    <span className="text-[10px] text-muted-foreground">暂无订单</span>
+                  </div>
+                </div>
+              );
+              const minAmt = p.minAmount || 1;
+              const totalShares = Math.floor(stats.totalAmount / minAmt);
+              const activeShares = Math.floor(stats.activeAmount / minAmt);
+              return (
+                <div key={p.id} className="rounded-lg px-3 py-2.5" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-foreground">{p.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{minAmt}U/份</span>
+                    </div>
+                    <span className="font-black text-sm" style={{ color: "#C9A227" }}>{totalShares} 份</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-[10px]">
+                    <div>
+                      <span className="text-muted-foreground">总订单</span>
+                      <div className="font-semibold text-foreground">{stats.orderCount} 笔</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">总金额</span>
+                      <div className="font-semibold" style={{ color: "#C9A227" }}>{stats.totalAmount.toLocaleString()}U</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">活跃份数</span>
+                      <div className="font-semibold" style={{ color: "#22c55e" }}>{activeShares} 份</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">活跃金额</span>
+                      <div className="font-semibold" style={{ color: "#22c55e" }}>{stats.activeAmount.toLocaleString()}U</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Total summary */}
+          {(() => {
+            const allStats = shareStats as any[];
+            const totalOrders = allStats.reduce((s, x) => s + x.orderCount, 0);
+            const totalAmount = allStats.reduce((s, x) => s + x.totalAmount, 0);
+            const totalShares = allStats.reduce((s, x) => {
+              const product = dbProducts.find((p: DBProduct) => p.id === x.productId);
+              return s + Math.floor(x.totalAmount / (product?.minAmount || 1));
+            }, 0);
+            const activeAmount = allStats.reduce((s, x) => s + x.activeAmount, 0);
+            return (
+              <div className="rounded-lg px-3 py-2.5 mt-1" style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.1)" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold" style={{ color: "#ef4444" }}>合计</span>
+                  <span className="font-black text-sm" style={{ color: "#ef4444" }}>{totalShares} 份</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[10px] mt-1">
+                  <div>
+                    <span className="text-muted-foreground">总订单</span>
+                    <div className="font-semibold text-foreground">{totalOrders} 笔</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">总金额</span>
+                    <div className="font-semibold" style={{ color: "#C9A227" }}>{totalAmount.toLocaleString()}U</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">活跃金额</span>
+                    <div className="font-semibold" style={{ color: "#22c55e" }}>{activeAmount.toLocaleString()}U</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Search bar */}
       <div className="flex gap-2">

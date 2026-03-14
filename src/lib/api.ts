@@ -691,6 +691,37 @@ export async function getAdminOrders(page: number, limit: number, status: string
   return { orders: enriched, total: count || 0, page, limit };
 }
 
+export async function getOrderShareStats() {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("product_id, product_name, amount, status");
+  if (error) throw new Error(error.message);
+
+  // Group by product, compute shares = floor(amount / minAmount)
+  // We'll return raw data and let the frontend compute with product minAmount
+  const byProduct = new Map<number, { name: string; totalAmount: number; orderCount: number; activeAmount: number; activeCount: number; amounts: number[] }>();
+  (data || []).forEach((o: any) => {
+    const pid = o.product_id;
+    if (!byProduct.has(pid)) {
+      byProduct.set(pid, { name: o.product_name, totalAmount: 0, orderCount: 0, activeAmount: 0, activeCount: 0, amounts: [] });
+    }
+    const entry = byProduct.get(pid)!;
+    const amt = parseFloat(o.amount);
+    entry.totalAmount += amt;
+    entry.orderCount += 1;
+    entry.amounts.push(amt);
+    if (o.status === "active") {
+      entry.activeAmount += amt;
+      entry.activeCount += 1;
+    }
+  });
+
+  return Array.from(byProduct.entries()).map(([productId, v]) => ({
+    productId,
+    ...v,
+  }));
+}
+
 export async function getAdminWithdrawals(page: number, limit: number, status: string) {
   const offset = (page - 1) * limit;
 
