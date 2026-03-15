@@ -383,6 +383,20 @@ const translations: Record<string, Partial<Record<Lang, string>>> = {
     th: "กรุณาลงทะเบียนผ่านลิงค์แนะนำ", id: "Silakan daftar melalui link referral", ms: "Sila daftar melalui pautan rujukan",
     fr: "Veuillez vous inscrire via un lien de parrainage", ar: "يرجى التسجيل عبر رابط الإحالة",
   },
+  "register.referral_link_format": {
+    zh: "请通过推荐人分享的链接访问", "zh-TW": "請通過推薦人分享的鏈接訪問", en: "Please visit via a referral link shared by your sponsor",
+    ja: "紹介者から共有されたリンクでアクセスしてください", ko: "추천인이 공유한 링크로 접속하세요",
+    vi: "Vui lòng truy cập qua liên kết được người giới thiệu chia sẻ",
+    th: "กรุณาเข้าผ่านลิงค์ที่ผู้แนะนำแชร์ให้", id: "Silakan kunjungi melalui link yang dibagikan oleh sponsor Anda",
+    ms: "Sila lawati melalui pautan yang dikongsi oleh penaja anda",
+    fr: "Veuillez accéder via un lien partagé par votre parrain", ar: "يرجى الزيارة عبر رابط مشترك من الراعي الخاص بك",
+  },
+  "register.disconnect_and_retry": {
+    zh: "断开钱包", "zh-TW": "斷開錢包", en: "Disconnect Wallet",
+    ja: "ウォレットを切断", ko: "지갑 연결 해제", vi: "Ngắt kết nối ví",
+    th: "ตัดการเชื่อมต่อกระเป๋า", id: "Putuskan Dompet", ms: "Putuskan Dompet",
+    fr: "Déconnecter le portefeuille", ar: "فصل المحفظة",
+  },
   "register.referrer_not_found": {
     zh: "邀请人不存在", "zh-TW": "邀請人不存在", en: "Referrer not found", ja: "招待者が見つかりません", ko: "추천인을 찾을 수 없습니다", vi: "Không tìm thấy người giới thiệu",
     th: "ไม่พบผู้แนะนำ", id: "Pemberi referral tidak ditemukan", ms: "Perujuk tidak dijumpai",
