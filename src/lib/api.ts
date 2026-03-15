@@ -1054,6 +1054,69 @@ export async function markAllNotificationsRead() {
   if (error) throw new Error(error.message);
 }
 
+// Admin rewards management
+export async function getAdminRewards(page: number, limit: number, type: string, filters?: { search?: string; dateFrom?: string; dateTo?: string }) {
+  const offset = (page - 1) * limit;
+
+  let query = supabase.from("rewards").select("*", { count: "exact" });
+  if (type && type !== "all") {
+    if (type === "equal_level_bonus") {
+      query = query.eq("type", "team_bonus").like("description", "equal-level%");
+    } else if (type === "team_bonus") {
+      query = query.eq("type", "team_bonus").not("description", "like", "equal-level%");
+    } else {
+      query = query.eq("type", type);
+    }
+  }
+  if (filters?.search) {
+    query = query.or(`wallet_address.ilike.%${filters.search}%,from_address.ilike.%${filters.search}%`);
+  }
+  if (filters?.dateFrom) {
+    query = query.gte("created_at", filters.dateFrom);
+  }
+  if (filters?.dateTo) {
+    query = query.lte("created_at", filters.dateTo + "T23:59:59");
+  }
+
+  const { data, count, error } = await query
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+
+  return { rewards: data || [], total: count || 0, page, limit };
+}
+
+export async function getAdminRewardStats() {
+  const types = ["daily", "direct_referral", "indirect_referral", "team_bonus"];
+  const stats: Record<string, { count: number; total: number }> = {};
+
+  for (const type of types) {
+    const { data, count } = await supabase
+      .from("rewards")
+      .select("amount", { count: "exact" })
+      .eq("type", type);
+    const total = (data || []).reduce((s, r) => s + parseFloat(r.amount || "0"), 0);
+    stats[type] = { count: count || 0, total };
+  }
+
+  // equal-level is a subset of team_bonus
+  const { data: equalData, count: equalCount } = await supabase
+    .from("rewards")
+    .select("amount", { count: "exact" })
+    .eq("type", "team_bonus")
+    .like("description", "equal-level%");
+  const equalTotal = (equalData || []).reduce((s, r) => s + parseFloat(r.amount || "0"), 0);
+  stats["equal_level_bonus"] = { count: equalCount || 0, total: equalTotal };
+
+  // Subtract equal-level from team_bonus
+  stats["team_bonus"] = {
+    count: stats["team_bonus"].count - stats["equal_level_bonus"].count,
+    total: stats["team_bonus"].total - stats["equal_level_bonus"].total,
+  };
+
+  return stats;
+}
+
 export async function deleteAdminUser(id: number) {
   const session = getAdminSession();
   if (!session) throw new Error("未登录");

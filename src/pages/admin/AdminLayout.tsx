@@ -4,7 +4,7 @@ import { getAdminSession, adminLogout, adminChangePassword, adminAddLog } from "
 import {
   LayoutDashboard, Users, ShoppingCart, ArrowDownToLine,
   MessageSquare, DollarSign, LogOut, Menu, X, Network, Settings,
-  Shield, ScrollText, FileCode, Image, Package, KeyRound, Loader2
+  Shield, ScrollText, FileCode, Image, Package, KeyRound, Loader2, Gift
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -16,6 +16,7 @@ const NAV_ITEMS: { path: string; label: string; icon: any; perm: string }[] = [
   { path: "/admin/members", label: "会员管理", icon: Users, perm: "members.read" },
   { path: "/admin/referrals", label: "推荐管理", icon: Network, perm: "referrals.read" },
   { path: "/admin/orders", label: "订单管理", icon: ShoppingCart, perm: "orders.read" },
+  { path: "/admin/rewards", label: "奖励明细", icon: Gift, perm: "orders.read" },
   { path: "/admin/withdrawals", label: "提现管理", icon: ArrowDownToLine, perm: "withdrawals.read" },
   { path: "/admin/messages", label: "消息管理", icon: MessageSquare, perm: "messages.read" },
   { path: "/admin/finance", label: "财务管理", icon: DollarSign, perm: "finance.read" },

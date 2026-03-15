@@ -26,6 +26,7 @@ import AdminLogs from "@/pages/admin/Logs";
 import ContractSetup from "@/pages/admin/ContractSetup";
 import AdminMedia from "@/pages/admin/Media";
 import AdminProducts from "@/pages/admin/Products";
+import AdminRewards from "@/pages/admin/Rewards";
 
 function FrontendRoutes() {
   return (
@@ -58,6 +59,7 @@ function AdminRoutes() {
         <Route path="/admin/contract" component={ContractSetup} />
         <Route path="/admin/media" component={AdminMedia} />
         <Route path="/admin/products" component={AdminProducts} />
+        <Route path="/admin/rewards" component={AdminRewards} />
         <Route>{() => { window.location.href = "/admin/dashboard"; return null; }}</Route>
       </Switch>
     </AdminLayout>

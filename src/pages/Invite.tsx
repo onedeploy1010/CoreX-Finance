@@ -649,7 +649,7 @@ export default function InvitePage() {
               </div>
               <div className="text-[10px] mt-2 leading-relaxed px-3 py-2 rounded-lg"
                 style={{ background: "rgba(255,140,0,0.06)", border: "1px solid rgba(255,140,0,0.1)", color: "rgba(255,255,255,0.35)" }}>
-                例: A(V2) 团队奖励 21.71 → 同级B拿 2.171 → 同级C拿 0.217 → ... 最多5层
+                例: A(V2) 团队奖励 21.71 → 同级B拿 2.171 → 同级C拿 0.217 → 同级D拿 0.0217 (最多3代)
               </div>
             </div>
           </div>
