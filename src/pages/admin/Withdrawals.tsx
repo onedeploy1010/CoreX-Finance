@@ -5,6 +5,7 @@ import { queryClient } from "@/lib/queryClient";
 import {
   getAdminWithdrawals, updateWithdrawalStatus, triggerAutoWithdraw, adminAddLog,
   getAdminNotifications, markNotificationRead, markAllNotificationsRead,
+  getFeeWalletAddress,
 } from "@/lib/api";
 import { readContract } from "thirdweb";
 import { useActiveAccount, useSendTransaction, ConnectButton } from "thirdweb/react";
@@ -51,6 +52,21 @@ async function getWalletBalance(): Promise<string> {
   }
 }
 
+async function getFeeWalletBalance(): Promise<{ address: string; balance: string }> {
+  try {
+    const addr = await getFeeWalletAddress();
+    if (!addr || addr.length !== 42) return { address: "", balance: "0.000000" };
+    const result = await readContract({
+      contract: getUSDTContract(),
+      method: "balanceOf",
+      params: [addr],
+    });
+    return { address: addr, balance: formatUSDT(result as bigint) };
+  } catch {
+    return { address: "", balance: "0.000000" };
+  }
+}
+
 function BalancePanel() {
   const { data: contractBal, isLoading: loadingContract, refetch: refetchContract } = useQuery({
     queryKey: ["/api/contract-balance"],
@@ -62,9 +78,16 @@ function BalancePanel() {
     queryFn: getWalletBalance,
     refetchInterval: 30000,
   });
+  const { data: feeData, isLoading: loadingFee, refetch: refetchFee } = useQuery({
+    queryKey: ["/api/fee-wallet-balance"],
+    queryFn: getFeeWalletBalance,
+    refetchInterval: 30000,
+  });
 
   const contractNum = parseFloat(contractBal || "0");
   const walletNum = parseFloat(walletBal || "0");
+  const feeNum = parseFloat(feeData?.balance || "0");
+  const feeAddr = feeData?.address || "";
   const totalAvailable = contractNum + walletNum;
   const isLow = totalAvailable < 100;
 
@@ -81,13 +104,13 @@ function BalancePanel() {
         <button
           className="p-1.5 rounded-lg transition-all"
           style={{ background: "rgba(201,162,39,0.08)" }}
-          onClick={() => { refetchContract(); refetchWallet(); }}
+          onClick={() => { refetchContract(); refetchWallet(); refetchFee(); }}
         >
           <RefreshCw size={13} style={{ color: "#C9A227" }} />
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid gap-3 ${feeAddr ? "grid-cols-4" : "grid-cols-3"}`}>
         <div className="text-center p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.06)" }}>
           <div className="text-[10px] text-muted-foreground mb-1">提现合约余额</div>
           <div className="text-sm font-bold" style={{ color: "#C9A227" }}>
@@ -100,6 +123,14 @@ function BalancePanel() {
             {loadingWallet ? "..." : `${walletNum.toFixed(2)} U`}
           </div>
         </div>
+        {feeAddr && (
+          <div className="text-center p-2 rounded-lg" style={{ background: "rgba(245,158,11,0.06)" }}>
+            <div className="text-[10px] text-muted-foreground mb-1">手续费钱包</div>
+            <div className="text-sm font-bold" style={{ color: "#f59e0b" }}>
+              {loadingFee ? "..." : `${feeNum.toFixed(2)} U`}
+            </div>
+          </div>
+        )}
         <div className="text-center p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.06)" }}>
           <div className="text-[10px] text-muted-foreground mb-1">总可用</div>
           <div className="text-sm font-bold" style={{ color: isLow ? "#ef4444" : "#22c55e" }}>
@@ -120,6 +151,11 @@ function BalancePanel() {
       <div className="text-[10px] text-muted-foreground">
         提现钱包: <CopyableAddress address={OPERATOR_WALLET} className="text-muted-foreground inline" />
       </div>
+      {feeAddr && (
+        <div className="text-[10px] text-muted-foreground">
+          手续费钱包: <CopyableAddress address={feeAddr} className="text-muted-foreground inline" />
+        </div>
+      )}
       <div className="text-[10px] text-muted-foreground/50">
         合约余额不足时，系统自动从提现钱包转入合约；钱包余额也不足则暂停提现并通知管理员
       </div>

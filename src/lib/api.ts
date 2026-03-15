@@ -1035,6 +1035,17 @@ export async function setWithdrawalContractMinBalance(amount: number) {
   if (error) throw new Error(error.message);
 }
 
+// Fee wallet address
+export async function getFeeWalletAddress(): Promise<string> {
+  const { data } = await supabase.from("system_settings").select("value").eq("key", "fee_wallet_address").single();
+  return data?.value || "";
+}
+
+export async function setFeeWalletAddress(address: string) {
+  const { error } = await supabase.from("system_settings").upsert({ key: "fee_wallet_address", value: address.toLowerCase() }, { onConflict: "key" });
+  if (error) throw new Error(error.message);
+}
+
 // Auto-execute withdrawal minimum batch amount
 export async function getAutoWithdrawExecMin(): Promise<number> {
   const { data } = await supabase.from("system_settings").select("value").eq("key", "auto_withdraw_exec_min").single();

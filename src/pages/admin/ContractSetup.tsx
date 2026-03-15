@@ -16,7 +16,8 @@ import {
   formatUSDT,
   getUSDTBalance,
 } from "@/lib/contracts";
-import { getProducts, DBProduct, adminAddLog } from "@/lib/api";
+import { getProducts, DBProduct, adminAddLog, getFeeWalletAddress, setFeeWalletAddress } from "@/lib/api";
+import { Input } from "@/components/ui/input";
 
 function shortAddr(addr: string) {
   if (!addr) return "";
@@ -42,6 +43,12 @@ export default function ContractSetup() {
   const [fundingWalletBalance, setFundingWalletBalance] = useState<bigint | null>(null);
   const [approving, setApproving] = useState(false);
 
+  // Fee wallet state
+  const [feeWallet, setFeeWallet] = useState<string>("");
+  const [feeWalletInput, setFeeWalletInput] = useState<string>("");
+  const [feeWalletBalance, setFeeWalletBalance] = useState<bigint | null>(null);
+  const [savingFeeWallet, setSavingFeeWallet] = useState(false);
+
   useEffect(() => {
     loadContractData();
   }, []);
@@ -49,18 +56,21 @@ export default function ContractSetup() {
   const loadContractData = async () => {
     setLoadingData(true);
     try {
-      const [recs, authStatus, pCount, products, fWallet] = await Promise.all([
+      const [recs, authStatus, pCount, products, fWallet, feeAddr] = await Promise.all([
         getDistributorRecipients().catch(() => []),
         isAuthorizedCaller(COREX_INVESTMENT_ADDRESS).catch(() => null),
         getProductCount().catch(() => 0),
         getProducts().catch(() => []),
         getFundingWallet().catch(() => ""),
+        getFeeWalletAddress().catch(() => ""),
       ]);
       setRecipients(Array.isArray(recs) ? recs as any[] : []);
       setInvestAuthorized(authStatus);
       setProductCount(pCount);
       setDbProducts(products);
       setFundingWallet(fWallet);
+      setFeeWallet(feeAddr);
+      setFeeWalletInput(feeAddr);
 
       // Load allowance and balance for funding wallet
       if (fWallet && fWallet !== "0x0000000000000000000000000000000000000000") {
@@ -70,6 +80,12 @@ export default function ContractSetup() {
         ]);
         setWithdrawalAllowance(allowance);
         setFundingWalletBalance(balance);
+      }
+
+      // Load fee wallet balance
+      if (feeAddr && feeAddr.length === 42) {
+        const feeBal = await getUSDTBalance(feeAddr).catch(() => BigInt(0));
+        setFeeWalletBalance(feeBal);
       }
     } catch {}
     setLoadingData(false);
@@ -229,6 +245,84 @@ export default function ContractSetup() {
         </div>
         <div className="text-xs text-muted-foreground">
           CoreXInvestment → FundDistributor distribute 授权状态
+        </div>
+      </div>
+
+      {/* Fee Wallet */}
+      <div className="rounded-xl p-4 space-y-3" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.12)" }}>
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold text-foreground">手续费钱包</div>
+          {loadingData ? (
+            <Loader2 size={14} className="animate-spin text-muted-foreground" />
+          ) : (
+            <StatusBadge ok={!!feeWallet && feeWallet.length === 42} label={feeWallet ? "已配置" : "未配置"} />
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Input
+              value={feeWalletInput}
+              onChange={e => setFeeWalletInput(e.target.value.trim())}
+              placeholder="0x... 手续费收款钱包地址"
+              className="flex-1 text-xs font-mono"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)" }}
+            />
+            <Button
+              size="sm"
+              disabled={savingFeeWallet || feeWalletInput === feeWallet}
+              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+              onClick={async () => {
+                if (!feeWalletInput || !feeWalletInput.startsWith("0x") || feeWalletInput.length !== 42) {
+                  toast({ title: "请输入有效的钱包地址", variant: "destructive" });
+                  return;
+                }
+                setSavingFeeWallet(true);
+                try {
+                  await setFeeWalletAddress(feeWalletInput);
+                  setFeeWallet(feeWalletInput.toLowerCase());
+                  const feeBal = await getUSDTBalance(feeWalletInput).catch(() => BigInt(0));
+                  setFeeWalletBalance(feeBal);
+                  await adminAddLog("设置手续费钱包", "system_settings", "fee_wallet_address", { address: feeWalletInput });
+                  toast({ title: "保存成功" });
+                } catch (err: any) {
+                  toast({ title: "保存失败", description: err.message, variant: "destructive" });
+                } finally {
+                  setSavingFeeWallet(false);
+                }
+              }}
+            >
+              {savingFeeWallet ? <Loader2 size={14} className="animate-spin" /> : "保存"}
+            </Button>
+          </div>
+
+          {feeWallet && feeWallet.length === 42 && (
+            <>
+              <div className="flex items-center justify-between text-xs py-1" style={{ borderBottom: "1px solid rgba(201,162,39,0.08)" }}>
+                <span className="text-muted-foreground">钱包地址</span>
+                <a
+                  href={`https://bscscan.com/address/${feeWallet}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono flex items-center gap-1"
+                  style={{ color: "#C9A227" }}
+                >
+                  {shortAddr(feeWallet)}
+                  <ExternalLink size={9} />
+                </a>
+              </div>
+              <div className="flex items-center justify-between text-xs py-1">
+                <span className="text-muted-foreground">USDT 余额</span>
+                <span style={{ color: "#C9A227" }}>
+                  {feeWalletBalance !== null ? `${formatUSDT(feeWalletBalance)} USDT` : "..."}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="text-[10px] text-muted-foreground/50">
+          手续费钱包用于接收提现手续费，余额在提现管理页面显示
         </div>
       </div>
 
