@@ -99,5 +99,4 @@ $$;
 -- These were incorrectly calculated with the old 5-generation limit
 DELETE FROM rewards
 WHERE type = 'team_bonus'
-  AND description LIKE 'equal-level|4|%'
-  OR (type = 'team_bonus' AND description LIKE 'equal-level|5|%');
+  AND (description LIKE 'equal-level|4|%' OR description LIKE 'equal-level|5|%');
