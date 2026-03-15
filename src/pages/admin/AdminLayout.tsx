@@ -4,7 +4,7 @@ import { getAdminSession, adminLogout, adminChangePassword, adminAddLog } from "
 import {
   LayoutDashboard, Users, ShoppingCart, ArrowDownToLine,
   MessageSquare, DollarSign, LogOut, Menu, X, Network, Settings,
-  Shield, ScrollText, FileCode, Image, Package, KeyRound, Loader2, Gift
+  Shield, ScrollText, FileCode, Image, Package, KeyRound, Loader2, Gift, Activity
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -23,13 +23,15 @@ const NAV_ITEMS: { path: string; label: string; icon: any; perm: string }[] = [
   { path: "/admin/settings", label: "系统设置", icon: Settings, perm: "settings.read" },
   { path: "/admin/admins", label: "管理员", icon: Shield, perm: "admins.read" },
   { path: "/admin/logs", label: "操作日志", icon: ScrollText, perm: "logs.read" },
-  { path: "/admin/contract", label: "合约配置", icon: FileCode, perm: "settings.read" },
+  { path: "/admin/contract", label: "合约配置", icon: FileCode, perm: "contracts.read" },
+  { path: "/admin/products", label: "产品管理", icon: Package, perm: "contracts.read" },
+  { path: "/admin/system", label: "系统环境", icon: Activity, perm: "system.read" },
   { path: "/admin/media", label: "Landing Page", icon: Image, perm: "media.read" },
-  { path: "/admin/products", label: "产品管理", icon: Package, perm: "settings.read" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
   superadmin: "超级管理员",
+  tech: "技术调试",
   finance: "财务",
   customer_service: "客服",
   custom: "自定义",

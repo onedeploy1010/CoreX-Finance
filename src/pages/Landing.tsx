@@ -7,11 +7,12 @@ import { t, getLang } from "@/lib/i18n";
 import { ChevronLeft, ChevronRight, Shield, TrendingUp, Zap, Globe, Users, BarChart3, Wallet, Play, ImageIcon } from "lucide-react";
 import { LangSwitch } from "@/components/LangSwitch";
 
-async function getMedia() {
+async function getMedia(lang: string) {
   const { data } = await supabase
     .from("media")
     .select("*")
     .eq("is_active", true)
+    .in("lang", [lang, "all"])
     .order("sort_order", { ascending: true });
   return data || [];
 }
@@ -117,7 +118,7 @@ function VideoSlider({ items }: { items: any[] }) {
                 border: i === current ? "1px solid rgba(201,162,39,0.3)" : "1px solid rgba(255,255,255,0.06)",
                 color: i === current ? "#C9A227" : "rgba(255,255,255,0.35)",
               }}>
-              {v.title || `视频 ${i + 1}`}
+              {v.title || `${t("landing.videos")} ${i + 1}`}
             </button>
           ))}
         </div>
@@ -355,7 +356,8 @@ function ScanLine() {
 }
 
 export default function LandingPage() {
-  const { data: media = [] } = useQuery({ queryKey: ["/api/media"], queryFn: getMedia });
+  const currentLang = getLang();
+  const { data: media = [] } = useQuery({ queryKey: ["/api/media", currentLang], queryFn: () => getMedia(currentLang) });
   const { data: companyIntro = "" } = useQuery({ queryKey: ["/api/company-intro", getLang()], queryFn: getCompanyIntro });
   const { connect } = useConnectModal();
   const [connecting, setConnecting] = useState(false);

@@ -12,6 +12,7 @@ import { Plus, Edit, Trash2, UserCog, KeyRound, Loader2 } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   superadmin: "超级管理员",
+  tech: "技术调试",
   finance: "财务",
   customer_service: "客服",
   custom: "自定义",
@@ -19,6 +20,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
   superadmin: { bg: "rgba(239,68,68,0.1)", color: "#ef4444" },
+  tech: { bg: "rgba(245,158,11,0.1)", color: "#f59e0b" },
   finance: { bg: "rgba(59,130,246,0.1)", color: "#3b82f6" },
   customer_service: { bg: "rgba(34,197,94,0.1)", color: "#22c55e" },
   custom: { bg: "rgba(168,85,247,0.1)", color: "#a855f7" },
@@ -30,7 +32,11 @@ const ROLE_PRESETS: Record<string, string[]> = {
     "orders.read", "withdrawals.read", "withdrawals.write",
     "messages.read", "messages.write", "finance.read",
     "settings.read", "settings.write", "admins.read", "admins.write", "logs.read",
-    "media.read", "media.write",
+    "media.read", "media.write", "contracts.read", "contracts.write", "system.read",
+  ],
+  tech: [
+    "dashboard.read", "orders.read", "settings.read",
+    "contracts.read", "contracts.write", "system.read", "logs.read",
   ],
   finance: [
     "members.read", "referrals.read", "orders.read",
@@ -49,6 +55,8 @@ const PERM_MODULES = [
   { key: "withdrawals", label: "提现管理", hasWrite: true },
   { key: "messages", label: "消息管理", hasWrite: true },
   { key: "finance", label: "财务管理", hasWrite: false },
+  { key: "contracts", label: "合约管理", hasWrite: true },
+  { key: "system", label: "系统环境", hasWrite: false },
   { key: "settings", label: "系统设置", hasWrite: true },
   { key: "admins", label: "管理员", hasWrite: true },
   { key: "logs", label: "操作日志", hasWrite: false },
@@ -130,7 +138,7 @@ export default function AdminManagement() {
   const openEdit = (admin: any) => {
     setEditing(admin);
     setForm({ username: admin.username, password: "", role: admin.role });
-    setPerms(admin.permissions || []);
+    setPerms(typeof admin.permissions === 'string' ? JSON.parse(admin.permissions) : (admin.permissions || []));
     setDialogOpen(true);
   };
 
@@ -187,7 +195,8 @@ export default function AdminManagement() {
         <div className="space-y-2">
           {(admins as any[]).map((a: any) => {
             const rc = ROLE_COLORS[a.role] || ROLE_COLORS.custom;
-            const permCount = (a.permissions || []).length;
+            const parsedPerms = typeof a.permissions === 'string' ? JSON.parse(a.permissions) : (a.permissions || []);
+            const permCount = parsedPerms.length;
             return (
               <div key={a.id} className="rounded-xl p-3 flex items-center justify-between" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.12)" }}>
                 <div className="flex items-center gap-3">
@@ -309,6 +318,7 @@ export default function AdminManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="superadmin">超级管理员（全部权限）</SelectItem>
+                  <SelectItem value="tech">技术调试（合约/系统/日志）</SelectItem>
                   <SelectItem value="finance">财务（会员/订单/出入金）</SelectItem>
                   <SelectItem value="customer_service">客服（仅查看）</SelectItem>
                   <SelectItem value="custom">自定义</SelectItem>

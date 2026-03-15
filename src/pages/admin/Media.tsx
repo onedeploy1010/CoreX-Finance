@@ -34,11 +34,28 @@ async function uploadToStorage(file: File, folder: string): Promise<string> {
   return urlData.publicUrl;
 }
 
+const LANG_OPTIONS = [
+  { value: "all", label: "全部语言" },
+  { value: "zh", label: "中文" },
+  { value: "zh-TW", label: "繁體" },
+  { value: "en", label: "English" },
+  { value: "ko", label: "한국어" },
+  { value: "ja", label: "日本語" },
+  { value: "vi", label: "Tiếng Việt" },
+  { value: "th", label: "ไทย" },
+  { value: "id", label: "Indonesia" },
+  { value: "ms", label: "Melayu" },
+  { value: "fr", label: "Français" },
+  { value: "ar", label: "العربية" },
+];
+
+const langLabel = (lang: string) => LANG_OPTIONS.find(l => l.value === lang)?.label || lang;
+
 export default function AdminMedia() {
   const [addOpen, setAddOpen] = useState(false);
   const [editIntro, setEditIntro] = useState(false);
   const [introText, setIntroText] = useState("");
-  const [form, setForm] = useState({ type: "image", url: "", title: "", description: "" });
+  const [form, setForm] = useState({ type: "image", url: "", title: "", description: "", lang: "all" });
   const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -104,6 +121,7 @@ export default function AdminMedia() {
         url: form.url,
         title: form.title || null,
         description: form.description || null,
+        lang: form.lang || "all",
         sort_order: maxSort,
       });
       if (error) throw new Error(error.message);
@@ -146,6 +164,14 @@ export default function AdminMedia() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/media"] }),
   });
 
+  const langMutation = useMutation({
+    mutationFn: async ({ id, lang }: { id: number; lang: string }) => {
+      const { error } = await supabase.from("media").update({ lang }).eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/media"] }),
+  });
+
   const moveMutation = useMutation({
     mutationFn: async ({ id, direction }: { id: number; direction: "up" | "down" }) => {
       const sorted = [...media].sort((a: any, b: any) => a.sort_order - b.sort_order);
@@ -175,7 +201,7 @@ export default function AdminMedia() {
   });
 
   const resetForm = () => {
-    setForm({ type: "image", url: "", title: "", description: "" });
+    setForm({ type: "image", url: "", title: "", description: "", lang: "all" });
     setUploadMode("file");
     setUploadProgress("");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -254,10 +280,24 @@ export default function AdminMedia() {
                   <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227" }}>
                     {typeLabel(m.type)}
                   </span>
+                  <span className="text-[10px] px-1 py-0.5 rounded" style={{ background: m.lang === "all" ? "rgba(34,197,94,0.1)" : "rgba(59,130,246,0.1)", color: m.lang === "all" ? "#22c55e" : "#3b82f6" }}>
+                    {langLabel(m.lang || "all")}
+                  </span>
                   <span className="text-xs text-foreground font-semibold truncate">{m.title || "无标题"}</span>
                 </div>
                 <div className="text-[10px] text-muted-foreground truncate mt-0.5">{m.url}</div>
               </div>
+              {/* Language select */}
+              <select
+                className="text-[10px] rounded px-1 py-0.5 shrink-0"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(201,162,39,0.15)", color: "#C9A227" }}
+                value={m.lang || "all"}
+                onChange={(e) => langMutation.mutate({ id: m.id, lang: e.target.value })}
+              >
+                {LANG_OPTIONS.map(l => (
+                  <option key={l.value} value={l.value}>{l.label}</option>
+                ))}
+              </select>
               {/* Actions */}
               <div className="flex items-center gap-1 shrink-0">
                 <button className="p-1.5 rounded" style={{ background: "rgba(201,162,39,0.1)" }}
@@ -440,6 +480,25 @@ export default function AdminMedia() {
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1.5 block">显示语言</label>
+              <div className="flex flex-wrap gap-1.5">
+                {LANG_OPTIONS.map(l => (
+                  <button key={l.value}
+                    className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all"
+                    style={{
+                      background: form.lang === l.value ? "rgba(201,162,39,0.15)" : "rgba(255,255,255,0.03)",
+                      border: form.lang === l.value ? "1px solid rgba(201,162,39,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                      color: form.lang === l.value ? "#C9A227" : "rgba(255,255,255,0.4)",
+                    }}
+                    onClick={() => setForm({ ...form, lang: l.value })}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+              <div className="text-[10px] text-muted-foreground/50 mt-1">选"全部语言"则所有语言环境都显示</div>
             </div>
             <Button
               className="w-full font-bold text-sm"

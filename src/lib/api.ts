@@ -225,15 +225,23 @@ export async function getTeamStats(walletAddress: string) {
   const addr = walletAddress.toLowerCase();
   const { data } = await supabase.rpc("get_team_stats", { root_address: addr });
   if (data) return data;
-  // Fallback if RPC not available
+  // Fallback if RPC not available - only count members with deposits
   const { data: directs } = await supabase
     .from("members")
-    .select("*")
+    .select("wallet_address")
     .eq("referrer_address", addr);
+  let depositedCount = 0;
+  if (directs) {
+    for (const d of directs) {
+      const { count } = await supabase.from("orders").select("*", { count: "exact", head: true }).eq("wallet_address", d.wallet_address);
+      if ((count || 0) > 0) depositedCount++;
+    }
+  }
   return {
-    totalAccounts: directs?.length || 0,
+    totalAccounts: depositedCount,
     totalStaking: "0",
-    directCount: directs?.length || 0,
+    directCount: depositedCount,
+    directEffective: 0,
     indirectCount: 0,
   };
 }
