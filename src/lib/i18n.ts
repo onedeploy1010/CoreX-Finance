@@ -442,6 +442,53 @@ const translations: Record<string, Partial<Record<Lang, string>>> = {
     zh: "注册中...", "zh-TW": "註冊中...", en: "Registering...", ja: "登録中...", ko: "등록 중...", vi: "Đang đăng ký...",
     th: "กำลังลงทะเบียน...", id: "Mendaftar...", ms: "Mendaftar...", fr: "Inscription...", ar: "جاري التسجيل...",
   },
+  "register.enter_referrer": {
+    zh: "输入推荐人地址", "zh-TW": "輸入推薦人地址", en: "Enter Referrer Address", ja: "紹介者アドレスを入力", ko: "추천인 주소 입력",
+    vi: "Nhập địa chỉ người giới thiệu", th: "ป้อนที่อยู่ผู้แนะนำ", id: "Masukkan Alamat Referral", ms: "Masukkan Alamat Perujuk",
+    fr: "Entrez l'adresse du parrain", ar: "أدخل عنوان المُحيل",
+  },
+  "register.enter_referrer_desc": {
+    zh: "请输入推荐人的钱包地址完成绑定注册", "zh-TW": "請輸入推薦人的錢包地址完成綁定註冊",
+    en: "Enter your referrer's wallet address to register", ja: "紹介者のウォレットアドレスを入力して登録",
+    ko: "추천인의 지갑 주소를 입력하여 등록하세요", vi: "Nhập địa chỉ ví của người giới thiệu để đăng ký",
+    th: "ป้อนที่อยู่กระเป๋าของผู้แนะนำเพื่อลงทะเบียน", id: "Masukkan alamat dompet referral untuk mendaftar",
+    ms: "Masukkan alamat dompet perujuk untuk mendaftar", fr: "Entrez l'adresse du portefeuille de votre parrain pour vous inscrire",
+    ar: "أدخل عنوان محفظة المُحيل للتسجيل",
+  },
+  "register.invalid_address": {
+    zh: "钱包地址格式不正确", "zh-TW": "錢包地址格式不正確", en: "Invalid wallet address format", ja: "ウォレットアドレスの形式が無効です",
+    ko: "잘못된 지갑 주소 형식", vi: "Định dạng địa chỉ ví không hợp lệ", th: "รูปแบบที่อยู่กระเป๋าไม่ถูกต้อง",
+    id: "Format alamat dompet tidak valid", ms: "Format alamat dompet tidak sah", fr: "Format d'adresse invalide", ar: "تنسيق عنوان المحفظة غير صالح",
+  },
+  "register.cannot_refer_self": {
+    zh: "不能推荐自己", "zh-TW": "不能推薦自己", en: "Cannot refer yourself", ja: "自分を紹介することはできません",
+    ko: "자기 자신을 추천할 수 없습니다", vi: "Không thể giới thiệu chính mình", th: "ไม่สามารถแนะนำตัวเองได้",
+    id: "Tidak dapat merujuk diri sendiri", ms: "Tidak boleh merujuk diri sendiri", fr: "Vous ne pouvez pas vous parrainer", ar: "لا يمكنك إحالة نفسك",
+  },
+  "register.check_failed": {
+    zh: "查询失败，请重试", "zh-TW": "查詢失敗，請重試", en: "Check failed, please retry", ja: "確認に失敗しました。再試行してください",
+    ko: "확인 실패, 다시 시도하세요", vi: "Kiểm tra thất bại, vui lòng thử lại", th: "ตรวจสอบล้มเหลว กรุณาลองอีกครั้ง",
+    id: "Pemeriksaan gagal, silakan coba lagi", ms: "Semakan gagal, sila cuba lagi", fr: "Vérification échouée, veuillez réessayer", ar: "فشل التحقق، يرجى المحاولة مرة أخرى",
+  },
+  "register.referrer_found": {
+    zh: "推荐人验证通过", "zh-TW": "推薦人驗證通過", en: "Referrer verified", ja: "紹介者が確認されました",
+    ko: "추천인 확인됨", vi: "Người giới thiệu đã xác minh", th: "ยืนยันผู้แนะนำสำเร็จ",
+    id: "Referral terverifikasi", ms: "Perujuk disahkan", fr: "Parrain vérifié", ar: "تم التحقق من المُحيل",
+  },
+  "register.confirm_bind": {
+    zh: "确认绑定并注册", "zh-TW": "確認綁定並註冊", en: "Confirm & Register", ja: "バインドして登録",
+    ko: "연결 및 등록", vi: "Xác nhận & Đăng ký", th: "ยืนยันและลงทะเบียน",
+    id: "Konfirmasi & Daftar", ms: "Sahkan & Daftar", fr: "Confirmer et s'inscrire", ar: "تأكيد والتسجيل",
+  },
+  "register.checking": {
+    zh: "验证中...", "zh-TW": "驗證中...", en: "Verifying...", ja: "確認中...", ko: "확인 중...", vi: "Đang xác minh...",
+    th: "กำลังตรวจสอบ...", id: "Memverifikasi...", ms: "Mengesahkan...", fr: "Vérification...", ar: "جاري التحقق...",
+  },
+  "register.verify_referrer": {
+    zh: "验证推荐人", "zh-TW": "驗證推薦人", en: "Verify Referrer", ja: "紹介者を確認", ko: "추천인 확인",
+    vi: "Xác minh người giới thiệu", th: "ตรวจสอบผู้แนะนำ", id: "Verifikasi Referral", ms: "Sahkan Perujuk",
+    fr: "Vérifier le parrain", ar: "التحقق من المُحيل",
+  },
 
   // --- Common ---
   "common.days": {

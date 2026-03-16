@@ -28,9 +28,10 @@ import AdminMedia from "@/pages/admin/Media";
 import AdminProducts from "@/pages/admin/Products";
 import AdminRewards from "@/pages/admin/Rewards";
 import SystemHealth from "@/pages/admin/SystemHealth";
-import { getMember } from "@/lib/api";
+import { getMember, registerMember } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { Loader2, UserX, Link2 } from "lucide-react";
+import { Loader2, UserPlus, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
 
 function FrontendRoutes() {
   return (
@@ -71,40 +72,148 @@ function AdminRoutes() {
   );
 }
 
-/** Gate page shown when user connects wallet but is not registered and has no referral link */
-function NeedReferralPage() {
+/** Gate page: prompt user to enter referrer address to register */
+function ReferralInputPage() {
   const { disconnect } = useDisconnect();
   const wallet = useActiveWallet();
+  const account = useActiveAccount();
+  const refParam = new URLSearchParams(window.location.search).get("ref") || "";
+  const [refInput, setRefInput] = useState(refParam);
+  const [status, setStatus] = useState<"idle" | "checking" | "valid" | "invalid" | "registering" | "done">("idle");
+  const [error, setError] = useState("");
+  const [referrerLevel, setReferrerLevel] = useState(0);
+
+  const isValidAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
+
+  const handleCheck = async () => {
+    const addr = refInput.trim().toLowerCase();
+    if (!isValidAddress(addr)) {
+      setStatus("invalid");
+      setError(t("register.invalid_address"));
+      return;
+    }
+    if (account && addr === account.address.toLowerCase()) {
+      setStatus("invalid");
+      setError(t("register.cannot_refer_self"));
+      return;
+    }
+    setStatus("checking");
+    setError("");
+    try {
+      const member = await getMember(addr);
+      if (!member) {
+        setStatus("invalid");
+        setError(t("register.referrer_not_found"));
+        return;
+      }
+      setReferrerLevel(member.level ?? 0);
+      setStatus("valid");
+    } catch {
+      setStatus("invalid");
+      setError(t("register.check_failed"));
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!account?.address) return;
+    setStatus("registering");
+    try {
+      await registerMember(account.address, refInput.trim());
+      setStatus("done");
+      // Reload to enter platform
+      setTimeout(() => window.location.reload(), 800);
+    } catch (err: any) {
+      setStatus("invalid");
+      const msg = err?.message || "";
+      if (msg === "REFERRER_NOT_INVESTED") {
+        setError(t("register.referrer_not_invested"));
+      } else {
+        setError(msg || t("register.failed"));
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{ background: "#0c0a08" }}>
-      <div className="w-full max-w-sm space-y-6 text-center">
-        <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
-          <UserX size={28} style={{ color: "#ef4444" }} />
-        </div>
-
-        <div>
-          <h2 className="text-xl font-bold text-foreground mb-2">{t("register.need_referral")}</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">{t("register.need_referral_desc")}</p>
-        </div>
-
-        <div className="rounded-xl p-4 space-y-2" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.12)" }}>
-          <div className="flex items-center gap-2 justify-center">
-            <Link2 size={14} style={{ color: "#C9A227" }} />
-            <span className="text-xs font-medium" style={{ color: "#C9A227" }}>{t("register.referral_link_format")}</span>
+      <div className="w-full max-w-sm space-y-5">
+        {/* Icon */}
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center mb-4" style={{ background: "rgba(201,162,39,0.1)", border: "1px solid rgba(201,162,39,0.2)" }}>
+            <UserPlus size={28} style={{ color: "#C9A227" }} />
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            {window.location.origin}/?ref=0x...
-          </p>
+          <h2 className="text-xl font-bold text-foreground mb-1">{t("register.enter_referrer")}</h2>
+          <p className="text-sm text-muted-foreground">{t("register.enter_referrer_desc")}</p>
         </div>
 
-        <button
-          className="w-full py-3 rounded-xl font-bold text-sm transition-all"
-          style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#ef4444" }}
-          onClick={() => { if (wallet) disconnect(wallet); }}
-        >
-          {t("register.disconnect_and_retry")}
-        </button>
+        {/* Input */}
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={refInput}
+            onChange={(e) => { setRefInput(e.target.value); setStatus("idle"); setError(""); }}
+            placeholder="0x..."
+            className="w-full px-4 py-3 rounded-xl text-sm font-mono"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: `1px solid ${status === "valid" ? "rgba(34,197,94,0.4)" : status === "invalid" ? "rgba(239,68,68,0.4)" : "rgba(201,162,39,0.2)"}`,
+              color: "#fff",
+              outline: "none",
+            }}
+          />
+
+          {/* Error / Valid feedback */}
+          {status === "invalid" && error && (
+            <div className="flex items-center gap-2 text-xs" style={{ color: "#ef4444" }}>
+              <AlertCircle size={12} /> {error}
+            </div>
+          )}
+          {status === "valid" && (
+            <div className="flex items-center gap-2 text-xs" style={{ color: "#22c55e" }}>
+              <CheckCircle2 size={12} />
+              {t("register.referrer_found")} (V{referrerLevel})
+            </div>
+          )}
+          {status === "done" && (
+            <div className="flex items-center gap-2 text-xs" style={{ color: "#22c55e" }}>
+              <CheckCircle2 size={12} /> {t("register.success")}
+            </div>
+          )}
+        </div>
+
+        {/* Buttons */}
+        <div className="space-y-2">
+          {(status === "valid" || status === "registering") ? (
+            <button
+              className="w-full py-3 rounded-xl font-bold text-sm transition-all"
+              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+              onClick={handleRegister}
+              disabled={status === "registering"}
+            >
+              {status === "registering" ? (
+                <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> {t("register.registering")}</span>
+              ) : t("register.confirm_bind")}
+            </button>
+          ) : (
+            <button
+              className="w-full py-3 rounded-xl font-bold text-sm transition-all"
+              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+              onClick={handleCheck}
+              disabled={!refInput.trim() || status === "checking"}
+            >
+              {status === "checking" ? (
+                <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> {t("register.checking")}</span>
+              ) : t("register.verify_referrer")}
+            </button>
+          )}
+
+          <button
+            className="w-full py-3 rounded-xl font-bold text-sm transition-all"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}
+            onClick={() => { if (wallet) disconnect(wallet); }}
+          >
+            {t("register.disconnect_and_retry")}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -113,7 +222,6 @@ function NeedReferralPage() {
 function AppRouter() {
   const [location] = useLocation();
   const account = useActiveAccount();
-  const ref = new URLSearchParams(window.location.search).get("ref");
 
   // Check if connected user is a registered member
   const { data: memberCheck, isLoading: memberLoading } = useQuery({
@@ -143,12 +251,12 @@ function AppRouter() {
     );
   }
 
-  // Connected but not registered and no referral link → block
-  if (!memberCheck && !ref) {
-    return <NeedReferralPage />;
+  // Connected but not registered → show referrer input (auto-fill if ?ref= exists)
+  if (!memberCheck) {
+    return <ReferralInputPage />;
   }
 
-  // Connected (registered or has ref param for registration) → enter platform
+  // Connected and registered → enter platform
   return <FrontendRoutes />;
 }
 
