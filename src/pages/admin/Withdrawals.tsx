@@ -5,14 +5,14 @@ import { queryClient } from "@/lib/queryClient";
 import {
   getAdminWithdrawals, updateWithdrawalStatus, triggerAutoWithdraw, adminAddLog,
   getAdminNotifications, markNotificationRead, markAllNotificationsRead,
-  getFeeWalletAddress,
+  getFeeWalletAddress, exportWithdrawalsCSV,
 } from "@/lib/api";
 import { readContract } from "thirdweb";
 import { useActiveAccount, useSendTransaction, ConnectButton } from "thirdweb/react";
 import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { getWithdrawalContract, getUSDTContract, formatUSDT, prepareApproveUSDTForWithdrawal, getWithdrawalAllowance, getFundingWallet, COREX_WITHDRAWAL_ADDRESS } from "@/lib/contracts";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck, Download } from "lucide-react";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
 
 const STATUS_TABS = [
@@ -497,6 +497,7 @@ export default function AdminWithdrawals() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
   const [batchProcessing, setBatchProcessing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
 
   const qk = ["/api/admin/withdrawals", `?page=${page}&limit=20&status=${status}`];
@@ -579,6 +580,12 @@ export default function AdminWithdrawals() {
           <h2 className="font-bold text-lg text-foreground">提现管理</h2>
           <span className="text-xs text-muted-foreground ml-2">共 {d?.total || 0} 条</span>
         </div>
+        <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" disabled={exporting}
+          style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "36px" }}
+          onClick={async () => { setExporting(true); try { await exportWithdrawalsCSV(status); } finally { setExporting(false); } }}>
+          <Download size={14} className="mr-1" /> {exporting ? "导出中..." : "导出CSV"}
+        </Button>
         <Button
           data-testid="button-batch-withdraw"
           size="sm"
@@ -592,6 +599,7 @@ export default function AdminWithdrawals() {
             <><Send size={14} className="mr-1.5" /> 批量上链提现</>
           )}
         </Button>
+        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap">

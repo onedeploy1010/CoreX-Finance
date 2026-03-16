@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, hasPermission, adminCreateOrderForMember, adminCancelOrder, getProducts, DBProduct } from "@/lib/api";
+import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, hasPermission, adminCreateOrderForMember, adminCancelOrder, getProducts, DBProduct, exportMembersCSV } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save, Plus, X, Package } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save, Plus, X, Package, Download } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
@@ -380,6 +380,7 @@ export default function Members() {
   const [searchInput, setSearchInput] = useState("");
   const [levelFilter, setLevelFilter] = useState<number | null>(null);
   const [detailAddr, setDetailAddr] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/admin/members", `?page=${page}&limit=20&search=${search}&level=${levelFilter}`],
@@ -399,10 +400,17 @@ export default function Members() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-        <h2 className="font-bold text-lg text-foreground">会员管理</h2>
-        <span className="text-xs text-muted-foreground ml-2">共 {d?.total || 0} 人</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
+          <h2 className="font-bold text-lg text-foreground">会员管理</h2>
+          <span className="text-xs text-muted-foreground ml-2">共 {d?.total || 0} 人</span>
+        </div>
+        <Button size="sm" variant="outline" disabled={exporting}
+          style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "36px" }}
+          onClick={async () => { setExporting(true); try { await exportMembersCSV(search, levelFilter); } finally { setExporting(false); } }}>
+          <Download size={14} className="mr-1" /> {exporting ? "导出中..." : "导出CSV"}
+        </Button>
       </div>
 
       <div className="flex gap-2">

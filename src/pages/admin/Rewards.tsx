@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminRewards, getAdminRewardStats } from "@/lib/api";
+import { getAdminRewards, getAdminRewardStats, exportRewardsCSV } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Gift, Users, ChevronLeft, ChevronRight, Calendar, TrendingUp, Star, Award } from "lucide-react";
+import { Search, Gift, Users, ChevronLeft, ChevronRight, Calendar, TrendingUp, Star, Award, Download } from "lucide-react";
 import { CopyableAddress } from "@/components/CopyableAddress";
 
 const TYPE_TABS = [
@@ -35,6 +35,7 @@ export default function AdminRewards() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const limit = 20;
 
   const { data: statsData } = useQuery({
@@ -57,10 +58,17 @@ export default function AdminRewards() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
-        <h2 className="font-bold text-lg text-foreground">奖励明细管理</h2>
-        <Gift size={16} style={{ color: "#C9A227" }} className="ml-1" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
+          <h2 className="font-bold text-lg text-foreground">奖励明细管理</h2>
+          <Gift size={16} style={{ color: "#C9A227" }} className="ml-1" />
+        </div>
+        <Button size="sm" variant="outline" disabled={exporting}
+          style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "36px" }}
+          onClick={async () => { setExporting(true); try { await exportRewardsCSV(type, { search, dateFrom, dateTo }); } finally { setExporting(false); } }}>
+          <Download size={14} className="mr-1" /> {exporting ? "导出中..." : "导出CSV"}
+        </Button>
       </div>
 
       {/* Stats cards */}

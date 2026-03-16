@@ -1172,6 +1172,131 @@ export async function getAdminRewardStats() {
   return stats;
 }
 
+// ============ CSV Export Functions ============
+
+function downloadCSV(filename: string, headers: string[], rows: string[][]) {
+  const bom = "\uFEFF";
+  const csvContent = bom + [headers.join(","), ...rows.map(r => r.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function exportRewardsCSV(type: string, filters?: { search?: string; dateFrom?: string; dateTo?: string }) {
+  let query = supabase.from("rewards").select("*");
+  if (type && type !== "all") {
+    if (type === "equal_level_bonus") {
+      query = query.eq("type", "team_bonus").like("description", "equal-level%");
+    } else if (type === "team_bonus") {
+      query = query.eq("type", "team_bonus").not("description", "like", "equal-level%");
+    } else {
+      query = query.eq("type", type);
+    }
+  }
+  if (filters?.search) query = query.or(`wallet_address.ilike.%${filters.search}%,from_address.ilike.%${filters.search}%`);
+  if (filters?.dateFrom) query = query.gte("created_at", filters.dateFrom);
+  if (filters?.dateTo) query = query.lte("created_at", filters.dateTo + "T23:59:59");
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  const headers = ["ID", "类型", "金额", "获奖人", "来源", "说明", "时间"];
+  const typeLabels: Record<string, string> = { daily: "日收益", direct_referral: "直推奖励", indirect_referral: "间推奖励", team_bonus: "团队分红" };
+  const rows = (data || []).map(r => [
+    r.id,
+    r.description?.startsWith("equal-level") ? "同级奖励" : (typeLabels[r.type] || r.type),
+    parseFloat(r.amount).toFixed(6),
+    r.wallet_address,
+    r.from_address || "",
+    r.description || "",
+    new Date(r.created_at).toLocaleString(),
+  ]);
+  downloadCSV(`rewards_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+}
+
+export async function exportMembersCSV(search?: string, levelFilter?: number | null) {
+  let query = supabase.from("members").select("*");
+  if (search) query = query.ilike("wallet_address", `%${search}%`);
+  if (levelFilter !== null && levelFilter !== undefined && levelFilter >= 0) query = query.eq("level", levelFilter);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  // Batch fetch staking data
+  const wallets = (data || []).map(m => m.wallet_address);
+  const { data: allOrders } = await supabase.from("orders").select("wallet_address, amount, total_earned, status").in("wallet_address", wallets);
+  const stakingMap = new Map<string, number>();
+  const earnedMap = new Map<string, number>();
+  (allOrders || []).forEach(o => {
+    if (o.status === "active") stakingMap.set(o.wallet_address, (stakingMap.get(o.wallet_address) || 0) + parseFloat(o.amount));
+    earnedMap.set(o.wallet_address, (earnedMap.get(o.wallet_address) || 0) + parseFloat(o.total_earned || "0"));
+  });
+
+  const headers = ["钱包地址", "等级", "推荐人", "质押金额", "总收益", "注册时间"];
+  const rows = (data || []).map(m => [
+    m.wallet_address,
+    m.level === 0 ? "普通" : `V${m.level}`,
+    m.referrer_address || "",
+    (stakingMap.get(m.wallet_address) || 0).toFixed(2),
+    (earnedMap.get(m.wallet_address) || 0).toFixed(6),
+    new Date(m.created_at).toLocaleString(),
+  ]);
+  downloadCSV(`members_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+}
+
+export async function exportOrdersCSV(status: string, filters?: { search?: string; productId?: number | null; dateFrom?: string; dateTo?: string }) {
+  let query = supabase.from("orders").select("*");
+  if (status && status !== "all") query = query.eq("status", status);
+  if (filters?.search) query = query.ilike("wallet_address", `%${filters.search}%`);
+  if (filters?.productId) query = query.eq("product_id", filters.productId);
+  if (filters?.dateFrom) query = query.gte("start_date", filters.dateFrom);
+  if (filters?.dateTo) query = query.lte("start_date", filters.dateTo + "T23:59:59");
+  const { data, error } = await query.order("start_date", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  const headers = ["ID", "产品", "钱包地址", "金额", "日利率", "天数", "已赚", "状态", "开始日期", "结束日期", "交易哈希"];
+  const statusLabels: Record<string, string> = { active: "进行中", completed: "已完成", cancelled: "已取消" };
+  const rows = (data || []).map(o => [
+    o.id,
+    o.product_name,
+    o.wallet_address,
+    parseFloat(o.amount).toFixed(2),
+    o.daily_rate + "%",
+    o.days,
+    parseFloat(o.total_earned || "0").toFixed(6),
+    statusLabels[o.status] || o.status,
+    new Date(o.start_date).toLocaleDateString(),
+    new Date(o.end_date).toLocaleDateString(),
+    o.tx_hash || "",
+  ]);
+  downloadCSV(`orders_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+}
+
+export async function exportWithdrawalsCSV(status: string) {
+  let query = supabase.from("withdrawals").select("*");
+  if (status && status !== "all") query = query.eq("status", status);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  const headers = ["ID", "钱包地址", "金额", "手续费", "实际金额", "状态", "申请时间", "处理时间", "交易哈希", "批次ID"];
+  const statusLabels: Record<string, string> = { pending: "待审核", approved: "已批准", completed: "已完成", rejected: "已拒绝" };
+  const rows = (data || []).map(w => [
+    w.id,
+    w.wallet_address,
+    parseFloat(w.amount).toFixed(6),
+    parseFloat(w.fee || "0").toFixed(6),
+    parseFloat(w.actual_amount || "0").toFixed(6),
+    statusLabels[w.status] || w.status,
+    new Date(w.created_at).toLocaleString(),
+    w.processed_at ? new Date(w.processed_at).toLocaleString() : "",
+    w.tx_hash || "",
+    w.batch_id || "",
+  ]);
+  downloadCSV(`withdrawals_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+}
+
 export async function deleteAdminUser(id: number) {
   const session = getAdminSession();
   if (!session) throw new Error("未登录");

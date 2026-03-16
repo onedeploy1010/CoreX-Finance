@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminOrders, getProducts, getOrderShareStats, DBProduct } from "@/lib/api";
+import { getAdminOrders, getProducts, getOrderShareStats, DBProduct, exportOrdersCSV } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Eye, Search, Filter, Calendar, BarChart3 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Search, Filter, Calendar, BarChart3, Download } from "lucide-react";
 import { CopyableAddress } from "@/components/CopyableAddress";
 
 const STATUS_TABS = [
@@ -68,6 +68,7 @@ export default function AdminOrders() {
   const [showFilters, setShowFilters] = useState(false);
 
   const [showStats, setShowStats] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   const { data: dbProducts = [] } = useQuery({
     queryKey: ["/api/products"],
@@ -139,13 +140,20 @@ export default function AdminOrders() {
           <h2 className="font-bold text-lg text-foreground">订单管理</h2>
           <span className="text-xs text-muted-foreground ml-2">共 {d?.total || 0} 条</span>
         </div>
-        <button
-          onClick={() => setShowStats(!showStats)}
-          className="p-2 rounded-lg"
-          style={{ background: showStats ? "rgba(201,162,39,0.15)" : "rgba(255,255,255,0.04)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.2)" }}
-        >
-          <BarChart3 size={14} />
-        </button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" disabled={exporting}
+            style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "36px" }}
+            onClick={async () => { setExporting(true); try { await exportOrdersCSV(status, { search, productId: appliedProductFilter, dateFrom: appliedDateFrom, dateTo: appliedDateTo }); } finally { setExporting(false); } }}>
+            <Download size={14} className="mr-1" /> {exporting ? "导出中..." : "导出CSV"}
+          </Button>
+          <button
+            onClick={() => setShowStats(!showStats)}
+            className="p-2 rounded-lg"
+            style={{ background: showStats ? "rgba(201,162,39,0.15)" : "rgba(255,255,255,0.04)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.2)" }}
+          >
+            <BarChart3 size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Product share statistics */}
