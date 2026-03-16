@@ -33,7 +33,7 @@ BEGIN
       WHERE wallet_address = v_leader.wallet_address
         AND type = 'team_bonus'
         AND description NOT LIKE 'equal-level%'
-        AND created_at::DATE = CURRENT_DATE
+        AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE
     ) THEN
       CONTINUE;
     END IF;
@@ -78,7 +78,7 @@ BEGIN
       VALUES (v_leader.wallet_address, 'team_bonus', v_team_reward,
               '业绩:' || TRIM(TO_CHAR(v_team_staking, '999999999999')) || '|利率:' || v_highest_rate || '|比例:' || v_bonus_rate);
 
-      -- Cascading equal-level bonus: up to 3 same-level ancestors (10% each)
+      -- Cascading equal-level bonus: up to 3 same-level ancestors (10% each, decreasing)
       v_prev_bonus := v_team_reward;
       v_current_addr := v_leader.referrer_address;
       v_equal_count := 0;

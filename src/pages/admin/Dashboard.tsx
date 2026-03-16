@@ -1,6 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAdminDashboard } from "@/lib/api";
-import { Users, ShoppingCart, ArrowDownToLine, DollarSign, TrendingUp, Clock, Crown } from "lucide-react";
+import { Users, ShoppingCart, ArrowDownToLine, DollarSign, TrendingUp, Clock, Crown, Activity, CheckCircle2, XCircle, Loader2, RefreshCw } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { Link } from "wouter";
+import {
+  COREX_INVESTMENT_ADDRESS,
+  getProductCount,
+  isAuthorizedCaller,
+  getFundingWallet,
+  getUSDTBalance,
+  formatUSDT,
+} from "@/lib/contracts";
 
 function StatCard({ icon: Icon, label, value, sub, color }: { icon: any; label: string; value: string; sub?: string; color?: string }) {
   return (
@@ -39,6 +50,169 @@ function SimpleBarChart({ data, labelKey, valueKey, title }: { data: any[]; labe
   );
 }
 
+interface QuickCheck {
+  label: string;
+  status: "ok" | "error" | "warn" | "loading";
+  detail?: string;
+}
+
+function SystemCheckCard() {
+  const [checking, setChecking] = useState(false);
+  const [checks, setChecks] = useState<QuickCheck[] | null>(null);
+
+  const runCheck = async () => {
+    setChecking(true);
+    const results: QuickCheck[] = [];
+
+    // Database
+    try {
+      const start = Date.now();
+      const { error } = await supabase.from("members").select("*", { count: "exact", head: true });
+      const ms = Date.now() - start;
+      results.push({ label: "数据库连接", status: error ? "error" : "ok", detail: error ? error.message : `${ms}ms` });
+    } catch (e: any) {
+      results.push({ label: "数据库连接", status: "error", detail: e.message });
+    }
+
+    // Investment contract
+    try {
+      const pCount = await getProductCount().catch(() => -1);
+      results.push({ label: "Investment合约", status: pCount >= 0 ? "ok" : "error", detail: pCount >= 0 ? `${pCount} 个产品` : "无法连接" });
+    } catch {
+      results.push({ label: "Investment合约", status: "error", detail: "无法连接" });
+    }
+
+    // Distributor auth
+    try {
+      const auth = await isAuthorizedCaller(COREX_INVESTMENT_ADDRESS).catch(() => null);
+      results.push({ label: "Distributor授权", status: auth === true ? "ok" : "error", detail: auth === true ? "已授权" : "未授权" });
+    } catch {
+      results.push({ label: "Distributor授权", status: "error", detail: "检查失败" });
+    }
+
+    // Withdrawal wallet balance
+    try {
+      const fw = await getFundingWallet().catch(() => "");
+      if (fw && fw !== "0x0000000000000000000000000000000000000000") {
+        const bal = await getUSDTBalance(fw).catch(() => BigInt(0));
+        results.push({ label: "提现钱包余额", status: bal > BigInt(0) ? "ok" : "warn", detail: `${formatUSDT(bal)} USDT` });
+      } else {
+        results.push({ label: "提现钱包", status: "error", detail: "未配置" });
+      }
+    } catch {
+      results.push({ label: "提现钱包", status: "error", detail: "检查失败" });
+    }
+
+    // Data integrity
+    try {
+      const { data: issues, error } = await supabase.rpc("admin_data_integrity_check");
+      if (!error && issues) {
+        const wrongCount = (issues as any[]).reduce((s: number, i: any) => s + (i.wrong || 0), 0);
+        results.push({ label: "数据完整性", status: wrongCount === 0 ? "ok" : "warn", detail: wrongCount === 0 ? "全部通过" : `${wrongCount} 条异常` });
+      }
+    } catch {
+      results.push({ label: "数据完整性", status: "error", detail: "检查失败" });
+    }
+
+    // Daily settlement check
+    try {
+      const { data: sData, error: sError } = await supabase.rpc("admin_settlement_check");
+      if (!sError && sData) {
+        const settled = sData.today_settled;
+        const activeOrders = sData.active_orders || 0;
+        const dailyCount = sData.today_daily_count || 0;
+        const matchOrders = activeOrders > 0 && dailyCount === activeOrders;
+        results.push({
+          label: "每日结算",
+          status: settled ? (matchOrders ? "ok" : "warn") : "error",
+          detail: settled
+            ? `${dailyCount}/${activeOrders} 笔 | ${sData.today_daily_sum} U`
+            : `未结算 (${activeOrders} 活跃订单)`,
+        });
+      }
+    } catch {
+      results.push({ label: "每日结算", status: "error", detail: "检查失败" });
+    }
+
+    // Env config
+    const supabaseOk = !!import.meta.env.VITE_SUPABASE_URL;
+    const thirdwebOk = !!import.meta.env.VITE_THIRDWEB_CLIENT_ID;
+    results.push({ label: "环境配置", status: supabaseOk && thirdwebOk ? "ok" : "error", detail: !supabaseOk ? "Supabase未配置" : !thirdwebOk ? "Thirdweb未配置" : "正常" });
+
+    setChecks(results);
+    setChecking(false);
+  };
+
+  const okCount = checks?.filter(c => c.status === "ok").length || 0;
+  const totalCount = checks?.length || 0;
+  const allOk = checks && checks.every(c => c.status === "ok");
+
+  return (
+    <div className="rounded-xl p-4" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Activity size={16} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-semibold text-foreground">系统环境检查</span>
+          {checks && (
+            <span className="text-[10px] px-2 py-0.5 rounded" style={{
+              background: allOk ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.1)",
+              color: allOk ? "#22c55e" : "#f59e0b",
+            }}>
+              {okCount}/{totalCount} 通过
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/system">
+            <span className="text-[10px] text-muted-foreground hover:underline cursor-pointer">详情</span>
+          </Link>
+          <button
+            onClick={runCheck}
+            disabled={checking}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={{
+              background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
+              color: "#0c0a08",
+              opacity: checking ? 0.7 : 1,
+            }}
+          >
+            {checking ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            {checking ? "检测中..." : "检查"}
+          </button>
+        </div>
+      </div>
+
+      {!checks && !checking && (
+        <div className="text-center py-4 text-xs text-muted-foreground">
+          点击「检查」按钮运行系统环境检测
+        </div>
+      )}
+
+      {checking && !checks && (
+        <div className="flex items-center justify-center py-4 gap-2 text-muted-foreground text-xs">
+          <Loader2 size={14} className="animate-spin" /> 正在检测系统环境...
+        </div>
+      )}
+
+      {checks && (
+        <div className="space-y-1">
+          {checks.map((c, i) => (
+            <div key={i} className="flex items-center justify-between py-1.5 text-xs" style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
+              <div className="flex items-center gap-2">
+                {c.status === "ok" ? <CheckCircle2 size={12} style={{ color: "#22c55e" }} /> :
+                 c.status === "error" ? <XCircle size={12} style={{ color: "#ef4444" }} /> :
+                 <CheckCircle2 size={12} style={{ color: "#f59e0b" }} />}
+                <span className="text-foreground">{c.label}</span>
+              </div>
+              <span className="text-muted-foreground">{c.detail}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { data, isLoading } = useQuery({ queryKey: ["/api/admin/dashboard"], queryFn: getAdminDashboard });
 
@@ -66,6 +240,9 @@ export default function Dashboard() {
         <StatCard icon={DollarSign} label="累计奖励(U)" value={parseFloat(d.totalRewards || 0).toFixed(6)} />
         <StatCard icon={ShoppingCart} label="已完成订单(U)" value={parseFloat(d.completedOrderAmount || 0).toFixed(6)} />
       </div>
+
+      {/* System Environment Check */}
+      <SystemCheckCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SimpleBarChart data={d.dailyMemberCounts || []} labelKey="date" valueKey="count" title="每日注册会员" />

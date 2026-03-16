@@ -6,14 +6,18 @@ import { ChevronLeft, ChevronRight, ScrollText, UserCog } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   superadmin: "超管",
+  tech: "技术调试",
   finance: "财务",
   customer_service: "客服",
+  custom: "自定义",
 };
 
 const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
   superadmin: { bg: "rgba(239,68,68,0.1)", color: "#ef4444" },
+  tech: { bg: "rgba(168,85,247,0.1)", color: "#a855f7" },
   finance: { bg: "rgba(59,130,246,0.1)", color: "#3b82f6" },
   customer_service: { bg: "rgba(34,197,94,0.1)", color: "#22c55e" },
+  custom: { bg: "rgba(201,162,39,0.1)", color: "#C9A227" },
 };
 
 export default function AdminLogs() {

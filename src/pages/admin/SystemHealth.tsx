@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, Loader2, CheckCircle2, XCircle, Database, Clock, Server, Link2, Cpu, ShieldCheck, Wrench } from "lucide-react";
+import { RefreshCw, Loader2, CheckCircle2, XCircle, Database, Clock, Server, Link2, Cpu, ShieldCheck, Wrench, CalendarCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   COREX_INVESTMENT_ADDRESS,
@@ -25,9 +25,11 @@ export default function SystemHealth() {
   const [envInfo, setEnvInfo] = useState<{ label: string; value: string }[]>([]);
   const [dbStats, setDbStats] = useState<{ label: string; value: string }[]>([]);
   const [contractStats, setContractStats] = useState<{ label: string; value: string; status?: "ok" | "warn" | "error" }[]>([]);
-  const [cronJobs, setCronJobs] = useState<{ name: string; schedule: string; lastRun?: string }[]>([]);
+  const [cronJobs, setCronJobs] = useState<{ name: string; schedule: string }[]>([]);
+  const [cronHistory, setCronHistory] = useState<any[]>([]);
   const [integrityIssues, setIntegrityIssues] = useState<{ key: string; label: string; total: number; correct: number; wrong: number; fixable: boolean; rule: string }[]>([]);
   const [fixing, setFixing] = useState<string | null>(null);
+  const [settlement, setSettlement] = useState<any>(null);
 
   useEffect(() => { runHealthCheck(); }, []);
 
@@ -151,13 +153,45 @@ export default function SystemHealth() {
       healthChecks.push({ label: "数据完整性", status: "error", detail: "检查失败" });
     }
 
-    // 7. Cron jobs check
+    // 6. Daily settlement check
     try {
-      const { data } = await supabase.rpc("admin_list_admins"); // just test RPC works
+      const { data: sData, error: sError } = await supabase.rpc("admin_settlement_check");
+      if (!sError && sData) {
+        setSettlement(sData);
+        const settled = sData.today_settled;
+        const activeOrders = sData.active_orders || 0;
+        const dailyCount = sData.today_daily_count || 0;
+        const matchOrders = activeOrders > 0 && dailyCount === activeOrders;
+        healthChecks.push({
+          label: "每日结算",
+          status: settled ? (matchOrders ? "ok" : "warn") : "error",
+          detail: settled
+            ? `已发放 ${dailyCount}/${activeOrders} 笔 | ${sData.today_daily_sum} U`
+            : `未结算 (活跃订单 ${activeOrders})`,
+        });
+      }
+    } catch {
+      healthChecks.push({ label: "每日结算", status: "error", detail: "检查失败" });
+    }
+
+    // 7. Cron jobs check + execution history
+    try {
       setCronJobs([
-        { name: "process_daily()", schedule: "0 16 * * * (每天 UTC 16:00)", lastRun: "自动执行" },
+        { name: "process_daily()", schedule: "0 16 * * * (每天 UTC 16:00 / 北京 00:00)" },
+        { name: "process_daily_share_growth()", schedule: "5 0 * * * (每天 UTC 00:05 / 北京 08:05)" },
       ]);
-      healthChecks.push({ label: "定时任务配置", status: "ok", detail: "process_daily 每天 16:00 UTC" });
+      const { data: cronData } = await supabase.rpc("admin_cron_history");
+      if (cronData) {
+        setCronHistory(cronData);
+        const failedCount = (cronData as any[]).filter((c: any) => c.status !== "succeeded").length;
+        healthChecks.push({
+          label: "定时任务",
+          status: failedCount > 0 ? "warn" : "ok",
+          detail: failedCount > 0 ? `${failedCount} 次失败` : `最近 ${(cronData as any[]).length} 次全部成功`,
+        });
+      } else {
+        healthChecks.push({ label: "定时任务", status: "ok", detail: "2 个定时任务" });
+      }
     } catch {
       healthChecks.push({ label: "定时任务配置", status: "warn", detail: "无法验证" });
     }
@@ -201,8 +235,18 @@ export default function SystemHealth() {
           <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
           <h2 className="font-bold text-lg text-foreground">系统环境</h2>
         </div>
-        <button onClick={runHealthCheck} disabled={loading} className="p-2 rounded-lg" style={{ color: "#C9A227" }}>
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+        <button
+          onClick={runHealthCheck}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          style={{
+            background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
+            color: "#0c0a08",
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {loading ? "检测中..." : "重新检查"}
         </button>
       </div>
 
@@ -351,13 +395,105 @@ export default function SystemHealth() {
         )}
       </div>
 
+      {/* Daily Settlement Status */}
+      {settlement && (
+        <div className="rounded-xl p-4 space-y-2" style={cardStyle}>
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarCheck size={16} style={{ color: "#C9A227" }} />
+            <span className="text-sm font-semibold">每日结算状态</span>
+            <span className="text-[10px] px-2 py-0.5 rounded ml-auto" style={{
+              background: settlement.today_settled ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+              color: settlement.today_settled ? "#22c55e" : "#ef4444",
+            }}>
+              {settlement.today_settled ? "今日已结算" : "今日未结算"}
+            </span>
+          </div>
+
+          {/* Today summary */}
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(201,162,39,0.04)" }}>
+              <div className="text-base font-bold" style={{ color: "#C9A227" }}>{settlement.active_orders}</div>
+              <div className="text-[10px] text-muted-foreground">活跃订单</div>
+            </div>
+            <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(201,162,39,0.04)" }}>
+              <div className="text-base font-bold" style={{ color: settlement.today_daily_count === settlement.active_orders ? "#22c55e" : "#f59e0b" }}>
+                {settlement.today_daily_count}/{settlement.active_orders}
+              </div>
+              <div className="text-[10px] text-muted-foreground">今日每日收益</div>
+            </div>
+            <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(201,162,39,0.04)" }}>
+              <div className="text-base font-bold" style={{ color: "#C9A227" }}>{settlement.today_daily_sum}</div>
+              <div className="text-[10px] text-muted-foreground">收益(U)</div>
+            </div>
+          </div>
+
+          {/* Today reward breakdown */}
+          <div className="space-y-1 mb-3">
+            {[
+              { label: "直推奖励", count: settlement.today_direct_count },
+              { label: "间推奖励", count: settlement.today_indirect_count },
+              { label: "团队奖", count: settlement.today_team_count, extra: settlement.today_team_sum ? ` | ${settlement.today_team_sum} U` : "" },
+              { label: "同级奖", count: settlement.today_equal_count },
+            ].map((r, i) => (
+              <div key={i} className="flex items-center justify-between py-1 text-xs" style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
+                <span className="text-muted-foreground">{r.label}</span>
+                <span className="text-foreground">{r.count} 笔{r.extra || ""}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between py-1 text-xs">
+              <span className="text-muted-foreground">上次结算时间</span>
+              <span className="text-foreground font-mono">
+                {settlement.last_settlement
+                  ? new Date(settlement.last_settlement).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })
+                  : "无"}
+              </span>
+            </div>
+          </div>
+
+          {/* 7-day history */}
+          {settlement.daily_history && settlement.daily_history.length > 0 && (
+            <>
+              <div className="text-xs font-semibold text-muted-foreground mb-2">近 7 天结算记录</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(201,162,39,0.1)" }}>
+                      <th className="text-left py-1.5 text-muted-foreground font-normal">日期</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-normal">每日</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-normal">直推</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-normal">间推</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-normal">团队</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-normal">同级</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-normal">总额(U)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {settlement.daily_history.map((d: any, i: number) => (
+                      <tr key={i} style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
+                        <td className="py-1.5 text-foreground">{d.cn_date}</td>
+                        <td className="py-1.5 text-right text-foreground">{d.daily_count}</td>
+                        <td className="py-1.5 text-right text-foreground">{d.direct_count}</td>
+                        <td className="py-1.5 text-right text-foreground">{d.indirect_count}</td>
+                        <td className="py-1.5 text-right text-foreground">{d.team_count}</td>
+                        <td className="py-1.5 text-right text-foreground">{d.equal_count}</td>
+                        <td className="py-1.5 text-right font-semibold" style={{ color: "#C9A227" }}>{d.total_sum}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Cron Jobs */}
       <div className="rounded-xl p-4 space-y-2" style={cardStyle}>
         <div className="flex items-center gap-2 mb-3">
           <Clock size={16} style={{ color: "#C9A227" }} />
           <span className="text-sm font-semibold">定时任务</span>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 mb-3">
           {cronJobs.map((j, i) => (
             <div key={i} className="flex items-center justify-between py-1.5 text-xs" style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
               <span className="font-mono text-foreground">{j.name}</span>
@@ -365,6 +501,42 @@ export default function SystemHealth() {
             </div>
           ))}
         </div>
+
+        {/* Cron execution log */}
+        {cronHistory.length > 0 && (
+          <>
+            <div className="text-xs font-semibold text-muted-foreground mb-2">执行记录</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[10px]">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid rgba(201,162,39,0.1)" }}>
+                    <th className="text-left py-1.5 text-muted-foreground font-normal">时间 (北京)</th>
+                    <th className="text-left py-1.5 text-muted-foreground font-normal">任务</th>
+                    <th className="text-center py-1.5 text-muted-foreground font-normal">状态</th>
+                    <th className="text-right py-1.5 text-muted-foreground font-normal">耗时</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cronHistory.map((h: any, i: number) => (
+                    <tr key={i} style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
+                      <td className="py-1.5 text-foreground font-mono">{h.start_time_cn}</td>
+                      <td className="py-1.5 text-foreground">{h.jobname}</td>
+                      <td className="py-1.5 text-center">
+                        <span className="px-1.5 py-0.5 rounded" style={{
+                          background: h.status === "succeeded" ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+                          color: h.status === "succeeded" ? "#22c55e" : "#ef4444",
+                        }}>
+                          {h.status === "succeeded" ? "成功" : "失败"}
+                        </span>
+                      </td>
+                      <td className="py-1.5 text-right text-muted-foreground">{h.duration_ms}ms</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
