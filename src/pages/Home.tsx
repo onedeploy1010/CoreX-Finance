@@ -276,7 +276,6 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
 }
 
 function formatShares(n: number): string {
-  if (n >= 1000000) return (n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 1) + "万";
   if (n >= 10000) return (n / 10000).toFixed(n % 10000 === 0 ? 0 : 1) + "万";
   return n.toLocaleString();
 }
