@@ -135,22 +135,22 @@ function ForecastTab({ fc }: { fc: any }) {
       {/* Risk overview strip */}
       <div className="grid grid-cols-4 gap-2">
         <div className="rounded-xl p-3 text-center" style={cardBg}>
-          <div className="text-[10px] text-muted-foreground">日支出</div>
-          <div className="font-black text-sm" style={{ color: "#ef4444" }}>{fmt(dailyTotal)}</div>
+          <div className="text-xs text-muted-foreground">日支出</div>
+          <div className="font-black text-base" style={{ color: "#ef4444" }}>{fmt(dailyTotal)}</div>
         </div>
         <div className="rounded-xl p-3 text-center" style={cardBg}>
-          <div className="text-[10px] text-muted-foreground">待提现</div>
-          <div className="font-black text-sm" style={{ color: "#f59e0b" }}>{fmt(fc.pendingWithdrawals?.totalAmount || 0)}</div>
-          <div className="text-[9px] text-muted-foreground">{fc.pendingWithdrawals?.count || 0}笔</div>
+          <div className="text-xs text-muted-foreground">待提现</div>
+          <div className="font-black text-base" style={{ color: "#f59e0b" }}>{fmt(fc.pendingWithdrawals?.totalAmount || 0)}</div>
+          <div className="text-[10px] text-muted-foreground">{fc.pendingWithdrawals?.count || 0}笔</div>
         </div>
         <div className="rounded-xl p-3 text-center" style={cardBg}>
-          <div className="text-[10px] text-muted-foreground">可提余额</div>
-          <div className="font-black text-sm" style={{ color: "#f59e0b" }}>{fmt(fc.unrealizedBalance)}</div>
+          <div className="text-xs text-muted-foreground">可提余额</div>
+          <div className="font-black text-base" style={{ color: "#f59e0b" }}>{fmt(fc.unrealizedBalance)}</div>
         </div>
         <div className="rounded-xl p-3 text-center" style={cardBg}>
-          <div className="text-[10px] text-muted-foreground">活跃订单</div>
-          <div className="font-black text-sm" style={{ color: "#C9A227" }}>{fc.activeOrderCount || 0}</div>
-          <div className="text-[9px] text-muted-foreground">{fmt(fc.activeStaking)}U</div>
+          <div className="text-xs text-muted-foreground">活跃订单</div>
+          <div className="font-black text-base" style={{ color: "#C9A227" }}>{fc.activeOrderCount || 0}</div>
+          <div className="text-[10px] text-muted-foreground">{fmt(fc.activeStaking)}U</div>
         </div>
       </div>
 
@@ -188,12 +188,12 @@ function ForecastTab({ fc }: { fc: any }) {
                 <ChevronLeft size={16} />
               </button>
               <div className="text-center">
-                <div className="text-sm font-bold text-foreground">{calY}年{calM}月</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">
+                <div className="text-base font-bold text-foreground">{calY}年{calM}月</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
                   当月新增 <span style={{ color: "#ef4444" }}>{fmt(monthTotal)} U</span>
                   {monthPrincipal > 0 && <span> · 本金 <span style={{ color: "#f59e0b" }}>{fmt(monthPrincipal)}</span></span>}
                 </div>
-                <div className="text-[10px] mt-0.5">
+                <div className="text-xs mt-0.5">
                   月末累积 <span className="font-bold" style={{ color: "#ef4444" }}>{fmt(monthEndCumulative)} U</span>
                 </div>
               </div>
@@ -205,7 +205,7 @@ function ForecastTab({ fc }: { fc: any }) {
             {/* Weekday headers */}
             <div className="grid grid-cols-7 gap-1 mb-1">
               {["一", "二", "三", "四", "五", "六", "日"].map(w => (
-                <div key={w} className="text-center text-[10px] text-muted-foreground py-1">{w}</div>
+                <div key={w} className="text-center text-xs text-muted-foreground py-1">{w}</div>
               ))}
             </div>
 
@@ -242,11 +242,11 @@ function ForecastTab({ fc }: { fc: any }) {
                     }}
                     onClick={() => setSelectedDate(isSelected ? null : dateStr)}
                   >
-                    <span className={`text-[10px] ${isToday ? "font-bold" : ""}`} style={{ color: isToday ? "#C9A227" : hasExpiration ? "#f59e0b" : "rgba(255,255,255,0.4)" }}>
+                    <span className={`text-xs ${isToday ? "font-bold" : ""}`} style={{ color: isToday ? "#C9A227" : hasExpiration ? "#f59e0b" : "rgba(255,255,255,0.5)" }}>
                       {day}
                     </span>
                     {hasData && (
-                      <span className="text-[6px] font-bold mt-0.5" style={{ color: "#ef4444" }}>
+                      <span className="text-[8px] font-bold mt-0.5" style={{ color: "#ef4444" }}>
                         {cumulative >= 10000 ? `${(cumulative / 1000).toFixed(0)}k` : cumulative >= 1000 ? `${(cumulative / 1000).toFixed(1)}k` : fmt(cumulative)}
                       </span>
                     )}
@@ -259,15 +259,15 @@ function ForecastTab({ fc }: { fc: any }) {
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-center gap-4 mt-3 text-[9px] text-muted-foreground">
+            <div className="flex items-center justify-center gap-4 mt-3 text-[11px] text-muted-foreground">
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded" style={{ background: "rgba(239,68,68,0.1)" }} />累积少
+                <div className="w-2.5 h-2.5 rounded" style={{ background: "rgba(239,68,68,0.1)" }} />累积少
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded" style={{ background: "rgba(239,68,68,0.4)" }} />累积多
+                <div className="w-2.5 h-2.5 rounded" style={{ background: "rgba(239,68,68,0.4)" }} />累积多
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#f59e0b" }} />有到期本金
+                <div className="w-2 h-2 rounded-full" style={{ background: "#f59e0b" }} />有到期本金
               </div>
             </div>
           </div>
