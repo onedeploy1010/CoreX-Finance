@@ -707,7 +707,7 @@ export default function AdminFinance() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             <StatCard icon={TrendingUp} label="总入金(U)" value={fmt(d.totalDeposits)} sub={`${d.totalDepositCount || 0} 笔订单`} color="#22c55e" />
-            <StatCard icon={TrendingDown} label="总出金(U)" value={fmt(d.totalWithdrawn)} sub={`${d.totalWithdrawnCount || 0} 笔提现`} color="#ef4444" />
+            <StatCard icon={TrendingDown} label="总出金(U)" value={fmt(d.totalWithdrawn)} sub={`实付 ${fmt(d.totalActualPaid || 0)} + 手续费 ${fmt(d.totalFees || 0)}`} color="#ef4444" />
             <StatCard icon={Wallet} label="净余额(U)" value={fmt(d.netBalance)} />
             <StatCard icon={DollarSign} label="活跃质押(U)" value={fmt(d.activeStaking)} />
             <StatCard icon={ArrowDownToLine} label="累计发放收益(U)" value={fmt(d.totalEarned)} />
