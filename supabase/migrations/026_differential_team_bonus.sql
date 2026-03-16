@@ -48,8 +48,9 @@ BEGIN
     END IF;
 
     -- Calculate DIFFERENTIAL team staking:
-    -- Only count members with level LOWER than leader
-    -- Stop recursion at same-or-higher level members (they have their own team bonus)
+    -- Include same-level members' PERSONAL staking, but stop recursion into their subtrees
+    -- The CTE includes same-level members (first SELECT) but does NOT recurse into them
+    -- So summing ALL members in the CTE gives: lower-level staking + same-level personal staking
     WITH RECURSIVE team AS (
       SELECT m.wallet_address, m.level
       FROM members m
@@ -58,12 +59,11 @@ BEGIN
       SELECT m.wallet_address, m.level
       FROM members m
       INNER JOIN team t ON m.referrer_address = t.wallet_address
-      WHERE t.level < v_leader.level  -- stop recursion at same/higher level
+      WHERE t.level < v_leader.level  -- stop recursion at same/higher level (don't enter their subtrees)
     )
     SELECT COALESCE(SUM(o.amount), 0) INTO v_team_staking
     FROM team t
-    INNER JOIN orders o ON o.wallet_address = t.wallet_address AND o.status = 'active'
-    WHERE t.level < v_leader.level;  -- only count lower level staking
+    INNER JOIN orders o ON o.wallet_address = t.wallet_address AND o.status = 'active';
 
     IF v_team_staking <= 0 THEN
       CONTINUE;
