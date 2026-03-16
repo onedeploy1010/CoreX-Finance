@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, Loader2, CheckCircle2, XCircle, Database, Globe, Clock, Server, Link2, Cpu, TrendingUp, ShieldCheck, Wrench } from "lucide-react";
+import { RefreshCw, Loader2, CheckCircle2, XCircle, Database, Clock, Server, Link2, Cpu, ShieldCheck, Wrench } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { getRewardDistributionCounts } from "@/lib/api";
 import {
   COREX_INVESTMENT_ADDRESS,
   FUND_DISTRIBUTOR_ADDRESS,
@@ -27,8 +26,7 @@ export default function SystemHealth() {
   const [dbStats, setDbStats] = useState<{ label: string; value: string }[]>([]);
   const [contractStats, setContractStats] = useState<{ label: string; value: string; status?: "ok" | "warn" | "error" }[]>([]);
   const [cronJobs, setCronJobs] = useState<{ name: string; schedule: string; lastRun?: string }[]>([]);
-  const [rewardCounts, setRewardCounts] = useState<{ type: string; total: number; dates: number }[]>([]);
-  const [integrityIssues, setIntegrityIssues] = useState<{ key: string; label: string; count: number; fixable: boolean; ids?: number[] }[]>([]);
+  const [integrityIssues, setIntegrityIssues] = useState<{ key: string; label: string; total: number; correct: number; wrong: number; fixable: boolean; rule: string }[]>([]);
   const [fixing, setFixing] = useState<string | null>(null);
 
   useEffect(() => { runHealthCheck(); }, []);
@@ -63,38 +61,25 @@ export default function SystemHealth() {
       healthChecks.push({ label: "数据库连接", status: "error", detail: e.message });
     }
 
-    // 2. DB stats
+    // 2. DB stats (detail card only, no duplicate in health summary)
     try {
-      const [members, orders, rewards, withdrawals, products] = await Promise.all([
+      const [members, orders, rewards, withdrawals, products, activeOrders] = await Promise.all([
         supabase.from("members").select("*", { count: "exact", head: true }),
         supabase.from("orders").select("*", { count: "exact", head: true }),
         supabase.from("rewards").select("*", { count: "exact", head: true }),
         supabase.from("withdrawals").select("*", { count: "exact", head: true }),
         supabase.from("products").select("*", { count: "exact", head: true }),
+        supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "active"),
       ]);
-      const stats = [
+      setDbStats([
         { label: "会员总数", value: String(members.count ?? 0) },
         { label: "订单总数", value: String(orders.count ?? 0) },
+        { label: "活跃订单", value: String(activeOrders.count ?? 0) },
         { label: "奖励记录", value: String(rewards.count ?? 0) },
         { label: "提现记录", value: String(withdrawals.count ?? 0) },
         { label: "产品数量", value: String(products.count ?? 0) },
-      ];
-      setDbStats(stats);
-      healthChecks.push({ label: "数据库统计", status: "ok", detail: `${members.count} 会员 / ${orders.count} 订单` });
-    } catch (e: any) {
-      healthChecks.push({ label: "数据库统计", status: "error", detail: e.message });
-    }
-
-    // 3. Active orders check
-    try {
-      const { data, count } = await supabase
-        .from("orders")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "active");
-      healthChecks.push({ label: "活跃订单", status: (count ?? 0) > 0 ? "ok" : "warn", detail: `${count ?? 0} 笔活跃` });
-    } catch {
-      healthChecks.push({ label: "活跃订单", status: "error", detail: "查询失败" });
-    }
+      ]);
+    } catch {}
 
     // 4. Contract checks
     const cStats: typeof contractStats = [];
@@ -150,26 +135,16 @@ export default function SystemHealth() {
 
     setContractStats(cStats);
 
-    // 5. Reward distribution counts
-    try {
-      const counts = await getRewardDistributionCounts();
-      setRewardCounts(counts);
-      const totalRewards = counts.reduce((s, c) => s + c.total, 0);
-      healthChecks.push({ label: "奖励发放", status: totalRewards > 0 ? "ok" : "warn", detail: `${totalRewards} 条记录` });
-    } catch {
-      healthChecks.push({ label: "奖励发放", status: "error", detail: "查询失败" });
-    }
-
-    // 6. Data integrity check
+    // 5. Data integrity check (detailed reward + order verification)
     try {
       const { data: issues, error } = await supabase.rpc("admin_data_integrity_check");
       if (!error && issues) {
         setIntegrityIssues(issues);
-        const problemCount = issues.filter((i: any) => i.key !== "all_ok").length;
+        const wrongCount = issues.reduce((s: number, i: any) => s + (i.wrong || 0), 0);
         healthChecks.push({
           label: "数据完整性",
-          status: problemCount === 0 ? "ok" : "warn",
-          detail: problemCount === 0 ? "全部通过" : `${problemCount} 项异常`,
+          status: wrongCount === 0 ? "ok" : "warn",
+          detail: wrongCount === 0 ? "全部通过" : `${wrongCount} 条异常`,
         });
       }
     } catch {
@@ -270,7 +245,7 @@ export default function SystemHealth() {
           <Database size={16} style={{ color: "#C9A227" }} />
           <span className="text-sm font-semibold">数据库统计</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {dbStats.map((s, i) => (
             <div key={i} className="rounded-lg p-3 text-center" style={{ background: "rgba(201,162,39,0.04)" }}>
               <div className="text-lg font-bold" style={{ color: "#C9A227" }}>{s.value}</div>
@@ -316,88 +291,62 @@ export default function SystemHealth() {
         </div>
       </div>
 
-      {/* Reward Distribution */}
-      <div className="rounded-xl p-4 space-y-2" style={cardStyle}>
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp size={16} style={{ color: "#C9A227" }} />
-          <span className="text-sm font-semibold">奖励发放统计</span>
-        </div>
-        {rewardCounts.length === 0 ? (
-          <div className="text-xs text-muted-foreground text-center py-4">暂无数据</div>
-        ) : (
-          <div className="space-y-1.5">
-            {rewardCounts.map((r, i) => {
-              const labels: Record<string, string> = {
-                daily: "日利息",
-                direct_referral: "直推奖励",
-                indirect_referral: "间推奖励",
-                team_bonus: "团队奖励",
-                equal_level_bonus: "同级奖励",
-              };
-              return (
-                <div key={i} className="flex items-center justify-between py-1.5 text-xs" style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
-                  <span className="text-foreground">{labels[r.type] || r.type}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-muted-foreground">{r.dates} 天</span>
-                    <span style={{ color: "#C9A227" }}>{r.total} 条</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Data Integrity */}
+      {/* Data Integrity - Detailed Reward & Order Verification */}
       <div className="rounded-xl p-4 space-y-2" style={cardStyle}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <ShieldCheck size={16} style={{ color: "#C9A227" }} />
             <span className="text-sm font-semibold">数据完整性检查</span>
           </div>
-          {integrityIssues.some(i => i.key !== "all_ok" && i.fixable) && (
-            <button
-              onClick={() => fixIssue("all")}
-              disabled={fixing !== null}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold"
-              style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e" }}
-            >
-              {fixing === "all" ? <Loader2 size={10} className="animate-spin" /> : <Wrench size={10} />}
-              一键修复
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {integrityIssues.some(i => i.wrong > 0 && i.fixable) && (
+              <button
+                onClick={() => fixIssue("all")}
+                disabled={fixing !== null}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold"
+                style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e" }}
+              >
+                {fixing === "all" ? <Loader2 size={10} className="animate-spin" /> : <Wrench size={10} />}
+                一键修复
+              </button>
+            )}
+          </div>
         </div>
         {integrityIssues.length === 0 ? (
-          <div className="text-xs text-muted-foreground text-center py-4">检查中...</div>
-        ) : integrityIssues[0]?.key === "all_ok" ? (
-          <div className="flex items-center gap-2 py-2 text-xs" style={{ color: "#22c55e" }}>
-            <CheckCircle2 size={14} />
-            <span>所有数据完整性检查通过</span>
+          <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground text-sm">
+            <Loader2 size={16} className="animate-spin" /> 检查中...
           </div>
         ) : (
-          <div className="space-y-1.5">
-            {integrityIssues.map((issue, i) => (
-              <div key={i} className="flex items-center justify-between py-1.5 text-xs" style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
-                <div className="flex items-center gap-2">
-                  <XCircle size={12} style={{ color: "#f59e0b" }} />
-                  <span className="text-foreground">{issue.label}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b" }}>
-                    {issue.count}
-                  </span>
+          <div className="space-y-2">
+            {integrityIssues.map((item, i) => {
+              const allOk = item.wrong === 0;
+              return (
+                <div key={i} className="rounded-lg p-2.5" style={{ background: "rgba(201,162,39,0.03)", border: `1px solid ${allOk ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.2)"}` }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      {allOk ? <CheckCircle2 size={12} style={{ color: "#22c55e" }} /> : <XCircle size={12} style={{ color: "#f59e0b" }} />}
+                      <span className="text-xs font-semibold text-foreground">{item.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {item.total > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{
+                          background: allOk ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.1)",
+                          color: allOk ? "#22c55e" : "#f59e0b",
+                        }}>
+                          {allOk ? `${item.correct}/${item.total} 通过` : `${item.wrong}/${item.total} 异常`}
+                        </span>
+                      )}
+                      {item.total === 0 && (
+                        <span className="text-[10px] text-muted-foreground">暂无数据</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground pl-5">
+                    规则: {item.rule}
+                  </div>
                 </div>
-                {issue.fixable && (
-                  <button
-                    onClick={() => fixIssue(issue.key)}
-                    disabled={fixing !== null}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px]"
-                    style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227" }}
-                  >
-                    {fixing === issue.key ? <Loader2 size={9} className="animate-spin" /> : <Wrench size={9} />}
-                    修复
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

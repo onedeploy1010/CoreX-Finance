@@ -1101,22 +1101,6 @@ export async function setRewardParams(params: RewardParams) {
   }
 }
 
-// Reward distribution counts by type
-export async function getRewardDistributionCounts(): Promise<{ type: string; total: number; dates: number }[]> {
-  const { data, error } = await supabase.rpc("admin_reward_distribution_counts");
-  if (error) {
-    // Fallback: manual query
-    const types = ["daily", "direct_referral", "indirect_referral", "team_bonus", "equal_level_bonus"];
-    const results: { type: string; total: number; dates: number }[] = [];
-    for (const t of types) {
-      const { count } = await supabase.from("rewards").select("*", { count: "exact", head: true }).eq("type", t);
-      results.push({ type: t, total: count ?? 0, dates: 0 });
-    }
-    return results;
-  }
-  return data || [];
-}
-
 export async function markAllNotificationsRead() {
   const { error } = await supabase
     .from("admin_notifications")

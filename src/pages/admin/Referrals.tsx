@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import {
   Search, Users, Network, ChevronRight, ChevronDown, Crown,
   GitBranch, UserPlus, Layers, Eye, X, ShoppingCart,
-  Wallet, ArrowDownToLine, Gift, Minimize2, Maximize2, FoldVertical
+  Wallet, ArrowDownToLine, Gift, Minimize2, Maximize2, FoldVertical, TrendingUp
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CopyableAddress } from "@/components/CopyableAddress";
 
 // ─── Member Detail Dialog ───────────────────────────────────────────
-function MemberDetailDialog({ address, open, onClose }: { address: string; open: boolean; onClose: () => void }) {
+function MemberDetailDialog({ address, open, onClose, onViewTree }: { address: string; open: boolean; onClose: () => void; onViewTree?: (address: string) => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ["/api/admin/member-detail", address],
     queryFn: () => getAdminMemberDetail(address),
@@ -29,6 +29,16 @@ function MemberDetailDialog({ address, open, onClose }: { address: string; open:
   const totalStaking = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
   const totalEarnings = rewards.reduce((s: number, r: any) => s + parseFloat(r.amount || "0"), 0);
   const totalWithdrawn = withdrawals.filter((w: any) => w.status === "completed").reduce((s: number, w: any) => s + parseFloat(w.amount || "0"), 0);
+
+  // Reward stats by type
+  const rewardByType = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const r of rewards) {
+      const t = r.type || "unknown";
+      map[t] = (map[t] || 0) + parseFloat(r.amount || "0");
+    }
+    return map;
+  }, [rewards]);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -66,6 +76,42 @@ function MemberDetailDialog({ address, open, onClose }: { address: string; open:
               ))}
             </div>
 
+            {/* Reward Stats by Type */}
+            {rewards.length > 0 && (
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <TrendingUp size={11} style={{ color: "#C9A227" }} />
+                  <span className="text-[10px] font-semibold text-muted-foreground">奖励明细</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { key: "daily", label: "日利息", color: "#C9A227" },
+                    { key: "direct_referral", label: "直推奖励", color: "#22c55e" },
+                    { key: "indirect_referral", label: "间推奖励", color: "#3b82f6" },
+                    { key: "team_bonus", label: "团队+同级", color: "#a855f7" },
+                  ].map(({ key, label, color }) => (
+                    <div key={key} className="flex items-center justify-between rounded px-2 py-1.5" style={{ background: "rgba(255,255,255,0.02)" }}>
+                      <span className="text-[10px] text-muted-foreground">{label}</span>
+                      <span className="text-[11px] font-bold" style={{ color }}>
+                        {(rewardByType[key] || 0).toFixed(4)} U
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* View Tree Button */}
+            {onViewTree && (
+              <button
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all"
+                style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227" }}
+                onClick={() => { onViewTree(address); onClose(); }}
+              >
+                <Network size={12} /> 查看推荐关系树
+              </button>
+            )}
+
             {/* Referrer */}
             {member.referrerAddress && (
               <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -100,27 +146,6 @@ function MemberDetailDialog({ address, open, onClose }: { address: string; open:
               </div>
             )}
 
-            {/* Rewards */}
-            {rewards.length > 0 && (
-              <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Gift size={12} style={{ color: "#C9A227" }} />
-                  <span className="text-xs font-semibold text-foreground">收益记录 ({rewards.length})</span>
-                </div>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                  {rewards.slice(0, 20).map((r: any) => (
-                    <div key={r.id} className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs"
-                      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <div>
-                        <span className="text-muted-foreground">{r.type}</span>
-                      </div>
-                      <span className="font-medium" style={{ color: "#C9A227" }}>+{parseFloat(r.amount).toFixed(6)} U</span>
-                    </div>
-                  ))}
-                  {rewards.length > 20 && <div className="text-center text-[10px] text-muted-foreground py-1">...还有 {rewards.length - 20} 条</div>}
-                </div>
-              </div>
-            )}
 
             {/* Direct Referrals */}
             {directReferrals.length > 0 && (
@@ -544,7 +569,12 @@ export default function AdminReferrals() {
       </div>
 
       {/* Member Detail Dialog */}
-      <MemberDetailDialog address={detailAddress} open={detailOpen} onClose={() => setDetailOpen(false)} />
+      <MemberDetailDialog
+        address={detailAddress}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        onViewTree={(addr) => { setSearchInput(addr); setSearch(addr); }}
+      />
     </div>
   );
 }
