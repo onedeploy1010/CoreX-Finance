@@ -242,16 +242,16 @@ function ForecastTab({ fc }: { fc: any }) {
                     }}
                     onClick={() => setSelectedDate(isSelected ? null : dateStr)}
                   >
-                    <span className={`text-xs ${isToday ? "font-bold" : ""}`} style={{ color: isToday ? "#C9A227" : hasExpiration ? "#f59e0b" : "rgba(255,255,255,0.5)" }}>
+                    <span className={`text-sm ${isToday ? "font-bold" : "font-medium"}`} style={{ color: isToday ? "#C9A227" : hasExpiration ? "#f59e0b" : "rgba(255,255,255,0.5)" }}>
                       {day}
                     </span>
                     {hasData && (
-                      <span className="text-[8px] font-bold mt-0.5" style={{ color: "#ef4444" }}>
+                      <span className="text-[11px] font-bold mt-0.5" style={{ color: "#ef4444" }}>
                         {cumulative >= 10000 ? `${(cumulative / 1000).toFixed(0)}k` : cumulative >= 1000 ? `${(cumulative / 1000).toFixed(1)}k` : fmt(cumulative)}
                       </span>
                     )}
                     {hasExpiration && (
-                      <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full" style={{ background: "#f59e0b" }} />
+                      <div className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full" style={{ background: "#f59e0b" }} />
                     )}
                   </button>
                 );
