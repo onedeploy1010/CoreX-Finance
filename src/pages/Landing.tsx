@@ -576,21 +576,6 @@ export default function LandingPage() {
           ))}
         </div>
 
-        {/* Bottom CTA */}
-        <button
-          className="w-full py-4 rounded-2xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2 relative overflow-hidden"
-          style={{
-            background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
-            color: "#0c0a08",
-            boxShadow: "0 4px 16px rgba(201,162,39,0.2)",
-            opacity: connecting ? 0.7 : 1,
-          }}
-          onClick={handleConnectWallet}
-          disabled={connecting}
-        >
-          {connecting ? t("landing.connecting") : t("landing.connect_wallet")} <Wallet size={16} strokeWidth={2.5} />
-        </button>
-
         {/* Footer */}
         <div className="text-center space-y-2 pb-4">
           <div className="flex items-center justify-center gap-2">
