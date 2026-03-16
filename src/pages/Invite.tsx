@@ -503,26 +503,106 @@ export default function InvitePage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {/* Table header */}
-                <div className="grid grid-cols-4 gap-2 px-4 py-3 text-[10px] font-semibold rounded-xl"
-                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.45)" }}>
-                  <span>{t("invite.date")}</span>
-                  <span className="text-right">{t("invite.performance")}</span>
-                  <span className="text-right">{t("invite.max_rate")}</span>
-                  <span className="text-right">{t("invite.rewards")}</span>
+                {/* Formula reminder */}
+                <div className="rounded-xl px-4 py-3 text-[10px] leading-relaxed"
+                  style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.15)", color: "rgba(255,255,255,0.4)" }}>
+                  {t("invite.team_formula_note")}
                 </div>
                 {filteredRewards.map((reward: any) => {
                   const desc = reward.description || "";
-                  const perfMatch = desc.match(/业绩:(\d+)/);
+                  const perfMatch = desc.match(/业绩:\s*(\d+)/);
                   const rateMatch = desc.match(/利率:([\d.]+)/);
-                  const perf = perfMatch ? parseFloat(perfMatch[1]).toLocaleString() : "-";
-                  const rate = rateMatch ? rateMatch[1] + "%" : "-";
+                  const ratioMatch = desc.match(/比例:(\d+)/);
+                  const perf = perfMatch ? parseFloat(perfMatch[1]) : 0;
+                  const rate = rateMatch ? parseFloat(rateMatch[1]) : 0;
+                  const ratio = ratioMatch ? parseInt(ratioMatch[1]) : 0;
                   return (
-                    <div key={reward.id} className="grid grid-cols-4 gap-2 px-4 py-3.5 rounded-xl items-center" style={cardStyle}>
-                      <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>{new Date(reward.createdAt).toLocaleDateString()}</span>
-                      <span className="text-xs font-semibold text-right" style={{ color: "#F0D060" }}>{perf}</span>
-                      <span className="text-xs font-semibold text-right" style={{ color: "#D4AF37" }}>{rate}</span>
-                      <span className="text-xs font-bold text-right" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(6)}</span>
+                    <div key={reward.id} className="rounded-xl p-4 space-y-3" style={cardStyle}>
+                      {/* Header: date + amount */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>{new Date(reward.createdAt).toLocaleDateString()}</span>
+                        <span className="font-bold text-sm" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(6)} U</span>
+                      </div>
+                      {/* Formula breakdown */}
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                        <div className="text-center">
+                          <div className="text-[9px] mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>{t("invite.diff_performance")}</div>
+                          <div className="text-sm font-bold" style={{ color: "#F0D060" }}>{perf > 0 ? perf.toLocaleString() : "-"}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[9px] mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>{t("invite.daily_rate")}</div>
+                          <div className="text-sm font-bold" style={{ color: "#D4AF37" }}>{rate > 0 ? rate + "%" : "-"}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[9px] mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>{t("invite.level_rate")}</div>
+                          <div className="text-sm font-bold" style={{ color: "#D4AF37" }}>{ratio > 0 ? ratio + "%" : "-"}</div>
+                        </div>
+                      </div>
+                      {/* Calculation formula line */}
+                      {perf > 0 && rate > 0 && ratio > 0 && (
+                        <div className="text-[10px] text-center px-3 py-1.5 rounded-lg"
+                          style={{ background: "rgba(201,162,39,0.06)", color: "rgba(255,255,255,0.4)" }}>
+                          {perf.toLocaleString()} × {rate}% × {ratio}% = {(perf * rate / 100 * ratio / 100).toFixed(6)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : rewardSubTab === "equal_level_bonus" ? (
+            filteredRewards.length === 0 ? (
+              <div className="text-center py-16">
+                <Award size={36} className="mx-auto mb-3" style={{ color: "rgba(255,255,255,0.1)" }} />
+                <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.no_reward_records")}</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredRewards.map((reward: any) => {
+                  const desc = reward.description || "";
+                  // Parse: equal-level|N|from:0xABCD...|X.XXXXx10%
+                  const genMatch = desc.match(/equal-level\|(\d+)/);
+                  const fromMatch = desc.match(/from:([0-9a-fA-Fx.]+)/);
+                  const baseMatch = desc.match(/([\d.]+)x10%/);
+                  const gen = genMatch ? parseInt(genMatch[1]) : 0;
+                  const fromAddr = fromMatch ? fromMatch[1] : "";
+                  const base = baseMatch ? parseFloat(baseMatch[1]) : 0;
+                  return (
+                    <div key={reward.id} className="rounded-xl p-4 space-y-2.5" style={cardStyle}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                            style={{ background: "rgba(255,140,0,0.08)", border: "1px solid rgba(255,140,0,0.2)" }}>
+                            <Star size={14} style={{ color: "#FF8C00" }} />
+                          </div>
+                          <div>
+                            <span className="text-xs font-semibold" style={{ color: "#FF8C00" }}>{t("invite.equal_reward")}</span>
+                            {gen > 0 && (
+                              <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] font-semibold"
+                                style={{ background: "rgba(255,140,0,0.1)", color: "#FF8C00" }}>
+                                {t("invite.equal_gen").replace("{n}", String(gen))}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="font-bold text-sm" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(6)} U</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs pl-10">
+                        {fromAddr && (
+                          <>
+                            <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.equal_from")}</span>
+                            <span className="font-mono text-right" style={{ color: "rgba(255,255,255,0.7)" }}>{fromAddr}</span>
+                          </>
+                        )}
+                        {base > 0 && (
+                          <>
+                            <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.equal_base")}</span>
+                            <span className="text-right" style={{ color: "rgba(255,255,255,0.7)" }}>{base.toFixed(4)} × 10%</span>
+                          </>
+                        )}
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.time")}</span>
+                        <span className="text-right" style={{ color: "rgba(255,255,255,0.7)" }}>{new Date(reward.createdAt).toLocaleString()}</span>
+                      </div>
                     </div>
                   );
                 })}
@@ -542,11 +622,10 @@ export default function InvitePage() {
                       <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
                         style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)" }}>
                         {rewardSubTab === "direct_referral" ? <Users size={14} style={{ color: "#F0D060" }} /> :
-                         rewardSubTab === "equal_level_bonus" ? <Star size={14} style={{ color: "#FF8C00" }} /> :
                          <ChevronRight size={14} style={{ color: "#D4AF37" }} />}
                       </div>
                       <span className="text-xs font-semibold" style={{ color: "#D4AF37" }}>
-                        {rewardSubTab === "direct_referral" ? t("invite.direct_reward") : rewardSubTab === "equal_level_bonus" ? t("invite.equal_reward") : t("invite.indirect_reward")}
+                        {rewardSubTab === "direct_referral" ? t("invite.direct_reward") : t("invite.indirect_reward")}
                       </span>
                     </div>
                     <span className="font-bold text-sm" style={{ color: "#FFD700" }}>+{parseFloat(reward.amount).toFixed(6)} U</span>
@@ -638,6 +717,10 @@ export default function InvitePage() {
               <div className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
                 {t("invite.team_formula_desc")}
               </div>
+              <div className="text-[10px] mt-2 leading-relaxed px-3 py-2 rounded-lg"
+                style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.1)", color: "rgba(255,255,255,0.35)" }}>
+                {t("invite.team_formula_note")}
+              </div>
             </div>
             <div className="border-t pt-3" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
               <div className="flex items-center gap-2 mb-2">
@@ -649,7 +732,7 @@ export default function InvitePage() {
               </div>
               <div className="text-[10px] mt-2 leading-relaxed px-3 py-2 rounded-lg"
                 style={{ background: "rgba(255,140,0,0.06)", border: "1px solid rgba(255,140,0,0.1)", color: "rgba(255,255,255,0.35)" }}>
-                例: A(V2) 团队奖励 21.71 → 同级B拿 2.171 → 同级C拿 0.217 → 同级D拿 0.0217 (最多3代)
+                {t("invite.equal_example")}
               </div>
             </div>
           </div>
