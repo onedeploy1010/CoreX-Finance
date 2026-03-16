@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, Loader2, CheckCircle2, XCircle, Database, Globe, Clock, Server, Link2, Cpu } from "lucide-react";
+import { RefreshCw, Loader2, CheckCircle2, XCircle, Database, Globe, Clock, Server, Link2, Cpu, TrendingUp, ShieldCheck, Wrench } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getRewardDistributionCounts } from "@/lib/api";
 import {
   COREX_INVESTMENT_ADDRESS,
   FUND_DISTRIBUTOR_ADDRESS,
@@ -26,6 +27,9 @@ export default function SystemHealth() {
   const [dbStats, setDbStats] = useState<{ label: string; value: string }[]>([]);
   const [contractStats, setContractStats] = useState<{ label: string; value: string; status?: "ok" | "warn" | "error" }[]>([]);
   const [cronJobs, setCronJobs] = useState<{ name: string; schedule: string; lastRun?: string }[]>([]);
+  const [rewardCounts, setRewardCounts] = useState<{ type: string; total: number; dates: number }[]>([]);
+  const [integrityIssues, setIntegrityIssues] = useState<{ key: string; label: string; count: number; fixable: boolean; ids?: number[] }[]>([]);
+  const [fixing, setFixing] = useState<string | null>(null);
 
   useEffect(() => { runHealthCheck(); }, []);
 
@@ -146,7 +150,33 @@ export default function SystemHealth() {
 
     setContractStats(cStats);
 
-    // 5. Cron jobs check
+    // 5. Reward distribution counts
+    try {
+      const counts = await getRewardDistributionCounts();
+      setRewardCounts(counts);
+      const totalRewards = counts.reduce((s, c) => s + c.total, 0);
+      healthChecks.push({ label: "奖励发放", status: totalRewards > 0 ? "ok" : "warn", detail: `${totalRewards} 条记录` });
+    } catch {
+      healthChecks.push({ label: "奖励发放", status: "error", detail: "查询失败" });
+    }
+
+    // 6. Data integrity check
+    try {
+      const { data: issues, error } = await supabase.rpc("admin_data_integrity_check");
+      if (!error && issues) {
+        setIntegrityIssues(issues);
+        const problemCount = issues.filter((i: any) => i.key !== "all_ok").length;
+        healthChecks.push({
+          label: "数据完整性",
+          status: problemCount === 0 ? "ok" : "warn",
+          detail: problemCount === 0 ? "全部通过" : `${problemCount} 项异常`,
+        });
+      }
+    } catch {
+      healthChecks.push({ label: "数据完整性", status: "error", detail: "检查失败" });
+    }
+
+    // 7. Cron jobs check
     try {
       const { data } = await supabase.rpc("admin_list_admins"); // just test RPC works
       setCronJobs([
@@ -159,6 +189,22 @@ export default function SystemHealth() {
 
     setChecks(healthChecks);
     setLoading(false);
+  };
+
+  const fixIssue = async (key: string) => {
+    setFixing(key);
+    try {
+      const { data, error } = await supabase.rpc("admin_data_integrity_fix", { p_key: key });
+      if (error) {
+        alert("修复失败: " + error.message);
+      } else {
+        alert(data);
+        runHealthCheck();
+      }
+    } catch (e: any) {
+      alert("修复失败: " + e.message);
+    }
+    setFixing(null);
   };
 
   const StatusIcon = ({ status }: { status: string }) => {
@@ -268,6 +314,92 @@ export default function SystemHealth() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Reward Distribution */}
+      <div className="rounded-xl p-4 space-y-2" style={cardStyle}>
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp size={16} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-semibold">奖励发放统计</span>
+        </div>
+        {rewardCounts.length === 0 ? (
+          <div className="text-xs text-muted-foreground text-center py-4">暂无数据</div>
+        ) : (
+          <div className="space-y-1.5">
+            {rewardCounts.map((r, i) => {
+              const labels: Record<string, string> = {
+                daily: "日利息",
+                direct_referral: "直推奖励",
+                indirect_referral: "间推奖励",
+                team_bonus: "团队奖励",
+                equal_level_bonus: "同级奖励",
+              };
+              return (
+                <div key={i} className="flex items-center justify-between py-1.5 text-xs" style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
+                  <span className="text-foreground">{labels[r.type] || r.type}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted-foreground">{r.dates} 天</span>
+                    <span style={{ color: "#C9A227" }}>{r.total} 条</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Data Integrity */}
+      <div className="rounded-xl p-4 space-y-2" style={cardStyle}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} style={{ color: "#C9A227" }} />
+            <span className="text-sm font-semibold">数据完整性检查</span>
+          </div>
+          {integrityIssues.some(i => i.key !== "all_ok" && i.fixable) && (
+            <button
+              onClick={() => fixIssue("all")}
+              disabled={fixing !== null}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold"
+              style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e" }}
+            >
+              {fixing === "all" ? <Loader2 size={10} className="animate-spin" /> : <Wrench size={10} />}
+              一键修复
+            </button>
+          )}
+        </div>
+        {integrityIssues.length === 0 ? (
+          <div className="text-xs text-muted-foreground text-center py-4">检查中...</div>
+        ) : integrityIssues[0]?.key === "all_ok" ? (
+          <div className="flex items-center gap-2 py-2 text-xs" style={{ color: "#22c55e" }}>
+            <CheckCircle2 size={14} />
+            <span>所有数据完整性检查通过</span>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {integrityIssues.map((issue, i) => (
+              <div key={i} className="flex items-center justify-between py-1.5 text-xs" style={{ borderBottom: "1px solid rgba(201,162,39,0.06)" }}>
+                <div className="flex items-center gap-2">
+                  <XCircle size={12} style={{ color: "#f59e0b" }} />
+                  <span className="text-foreground">{issue.label}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b" }}>
+                    {issue.count}
+                  </span>
+                </div>
+                {issue.fixable && (
+                  <button
+                    onClick={() => fixIssue(issue.key)}
+                    disabled={fixing !== null}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px]"
+                    style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227" }}
+                  >
+                    {fixing === issue.key ? <Loader2 size={9} className="animate-spin" /> : <Wrench size={9} />}
+                    修复
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Cron Jobs */}

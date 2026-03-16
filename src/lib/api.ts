@@ -1065,6 +1065,58 @@ export async function setAutoWithdrawExecMin(amount: number) {
   if (error) throw new Error(error.message);
 }
 
+// Reward parameters
+export interface RewardParams {
+  directRate: number;
+  indirectRate: number;
+  teamRates: number[];
+  equalLevelRate: number;
+  equalLevelGens: number;
+}
+
+export async function getRewardParams(): Promise<RewardParams> {
+  const keys = ["reward_direct_rate", "reward_indirect_rate", "reward_team_rates", "reward_equal_level_rate", "reward_equal_level_gens"];
+  const { data } = await supabase.from("system_settings").select("key, value").in("key", keys);
+  const map = Object.fromEntries((data || []).map(r => [r.key, r.value]));
+  return {
+    directRate: parseFloat(map.reward_direct_rate || "10"),
+    indirectRate: parseFloat(map.reward_indirect_rate || "5"),
+    teamRates: JSON.parse(map.reward_team_rates || "[8,13,18,22,26,30,33]"),
+    equalLevelRate: parseFloat(map.reward_equal_level_rate || "10"),
+    equalLevelGens: parseInt(map.reward_equal_level_gens || "3"),
+  };
+}
+
+export async function setRewardParams(params: RewardParams) {
+  const rows = [
+    { key: "reward_direct_rate", value: params.directRate.toString() },
+    { key: "reward_indirect_rate", value: params.indirectRate.toString() },
+    { key: "reward_team_rates", value: JSON.stringify(params.teamRates) },
+    { key: "reward_equal_level_rate", value: params.equalLevelRate.toString() },
+    { key: "reward_equal_level_gens", value: params.equalLevelGens.toString() },
+  ];
+  for (const row of rows) {
+    const { error } = await supabase.from("system_settings").upsert(row, { onConflict: "key" });
+    if (error) throw new Error(error.message);
+  }
+}
+
+// Reward distribution counts by type
+export async function getRewardDistributionCounts(): Promise<{ type: string; total: number; dates: number }[]> {
+  const { data, error } = await supabase.rpc("admin_reward_distribution_counts");
+  if (error) {
+    // Fallback: manual query
+    const types = ["daily", "direct_referral", "indirect_referral", "team_bonus", "equal_level_bonus"];
+    const results: { type: string; total: number; dates: number }[] = [];
+    for (const t of types) {
+      const { count } = await supabase.from("rewards").select("*", { count: "exact", head: true }).eq("type", t);
+      results.push({ type: t, total: count ?? 0, dates: 0 });
+    }
+    return results;
+  }
+  return data || [];
+}
+
 export async function markAllNotificationsRead() {
   const { error } = await supabase
     .from("admin_notifications")

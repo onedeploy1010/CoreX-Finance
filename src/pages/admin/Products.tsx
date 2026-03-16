@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getAdminProducts, adminCreateProduct, adminUpdateProduct, adminDeleteProduct, adminAddLog, DBProduct } from "@/lib/api";
+import { getAdminProducts, adminCreateProduct, adminUpdateProduct, adminDeleteProduct, adminAddLog, DBProduct, getRewardParams, setRewardParams, RewardParams, hasPermission } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit2, Trash2, Package, TrendingUp, Loader2, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Edit2, Trash2, Package, TrendingUp, Loader2, ArrowUp, ArrowDown, Settings2, Save } from "lucide-react";
 
 function formatShares(n: number): string {
   if (n >= 10000) return (n / 10000).toFixed(1) + "万";
@@ -32,6 +32,120 @@ const emptyForm = {
   name: "", nameEn: "", days: 30, dailyRate: 0.3, minAmount: 200,
   description: "", totalShares: 1000000, usedShares: 0, dailyGrowth: 0,
 };
+
+const TEAM_LEVEL_LABELS = ["V1", "V2", "V3", "V4", "V5", "V6", "V7"];
+
+function RewardParamsSection() {
+  const { toast } = useToast();
+  const [params, setParams] = useState<RewardParams | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const { isLoading } = useQuery({
+    queryKey: ["/api/reward-params"],
+    queryFn: async () => {
+      const p = await getRewardParams();
+      setParams(p);
+      return p;
+    },
+  });
+
+  const handleSave = async () => {
+    if (!params) return;
+    setSaving(true);
+    try {
+      await setRewardParams(params);
+      await adminAddLog("修改奖励参数", "settings", "reward_params");
+      queryClient.invalidateQueries({ queryKey: ["/api/reward-params"] });
+      toast({ title: "奖励参数已保存" });
+    } catch (err: any) {
+      toast({ title: "保存失败", description: err.message, variant: "destructive" });
+    }
+    setSaving(false);
+  };
+
+  const updateTeamRate = (idx: number, val: number) => {
+    if (!params) return;
+    const rates = [...params.teamRates];
+    rates[idx] = val;
+    setParams({ ...params, teamRates: rates });
+  };
+
+  const inputStyle = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "36px" };
+
+  if (isLoading || !params) return null;
+
+  return (
+    <div className="rounded-xl p-4 space-y-3 mt-4" style={{
+      background: "linear-gradient(145deg, #1a1510, #110e0a)",
+      border: "1px solid rgba(201,162,39,0.15)",
+    }}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Settings2 size={16} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-semibold" style={{ color: "#C9A227" }}>奖励参数配置</span>
+        </div>
+        <Button size="sm" disabled={saving} onClick={handleSave}
+          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}>
+          {saving ? <Loader2 size={12} className="mr-1 animate-spin" /> : <Save size={12} className="mr-1" />}
+          保存
+        </Button>
+      </div>
+
+      {/* Referral Rates */}
+      <div className="p-2.5 rounded-lg space-y-2" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
+        <div className="text-xs font-semibold text-muted-foreground">推荐奖励</div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">直推比例 (%)</label>
+            <Input type="number" step="0.1" value={params.directRate}
+              onChange={e => setParams({ ...params, directRate: parseFloat(e.target.value) || 0 })}
+              className="text-xs" style={inputStyle} />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">间推比例 (%)</label>
+            <Input type="number" step="0.1" value={params.indirectRate}
+              onChange={e => setParams({ ...params, indirectRate: parseFloat(e.target.value) || 0 })}
+              className="text-xs" style={inputStyle} />
+          </div>
+        </div>
+      </div>
+
+      {/* Team Bonus Rates */}
+      <div className="p-2.5 rounded-lg space-y-2" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
+        <div className="text-xs font-semibold text-muted-foreground">团队奖励 (V1-V7)</div>
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+          {TEAM_LEVEL_LABELS.map((label, i) => (
+            <div key={label}>
+              <label className="text-[10px] text-muted-foreground mb-1 block text-center">{label}</label>
+              <Input type="number" step="1" value={params.teamRates[i] ?? 0}
+                onChange={e => updateTeamRate(i, parseFloat(e.target.value) || 0)}
+                className="text-xs text-center" style={inputStyle} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Equal Level Bonus */}
+      <div className="p-2.5 rounded-lg space-y-2" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
+        <div className="text-xs font-semibold text-muted-foreground">同级奖励</div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">同级比例 (%)</label>
+            <Input type="number" step="0.1" value={params.equalLevelRate}
+              onChange={e => setParams({ ...params, equalLevelRate: parseFloat(e.target.value) || 0 })}
+              className="text-xs" style={inputStyle} />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">穿透代数</label>
+            <Input type="number" step="1" value={params.equalLevelGens}
+              onChange={e => setParams({ ...params, equalLevelGens: parseInt(e.target.value) || 0 })}
+              className="text-xs" style={inputStyle} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminProducts() {
   const [addOpen, setAddOpen] = useState(false);
@@ -207,6 +321,9 @@ export default function AdminProducts() {
           ))}
         </div>
       )}
+
+      {/* Reward Parameters */}
+      {hasPermission("contracts.write") && <RewardParamsSection />}
 
       {/* Add/Edit Product Dialog */}
       <Dialog open={addOpen || !!editProduct} onOpenChange={(open) => { if (!open) { setAddOpen(false); setEditProduct(null); } }}>
