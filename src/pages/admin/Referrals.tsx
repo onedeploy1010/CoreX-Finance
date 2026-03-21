@@ -213,6 +213,9 @@ function TreeNode({
           style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.08)" }}
           onClick={() => onToggleCollapse(depth)}
         >
+          {member.isObserved && (
+            <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#22c55e", boxShadow: "0 0 4px rgba(34,197,94,0.5)" }} />
+          )}
           <Maximize2 size={10} style={{ color: "rgba(201,162,39,0.5)" }} />
           <span className="text-[10px] text-muted-foreground truncate">
             {member.walletAddress.slice(0, 6)}...{member.walletAddress.slice(-4)}
@@ -237,6 +240,11 @@ function TreeNode({
                 : "1px solid rgba(255,255,255,0.06)",
             }}
           >
+            {/* Observation indicator */}
+            {member.isObserved && (
+              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: "#22c55e", boxShadow: "0 0 6px rgba(34,197,94,0.5)" }} title="观察账户" />
+            )}
+
             {/* Expand icon */}
             <div
               className="w-5 flex items-center justify-center shrink-0 cursor-pointer"

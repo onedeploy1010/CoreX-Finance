@@ -386,11 +386,31 @@ export async function getEarnings(walletAddress: string) {
 
 export async function createWithdrawal(walletAddress: string, amount: number, fee: number) {
   if (amount < WITHDRAW_MIN) throw new Error(`Minimum withdrawal is ${WITHDRAW_MIN} USDT`);
+
+  // Check if withdrawal is allowed for this member
+  const addr = walletAddress.toLowerCase();
+  const { data: member } = await supabase
+    .from("members")
+    .select("principal_withdrawal_enabled, earnings_withdrawal_enabled")
+    .eq("wallet_address", addr)
+    .single();
+  if (member) {
+    if (!member.principal_withdrawal_enabled && !member.earnings_withdrawal_enabled) {
+      throw new Error("提现功能已被管理员关闭");
+    }
+    if (!member.earnings_withdrawal_enabled) {
+      throw new Error("收益提现功能已被管理员关闭");
+    }
+    if (!member.principal_withdrawal_enabled) {
+      throw new Error("本金提现功能已被管理员关闭");
+    }
+  }
+
   const actualAmount = amount - fee;
   const { data, error } = await supabase
     .from("withdrawals")
     .insert({
-      wallet_address: walletAddress.toLowerCase(),
+      wallet_address: addr,
       amount: amount.toString(),
       fee: fee.toString(),
       actual_amount: actualAmount.toString(),
@@ -545,7 +565,7 @@ export async function getAdminDashboard() {
   return data;
 }
 
-export async function getAdminMembers(page: number, limit: number, search: string, levelFilter?: number | null) {
+export async function getAdminMembers(page: number, limit: number, search: string, levelFilter?: number | null, observedFilter?: boolean | null) {
   const offset = (page - 1) * limit;
 
   let query = supabase.from("members").select("*", { count: "exact" });
@@ -554,6 +574,9 @@ export async function getAdminMembers(page: number, limit: number, search: strin
   }
   if (levelFilter !== null && levelFilter !== undefined && levelFilter >= 0) {
     query = query.eq("level", levelFilter);
+  }
+  if (observedFilter === true) {
+    query = query.eq("is_observed", true);
   }
   const { data: memberList, count, error } = await query
     .order("created_at", { ascending: false })
@@ -589,6 +612,9 @@ export async function getAdminMembers(page: number, limit: number, search: strin
       stakingAmount: stakingAmount.toFixed(6),
       totalEarned: totalEarned.toFixed(6),
       directCount: directCount || 0,
+      isObserved: m.is_observed || false,
+      principalWithdrawalEnabled: m.principal_withdrawal_enabled !== false,
+      earningsWithdrawalEnabled: m.earnings_withdrawal_enabled !== false,
     });
   }
 
@@ -606,7 +632,7 @@ export async function getAdminMemberDetail(address: string) {
   const { data: directReferrals } = await supabase.from("members").select("*").eq("referrer_address", addr);
 
   return {
-    member: { ...member, walletAddress: member.wallet_address, referrerAddress: member.referrer_address, lifetimeLock: member.lifetime_lock, createdAt: member.created_at },
+    member: { ...member, walletAddress: member.wallet_address, referrerAddress: member.referrer_address, lifetimeLock: member.lifetime_lock, createdAt: member.created_at, isObserved: member.is_observed || false, principalWithdrawalEnabled: member.principal_withdrawal_enabled !== false, earningsWithdrawalEnabled: member.earnings_withdrawal_enabled !== false },
     orders: memberOrders || [],
     rewards: memberRewards || [],
     withdrawals: memberWithdrawals || [],
@@ -645,6 +671,7 @@ export async function getAdminTeamTree(rootAddress: string) {
       teamActiveAccounts,
       childrenCount: childrenCount || 0,
       hasChildren: (childrenCount || 0) > 0,
+      isObserved: d.is_observed || false,
     });
   }
   return result;
@@ -906,6 +933,7 @@ export async function getAdminReferralTree(search?: string, parentAddr?: string)
       directCount: directCount || 0,
       teamCount: 0,
       hasChildren: (directCount || 0) > 0,
+      isObserved: m.is_observed || false,
     });
   }
 
@@ -1367,4 +1395,17 @@ export async function updateMemberLevel(walletAddress: string, level: number) {
   });
   if (error) throw new Error(error.message);
   return data;
+}
+
+export async function updateMemberObservation(
+  walletAddress: string,
+  options: { isObserved?: boolean; principalWithdrawalEnabled?: boolean; earningsWithdrawalEnabled?: boolean }
+) {
+  const { error } = await supabase.rpc("admin_update_member_observation", {
+    p_wallet_address: walletAddress,
+    p_is_observed: options.isObserved ?? null,
+    p_principal_withdrawal_enabled: options.principalWithdrawalEnabled ?? null,
+    p_earnings_withdrawal_enabled: options.earningsWithdrawalEnabled ?? null,
+  });
+  if (error) throw new Error(error.message);
 }

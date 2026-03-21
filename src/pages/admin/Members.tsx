@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, adminAddLog, hasPermission, adminCreateOrderForMember, adminCancelOrder, getProducts, DBProduct, exportMembersCSV } from "@/lib/api";
+import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, updateMemberObservation, adminAddLog, hasPermission, adminCreateOrderForMember, adminCancelOrder, getProducts, DBProduct, exportMembersCSV } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save, Plus, X, Package, Download } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save, Plus, X, Package, Download, Shield, CircleDot } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
@@ -43,6 +43,9 @@ function TeamTree({ rootAddress }: { rootAddress: string }) {
           {(children as any[]).map((m: any) => (
             <div key={m.walletAddress} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: "rgba(201,162,39,0.04)" }}>
               <div className="flex items-center gap-2">
+                {m.isObserved && (
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: "#22c55e", boxShadow: "0 0 6px rgba(34,197,94,0.5)" }} title="观察账户" />
+                )}
                 <Users size={14} style={{ color: "#C9A227" }} />
                 <CopyableAddress address={m.walletAddress} />
                 <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227" }}>
@@ -78,6 +81,18 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
   const { toast } = useToast();
   const m = data.member;
   const canWrite = hasPermission("members.write");
+
+  const observationMutation = useMutation({
+    mutationFn: async (options: { isObserved?: boolean; principalWithdrawalEnabled?: boolean; earningsWithdrawalEnabled?: boolean }) => {
+      await updateMemberObservation(m.walletAddress, options);
+      await adminAddLog("更新会员观察设置", "member", m.walletAddress, options);
+    },
+    onSuccess: () => {
+      toast({ title: "设置已更新" });
+      onLevelChanged?.();
+    },
+    onError: (err: any) => toast({ title: "更新失败", description: err.message, variant: "destructive" }),
+  });
 
   const { data: dbProducts = [] } = useQuery({
     queryKey: ["/api/products"],
@@ -184,6 +199,59 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
           <div className="text-xs">{m.lifetimeLock ? "是" : "否"}</div>
         </div>
       </div>
+
+      {/* Observation Controls */}
+      {canWrite && (
+        <div className="rounded-lg p-3 space-y-2.5" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.15)" }}>
+          <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "#C9A227" }}>
+            <Shield size={14} /> 账户控制
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">观察账户</span>
+              <button
+                onClick={() => observationMutation.mutate({ isObserved: !m.isObserved })}
+                className="text-xs px-2.5 py-1 rounded-full font-semibold transition-all"
+                style={{
+                  background: m.isObserved ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)",
+                  color: m.isObserved ? "#22c55e" : "rgba(255,255,255,0.4)",
+                  border: m.isObserved ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                {m.isObserved ? "已标记" : "未标记"}
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">本金提现</span>
+              <button
+                onClick={() => observationMutation.mutate({ principalWithdrawalEnabled: !m.principalWithdrawalEnabled })}
+                className="text-xs px-2.5 py-1 rounded-full font-semibold transition-all"
+                style={{
+                  background: m.principalWithdrawalEnabled ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
+                  color: m.principalWithdrawalEnabled ? "#22c55e" : "#ef4444",
+                  border: m.principalWithdrawalEnabled ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(239,68,68,0.3)",
+                }}
+              >
+                {m.principalWithdrawalEnabled ? "开启" : "关闭"}
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">收益提现</span>
+              <button
+                onClick={() => observationMutation.mutate({ earningsWithdrawalEnabled: !m.earningsWithdrawalEnabled })}
+                className="text-xs px-2.5 py-1 rounded-full font-semibold transition-all"
+                style={{
+                  background: m.earningsWithdrawalEnabled ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
+                  color: m.earningsWithdrawalEnabled ? "#22c55e" : "#ef4444",
+                  border: m.earningsWithdrawalEnabled ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(239,68,68,0.3)",
+                }}
+              >
+                {m.earningsWithdrawalEnabled ? "开启" : "关闭"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {data.directReferrals?.length > 0 && (
         <div>
@@ -343,13 +411,21 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
 
 function MemberCard({ m, onView }: { m: any; onView: () => void }) {
   return (
-    <div className="rounded-xl p-3 space-y-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.12)" }}>
+    <div className="rounded-xl p-3 space-y-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: m.isObserved ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(201,162,39,0.12)" }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+          {m.isObserved && (
+            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: "#22c55e", boxShadow: "0 0 6px rgba(34,197,94,0.5)" }} title="观察账户" />
+          )}
           <CopyableAddress address={m.walletAddress} />
           <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>
             {m.level === 0 ? "普通" : `V${m.level}`}
           </span>
+          {m.isObserved && (!m.principalWithdrawalEnabled || !m.earningsWithdrawalEnabled) && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+              {!m.principalWithdrawalEnabled && !m.earningsWithdrawalEnabled ? "提现关闭" : !m.principalWithdrawalEnabled ? "本金关闭" : "收益关闭"}
+            </span>
+          )}
         </div>
         <button onClick={onView} className="p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227", minWidth: "36px", minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Eye size={16} />
@@ -379,12 +455,13 @@ export default function Members() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [levelFilter, setLevelFilter] = useState<number | null>(null);
+  const [observedFilter, setObservedFilter] = useState<boolean | null>(null);
   const [detailAddr, setDetailAddr] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/admin/members", `?page=${page}&limit=20&search=${search}&level=${levelFilter}`],
-    queryFn: () => getAdminMembers(page, 20, search, levelFilter),
+    queryKey: ["/api/admin/members", `?page=${page}&limit=20&search=${search}&level=${levelFilter}&observed=${observedFilter}`],
+    queryFn: () => getAdminMembers(page, 20, search, levelFilter, observedFilter),
   });
 
   const { data: detail } = useQuery({
@@ -440,6 +517,18 @@ export default function Members() {
           <option value="0">普通</option>
           {[1,2,3,4,5,6,7].map(v => <option key={v} value={v}>V{v}</option>)}
         </select>
+        <button
+          onClick={() => { setObservedFilter(observedFilter ? null : true); setPage(1); }}
+          className="text-xs rounded px-2.5 shrink-0 flex items-center gap-1"
+          style={{
+            background: observedFilter ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.04)",
+            border: observedFilter ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(201,162,39,0.25)",
+            color: observedFilter ? "#22c55e" : "#C9A227",
+            minHeight: "40px",
+          }}
+        >
+          <CircleDot size={12} /> 观察
+        </button>
         <Button data-testid="button-search" onClick={handleSearch} className="text-sm" style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "40px" }}>
           搜索
         </Button>
