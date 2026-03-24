@@ -375,8 +375,8 @@ export default function HomePage() {
           >
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
-                <h3 className="font-black text-base" style={{ color }}>{product.nameEn}</h3>
-                <div className="text-xs text-muted-foreground mt-0.5">{getProductName(product)} · {getProductDesc(product)}</div>
+                <h3 className="font-black text-base" style={{ color }}>{getProductName(product)}</h3>
+                <div className="text-xs text-muted-foreground mt-0.5">{getProductDesc(product)}</div>
               </div>
               <Button
                 data-testid={`button-invest-${product.id}`}

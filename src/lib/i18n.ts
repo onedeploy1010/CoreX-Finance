@@ -558,6 +558,11 @@ const translations: Record<string, Partial<Record<Lang, string>>> = {
   "home.day_cycle": { zh: "天周期", "zh-TW": "天周期", en: "day cycle", ko: "일 주기", ja: "日サイクル", vi: "ngày chu kỳ", th: "วัน รอบ", id: "hari siklus", ms: "hari kitaran", fr: "jours cycle", ar: "دورة أيام" },
   "home.daily_rate": { zh: "日利率", "zh-TW": "日利率", en: "Daily Rate", ko: "일일 이율", ja: "日利率", vi: "Lãi suất ngày", th: "อัตราดอกเบี้ยรายวัน", id: "Tarif Harian", ms: "Kadar Harian", fr: "Taux quotidien", ar: "المعدل اليومي" },
   "home.normal": { zh: "普通", "zh-TW": "普通", en: "Normal", ko: "일반", ja: "普通", vi: "Thường", th: "ปกติ", id: "Normal", ms: "Biasa", fr: "Normal", ar: "عادي" },
+  "product.name_1": { zh: "芯未来", "zh-TW": "芯未來", en: "CoreX Future", ko: "CoreX Future", ja: "CoreX Future", vi: "CoreX Future", th: "CoreX Future", id: "CoreX Future", ms: "CoreX Future", fr: "CoreX Future", ar: "CoreX Future" },
+  "product.name_2": { zh: "芯未来1号", "zh-TW": "芯未來1號", en: "CoreX Future I", ko: "CoreX Future I", ja: "CoreX Future I", vi: "CoreX Future I", th: "CoreX Future I", id: "CoreX Future I", ms: "CoreX Future I", fr: "CoreX Future I", ar: "CoreX Future I" },
+  "product.name_3": { zh: "芯未来2号", "zh-TW": "芯未來2號", en: "CoreX Future II", ko: "CoreX Future II", ja: "CoreX Future II", vi: "CoreX Future II", th: "CoreX Future II", id: "CoreX Future II", ms: "CoreX Future II", fr: "CoreX Future II", ar: "CoreX Future II" },
+  "product.name_4": { zh: "芯未来3号", "zh-TW": "芯未來3號", en: "CoreX Future III", ko: "CoreX Future III", ja: "CoreX Future III", vi: "CoreX Future III", th: "CoreX Future III", id: "CoreX Future III", ms: "CoreX Future III", fr: "CoreX Future III", ar: "CoreX Future III" },
+  "product.name_5": { zh: "芯未来4号", "zh-TW": "芯未來4號", en: "CoreX Future IV", ko: "CoreX Future IV", ja: "CoreX Future IV", vi: "CoreX Future IV", th: "CoreX Future IV", id: "CoreX Future IV", ms: "CoreX Future IV", fr: "CoreX Future IV", ar: "CoreX Future IV" },
   "product.desc_1": { zh: "入门级稳健理财", "zh-TW": "入門級穩健理財", en: "Entry-level stable investment", ko: "입문급 안정 투자", ja: "入門レベルの安定投資", vi: "Đầu tư ổn định cấp cơ bản", th: "การลงทุนเบื้องต้นมั่นคง", id: "Investasi stabil pemula", ms: "Pelaburan stabil peringkat permulaan", fr: "Investissement stable débutant", ar: "استثمار مستقر للمبتدئين" },
   "product.desc_2": { zh: "进阶稳健增值", "zh-TW": "進階穩健增值", en: "Advanced stable growth", ko: "고급 안정 성장", ja: "上級安定成長", vi: "Tăng trưởng ổn định nâng cao", th: "การเติบโตมั่นคงขั้นสูง", id: "Pertumbuhan stabil lanjutan", ms: "Pertumbuhan stabil lanjutan", fr: "Croissance stable avancée", ar: "نمو مستقر متقدم" },
   "product.desc_3": { zh: "中期复利增长", "zh-TW": "中期複利增長", en: "Mid-term compound growth", ko: "중기 복리 성장", ja: "中期複利成長", vi: "Tăng trưởng lãi kép trung hạn", th: "การเติบโตทบต้นระยะกลาง", id: "Pertumbuhan bunga majemuk jangka menengah", ms: "Pertumbuhan faedah kompaun jangka sederhana", fr: "Croissance composée à moyen terme", ar: "نمو مركب متوسط الأجل" },
@@ -697,4 +702,19 @@ export function t(key: string, lang?: Lang, vars?: Record<string, string | numbe
 export function shortAddr(addr: string): string {
   if (!addr) return "";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
+
+// Map stored product names (English or Chinese) to translated names
+const productNameMap: Record<string, string> = {
+  "CoreX Future": "product.name_1", "芯未来": "product.name_1",
+  "CoreX Future I": "product.name_2", "芯未来1号": "product.name_2",
+  "CoreX Future II": "product.name_3", "芯未来2号": "product.name_3",
+  "CoreX Future III": "product.name_4", "芯未来3号": "product.name_4",
+  "CoreX Future IV": "product.name_5", "芯未来4号": "product.name_5",
+};
+
+export function translateProductName(name: string): string {
+  const key = productNameMap[name];
+  if (key) return t(key);
+  return name;
 }

@@ -4,7 +4,7 @@ import { useActiveAccount } from "thirdweb/react";
 import { useQuery } from "@tanstack/react-query";
 import { Wallet, TrendingUp, Clock, ClipboardList, Loader2, Shield, Gift, ExternalLink } from "lucide-react";
 import { getOrdersByWallet, getEarnings, getRewardsByWallet } from "@/lib/api";
-import { t, getLang } from "@/lib/i18n";
+import { t, getLang, translateProductName } from "@/lib/i18n";
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<"orders" | "earnings">("orders");
@@ -158,7 +158,7 @@ export default function OrdersPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="font-bold text-sm text-foreground">{order.productName}</div>
+                      <div className="font-bold text-sm text-foreground">{translateProductName(order.productName)}</div>
                       <div className="text-xs text-muted-foreground">Order #{order.id}</div>
                     </div>
                     <Badge
@@ -265,7 +265,7 @@ export default function OrdersPage() {
                   {r.productName && (
                     <>
                       <span className="text-muted-foreground">{t("reward.product")}</span>
-                      <span className="text-right">{r.productName}</span>
+                      <span className="text-right">{translateProductName(r.productName)}</span>
                     </>
                   )}
                   {r.orderAmount && (

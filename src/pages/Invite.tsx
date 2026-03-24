@@ -7,7 +7,7 @@ import { getTeamStats, getEarnings, getRewardsByWallet, getDirectReferrals, getI
 import { useToast } from "@/hooks/use-toast";
 import { Copy, Users, UserPlus, Crown, ChevronRight, ChevronDown, Star, ArrowLeft, TrendingUp, BarChart3, Loader2, Wallet, Award, Search } from "lucide-react";
 import { LEVEL_CONFIG } from "@shared/schema";
-import { t } from "@/lib/i18n";
+import { t, translateProductName } from "@/lib/i18n";
 
 interface MemberInfo {
   walletAddress: string;
@@ -646,7 +646,7 @@ export default function InvitePage() {
                     {reward.productName && (
                       <>
                         <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("invite.source_product")}</span>
-                        <span className="text-right" style={{ color: "rgba(255,255,255,0.7)" }}>{reward.productName}</span>
+                        <span className="text-right" style={{ color: "rgba(255,255,255,0.7)" }}>{translateProductName(reward.productName)}</span>
                       </>
                     )}
                     {reward.orderAmount && (

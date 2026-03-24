@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getMember, getEarnings, getRewardsByWallet, getWithdrawalsByWallet, getOrdersByWallet, createWithdrawal } from "@/lib/api";
 import { WITHDRAW_MIN, WITHDRAW_FEE, WITHDRAW_MULTIPLE } from "@shared/schema";
-import { t, getLang, shortAddr } from "@/lib/i18n";
+import { t, getLang, shortAddr, translateProductName } from "@/lib/i18n";
 import {
   User, Bell, Globe, ChevronRight, Check, Clock,
   LogOut, Copy, Wallet, Crown, Award, BellRing, BellOff,
@@ -122,7 +122,7 @@ export default function ProfilePage() {
       label: t("profile.invest_label"),
       amount: `−${parseFloat(o.amount).toFixed(6)}`,
       amountColor: "#ef4444",
-      detail: o.productName || o.product_name,
+      detail: translateProductName(o.productName || o.product_name || ""),
       date: o.startDate || o.start_date,
     })),
     ...(rewardList as any[]).map((r: any) => ({
@@ -131,7 +131,7 @@ export default function ProfilePage() {
       label: r.type === "daily" ? t("reward.daily") : r.type === "direct_referral" ? t("reward.direct_referral") : r.type === "indirect_referral" ? t("reward.indirect_referral") : r.type === "team_bonus" ? t("reward.team_bonus") : t("invite.rewards"),
       amount: `+${parseFloat(r.amount).toFixed(6)}`,
       amountColor: "#C9A227",
-      detail: r.productName || r.description || "",
+      detail: r.productName ? translateProductName(r.productName) : (r.description || ""),
       date: r.createdAt,
     })),
     ...(withdrawalList as any[]).map((w: any) => ({
