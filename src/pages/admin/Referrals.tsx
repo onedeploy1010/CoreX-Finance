@@ -382,6 +382,7 @@ function TreeNode({
 export default function AdminReferrals() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [levelFilter, setLevelFilter] = useState<number | null>(null);
   const [collapsedDepths, setCollapsedDepths] = useState<Set<number>>(new Set());
   const [detailAddress, setDetailAddress] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
@@ -394,8 +395,8 @@ export default function AdminReferrals() {
   }, []);
 
   const { data, isLoading } = useQuery<any>({
-    queryKey: ["/api/admin/referrals/tree", search ? `?search=${search}` : ""],
-    queryFn: () => getAdminReferralTree(search || undefined),
+    queryKey: ["/api/admin/referrals/tree", search ? `?search=${search}` : "", `level=${levelFilter}`],
+    queryFn: () => getAdminReferralTree(search || undefined, undefined, levelFilter),
   });
 
   const treeMembers = (data as any)?.members || [];
@@ -456,7 +457,7 @@ export default function AdminReferrals() {
         </div>
       )}
 
-      {/* Search */}
+      {/* Search + Level Filter */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -469,6 +470,19 @@ export default function AdminReferrals() {
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "40px" }}
           />
         </div>
+        <select
+          value={levelFilter === null ? "all" : levelFilter.toString()}
+          onChange={e => {
+            const v = e.target.value;
+            setLevelFilter(v === "all" ? null : parseInt(v));
+          }}
+          className="text-xs rounded px-2 shrink-0"
+          style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "40px", minWidth: "80px" }}
+        >
+          <option value="all">全部等级</option>
+          <option value="0">普通</option>
+          {[1,2,3,4,5,6,7].map(v => <option key={v} value={v}>V{v}</option>)}
+        </select>
         <Button onClick={handleSearch} className="text-sm" style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "40px" }}>
           搜索
         </Button>
@@ -545,7 +559,9 @@ export default function AdminReferrals() {
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Network size={12} />
         {search ? (
-          <span>搜索结果: {treeMembers.length} 个匹配会员 (点击地址查看详情，点击箭头展开下级)</span>
+          <span>搜索结果: {treeMembers.length} 个匹配会员{levelFilter !== null ? ` (${levelFilter === 0 ? "普通" : `V${levelFilter}`})` : ""}</span>
+        ) : levelFilter !== null ? (
+          <span>等级筛选: {treeMembers.length} 个 {levelFilter === 0 ? "普通" : `V${levelFilter}`} 会员</span>
         ) : (
           <span>推荐关系树 - {treeMembers.length} 个根节点 (点击地址查看详情，点击箭头展开下级)</span>
         )}

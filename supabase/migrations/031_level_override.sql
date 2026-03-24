@@ -1,0 +1,105 @@
+-- Add level_override column: when set, auto-level calculation will not go below this value
+ALTER TABLE members
+  ADD COLUMN IF NOT EXISTS level_override integer DEFAULT NULL;
+
+-- Update check_and_upgrade_level: respect level_override as minimum level
+CREATE OR REPLACE FUNCTION check_and_upgrade_level(p_wallet_address TEXT)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_member members%ROWTYPE;
+  v_effective_count INTEGER;
+  v_team_staking DECIMAL;
+  v_new_level INTEGER := 0;
+  v_sub_count INTEGER;
+  v_direct_effective INTEGER;
+  v_levels_people INTEGER[] := ARRAY[0, 2, 6, 20, 80, 200, 500, 1000];
+  v_levels_amount DECIMAL[] := ARRAY[0, 1000, 20000, 60000, 200000, 800000, 3000000, 10000000];
+  v_levels_sublevel INTEGER[] := ARRAY[0, 0, 1, 2, 3, 4, 5, 6];
+  v_levels_subcount INTEGER[] := ARRAY[0, 0, 2, 2, 2, 2, 2, 2];
+  i INTEGER;
+BEGIN
+  SELECT * INTO v_member FROM members WHERE wallet_address = p_wallet_address;
+  IF NOT FOUND THEN RETURN; END IF;
+
+  WITH RECURSIVE team AS (
+    SELECT wallet_address FROM members WHERE referrer_address = p_wallet_address
+    UNION ALL
+    SELECT m.wallet_address FROM members m INNER JOIN team t ON m.referrer_address = t.wallet_address
+  )
+  SELECT
+    COUNT(DISTINCT t.wallet_address),
+    COALESCE(SUM(stk.total_staking), 0)
+  INTO v_effective_count, v_team_staking
+  FROM team t
+  INNER JOIN (
+    SELECT wallet_address, SUM(amount) as total_staking
+    FROM orders WHERE status = 'active'
+    GROUP BY wallet_address
+    HAVING SUM(amount) >= 200
+  ) stk ON stk.wallet_address = t.wallet_address;
+
+  SELECT COUNT(*) INTO v_direct_effective
+  FROM members m
+  INNER JOIN (
+    SELECT wallet_address, SUM(amount) as total_staking
+    FROM orders WHERE status = 'active'
+    GROUP BY wallet_address
+    HAVING SUM(amount) >= 200
+  ) stk ON stk.wallet_address = m.wallet_address
+  WHERE m.referrer_address = p_wallet_address;
+
+  FOR i IN REVERSE 7..1 LOOP
+    IF v_effective_count >= v_levels_people[i + 1] AND v_team_staking >= v_levels_amount[i + 1] THEN
+      IF i = 1 THEN
+        IF v_direct_effective >= 2 THEN
+          v_new_level := 1;
+          EXIT;
+        END IF;
+      ELSIF v_levels_subcount[i + 1] > 0 THEN
+        WITH RECURSIVE team AS (
+          SELECT wallet_address FROM members WHERE referrer_address = p_wallet_address
+          UNION ALL
+          SELECT m.wallet_address FROM members m INNER JOIN team t ON m.referrer_address = t.wallet_address
+        )
+        SELECT COUNT(*) INTO v_sub_count
+        FROM team t
+        INNER JOIN members m ON m.wallet_address = t.wallet_address
+        WHERE m.level >= v_levels_sublevel[i + 1];
+
+        IF v_sub_count >= v_levels_subcount[i + 1] THEN
+          v_new_level := i;
+          EXIT;
+        END IF;
+      ELSE
+        v_new_level := i;
+        EXIT;
+      END IF;
+    END IF;
+  END LOOP;
+
+  -- Respect level_override: never go below the manually set level
+  IF v_member.level_override IS NOT NULL AND v_new_level < v_member.level_override THEN
+    v_new_level := v_member.level_override;
+  END IF;
+
+  IF v_new_level != v_member.level THEN
+    UPDATE members SET level = v_new_level, lifetime_lock = FALSE
+    WHERE wallet_address = p_wallet_address;
+  END IF;
+END;
+$$;
+
+-- Update admin_update_member_level: also set level_override
+CREATE OR REPLACE FUNCTION admin_update_member_level(p_wallet_address TEXT, p_level INTEGER)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE members SET level = p_level, level_override = p_level
+  WHERE wallet_address = LOWER(p_wallet_address);
+  RETURN FOUND;
+END;
+$$;

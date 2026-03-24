@@ -894,7 +894,7 @@ export async function updateSettlementTime(sgtHour: number, sgtMinute: number) {
   return data;
 }
 
-export async function getAdminReferralTree(search?: string, parentAddr?: string) {
+export async function getAdminReferralTree(search?: string, parentAddr?: string, levelFilter?: number | null) {
   if (parentAddr) {
     const children = await getAdminTeamTree(parentAddr);
     return { members: children };
@@ -902,10 +902,18 @@ export async function getAdminReferralTree(search?: string, parentAddr?: string)
 
   let rootMembers;
   if (search) {
-    const { data } = await supabase.from("members").select("*").ilike("wallet_address", `%${search}%`).order("created_at", { ascending: false }).limit(50);
+    let q = supabase.from("members").select("*").ilike("wallet_address", `%${search}%`);
+    if (levelFilter !== null && levelFilter !== undefined) q = q.eq("level", levelFilter);
+    const { data } = await q.order("created_at", { ascending: false }).limit(50);
     rootMembers = data || [];
   } else {
-    const { data } = await supabase.from("members").select("*").is("referrer_address", null).order("created_at", { ascending: false });
+    let q = supabase.from("members").select("*");
+    if (levelFilter !== null && levelFilter !== undefined) {
+      q = q.eq("level", levelFilter);
+    } else {
+      q = q.is("referrer_address", null);
+    }
+    const { data } = await q.order("created_at", { ascending: false }).limit(200);
     rootMembers = data || [];
   }
 
