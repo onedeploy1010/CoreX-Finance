@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, updateMemberObservation, adminAddLog, hasPermission, adminCreateOrderForMember, adminCancelOrder, getProducts, DBProduct, exportMembersCSV } from "@/lib/api";
+import { getAdminMembers, getAdminMemberDetail, getAdminTeamTree, updateMemberLevel, updateMemberNote, updateMemberObservation, adminAddLog, hasPermission, adminCreateOrderForMember, adminCancelOrder, getProducts, DBProduct, exportMembersCSV } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save, Plus, X, Package, Download, Shield, CircleDot } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save, Plus, X, Package, Download, Shield, CircleDot, MessageSquare, Check } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
@@ -78,6 +78,7 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
   const [showAddOrder, setShowAddOrder] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<number>(0);
   const [orderAmount, setOrderAmount] = useState("");
+  const [editNote, setEditNote] = useState<string | null>(null);
   const { toast } = useToast();
   const m = data.member;
   const canWrite = hasPermission("members.write");
@@ -89,6 +90,19 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
     },
     onSuccess: () => {
       toast({ title: "设置已更新" });
+      onLevelChanged?.();
+    },
+    onError: (err: any) => toast({ title: "更新失败", description: err.message, variant: "destructive" }),
+  });
+
+  const noteMutation = useMutation({
+    mutationFn: async (note: string) => {
+      await updateMemberNote(m.walletAddress, note);
+      await adminAddLog("更新会员备注", "member", m.walletAddress, { note });
+    },
+    onSuccess: () => {
+      toast({ title: "备注已更新" });
+      setEditNote(null);
       onLevelChanged?.();
     },
     onError: (err: any) => toast({ title: "更新失败", description: err.message, variant: "destructive" }),
@@ -154,6 +168,39 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
         <div className="p-2 rounded" style={{ background: "rgba(201,162,39,0.04)" }}>
           <div className="text-[10px] text-muted-foreground">地址</div>
           <div className="font-mono text-xs break-all">{m.walletAddress}</div>
+        </div>
+        <div className="p-2 rounded" style={{ background: "rgba(201,162,39,0.04)" }}>
+          <div className="text-[10px] text-muted-foreground">备注</div>
+          {canWrite ? (
+            editNote !== null ? (
+              <div className="flex items-center gap-1">
+                <input
+                  value={editNote}
+                  onChange={e => setEditNote(e.target.value)}
+                  placeholder="添加备注..."
+                  className="flex-1 text-xs rounded px-1.5 py-0.5"
+                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
+                  autoFocus
+                  onKeyDown={e => { if (e.key === "Enter") noteMutation.mutate(editNote); if (e.key === "Escape") setEditNote(null); }}
+                />
+                <button onClick={() => noteMutation.mutate(editNote)} className="p-1 rounded" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                  <Check size={12} />
+                </button>
+                <button onClick={() => setEditNote(null)} className="p-1 rounded" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}>
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 cursor-pointer group" onClick={() => setEditNote(m.note || "")}>
+                <span className="text-xs" style={{ color: m.note ? "#C9A227" : "rgba(255,255,255,0.3)" }}>
+                  {m.note || "点击添加备注"}
+                </span>
+                <MessageSquare size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "#C9A227" }} />
+              </div>
+            )
+          ) : (
+            <div className="text-xs" style={{ color: m.note ? "#C9A227" : "rgba(255,255,255,0.3)" }}>{m.note || "无"}</div>
+          )}
         </div>
         <div className="p-2 rounded" style={{ background: "rgba(201,162,39,0.04)" }}>
           <div className="text-[10px] text-muted-foreground">等级</div>
@@ -418,6 +465,11 @@ function MemberCard({ m, onView }: { m: any; onView: () => void }) {
             <div className="w-2 h-2 rounded-full shrink-0" style={{ background: "#22c55e", boxShadow: "0 0 6px rgba(34,197,94,0.5)" }} title="观察账户" />
           )}
           <CopyableAddress address={m.walletAddress} />
+          {m.note && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded truncate max-w-[100px]" style={{ background: "rgba(201,162,39,0.08)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.15)" }} title={m.note}>
+              {m.note}
+            </span>
+          )}
           <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>
             {m.level === 0 ? "普通" : `V${m.level}`}
           </span>
@@ -498,7 +550,7 @@ export default function Members() {
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleSearch()}
-            placeholder="搜索钱包地址..."
+            placeholder="搜索地址或备注..."
             className="pl-9 text-sm"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "40px" }}
           />

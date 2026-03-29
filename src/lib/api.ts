@@ -570,7 +570,7 @@ export async function getAdminMembers(page: number, limit: number, search: strin
 
   let query = supabase.from("members").select("*", { count: "exact" });
   if (search) {
-    query = query.ilike("wallet_address", `%${search}%`);
+    query = query.or(`wallet_address.ilike.%${search}%,note.ilike.%${search}%`);
   }
   if (levelFilter !== null && levelFilter !== undefined && levelFilter >= 0) {
     query = query.eq("level", levelFilter);
@@ -615,6 +615,7 @@ export async function getAdminMembers(page: number, limit: number, search: strin
       isObserved: m.is_observed || false,
       principalWithdrawalEnabled: m.principal_withdrawal_enabled !== false,
       earningsWithdrawalEnabled: m.earnings_withdrawal_enabled !== false,
+      note: m.note || "",
     });
   }
 
@@ -632,7 +633,7 @@ export async function getAdminMemberDetail(address: string) {
   const { data: directReferrals } = await supabase.from("members").select("*").eq("referrer_address", addr);
 
   return {
-    member: { ...member, walletAddress: member.wallet_address, referrerAddress: member.referrer_address, lifetimeLock: member.lifetime_lock, createdAt: member.created_at, isObserved: member.is_observed || false, principalWithdrawalEnabled: member.principal_withdrawal_enabled !== false, earningsWithdrawalEnabled: member.earnings_withdrawal_enabled !== false },
+    member: { ...member, walletAddress: member.wallet_address, referrerAddress: member.referrer_address, lifetimeLock: member.lifetime_lock, createdAt: member.created_at, isObserved: member.is_observed || false, principalWithdrawalEnabled: member.principal_withdrawal_enabled !== false, earningsWithdrawalEnabled: member.earnings_withdrawal_enabled !== false, note: member.note || "" },
     orders: memberOrders || [],
     rewards: memberRewards || [],
     withdrawals: memberWithdrawals || [],
@@ -1393,6 +1394,14 @@ export async function adminCancelOrder(orderId: number) {
     .eq("status", "active")
     .select()
     .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function updateMemberNote(walletAddress: string, note: string) {
+  const { data, error } = await supabase.rpc("admin_update_member_note", {
+    p_wallet_address: walletAddress, p_note: note || null,
+  });
   if (error) throw new Error(error.message);
   return data;
 }
