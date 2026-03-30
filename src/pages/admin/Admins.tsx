@@ -29,17 +29,18 @@ const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
 const ROLE_PRESETS: Record<string, string[]> = {
   superadmin: [
     "dashboard.read", "members.read", "members.write", "referrals.read",
-    "orders.read", "withdrawals.read", "withdrawals.write",
+    "orders.read", "rewards.read", "withdrawals.read", "withdrawals.write",
     "messages.read", "messages.write", "finance.read",
+    "products.read", "products.write",
     "settings.read", "settings.write", "admins.read", "admins.write", "logs.read",
     "media.read", "media.write", "contracts.read", "contracts.write", "system.read",
   ],
   tech: [
-    "dashboard.read", "orders.read", "settings.read",
+    "dashboard.read", "orders.read", "products.read", "settings.read",
     "contracts.read", "contracts.write", "system.read", "logs.read",
   ],
   finance: [
-    "members.read", "referrals.read", "orders.read",
+    "members.read", "referrals.read", "orders.read", "rewards.read",
     "withdrawals.read", "withdrawals.write", "finance.read",
   ],
   customer_service: [
@@ -52,6 +53,8 @@ const PERM_MODULES = [
   { key: "members", label: "会员管理", hasWrite: true },
   { key: "referrals", label: "推荐管理", hasWrite: false },
   { key: "orders", label: "订单管理", hasWrite: false },
+  { key: "rewards", label: "奖励明细", hasWrite: false },
+  { key: "products", label: "产品管理", hasWrite: true },
   { key: "withdrawals", label: "提现管理", hasWrite: true },
   { key: "messages", label: "消息管理", hasWrite: true },
   { key: "finance", label: "财务管理", hasWrite: false },

@@ -16,7 +16,7 @@ const NAV_ITEMS: { path: string; label: string; icon: any; perm: string }[] = [
   { path: "/admin/members", label: "会员管理", icon: Users, perm: "members.read" },
   { path: "/admin/referrals", label: "推荐管理", icon: Network, perm: "referrals.read" },
   { path: "/admin/orders", label: "订单管理", icon: ShoppingCart, perm: "orders.read" },
-  { path: "/admin/rewards", label: "奖励明细", icon: Gift, perm: "orders.read" },
+  { path: "/admin/rewards", label: "奖励明细", icon: Gift, perm: "rewards.read" },
   { path: "/admin/withdrawals", label: "提现管理", icon: ArrowDownToLine, perm: "withdrawals.read" },
   { path: "/admin/messages", label: "消息管理", icon: MessageSquare, perm: "messages.read" },
   { path: "/admin/finance", label: "财务管理", icon: DollarSign, perm: "finance.read" },
@@ -24,7 +24,7 @@ const NAV_ITEMS: { path: string; label: string; icon: any; perm: string }[] = [
   { path: "/admin/admins", label: "管理员", icon: Shield, perm: "admins.read" },
   { path: "/admin/logs", label: "操作日志", icon: ScrollText, perm: "logs.read" },
   { path: "/admin/contract", label: "合约配置", icon: FileCode, perm: "contracts.read" },
-  { path: "/admin/products", label: "产品管理", icon: Package, perm: "contracts.read" },
+  { path: "/admin/products", label: "产品管理", icon: Package, perm: "products.read" },
   { path: "/admin/system", label: "系统环境", icon: Activity, perm: "system.read" },
   { path: "/admin/media", label: "Landing Page", icon: Image, perm: "media.read" },
 ];
