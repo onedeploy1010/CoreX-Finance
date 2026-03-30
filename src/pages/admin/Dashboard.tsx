@@ -243,11 +243,18 @@ export default function Dashboard() {
         <StatCard icon={TrendingUp} label="累计利息发放(U)" value={parseFloat(d.totalDailyEarnings || 0).toFixed(2)} color="#22c55e" />
       </div>
 
-      {/* Row 3: Withdrawals & Totals */}
+      {/* Row 3: Bonus Rewards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard icon={Gift} label="今日推荐奖励(U)" value={parseFloat(d.todayBonusRewards || 0).toFixed(2)} sub="直推+间推+团队+同级" color="#a855f7" />
+        <StatCard icon={TrendingUp} label="累计推荐奖励(U)" value={parseFloat(d.totalBonusRewards || 0).toFixed(2)} sub="直推+间推+团队+同级" color="#a855f7" />
+        <StatCard icon={DollarSign} label="今日发放总额(U)" value={parseFloat(d.todayTotalRewards || 0).toFixed(2)} sub="利息+推荐奖励" color="#C9A227" />
+        <StatCard icon={DollarSign} label="累计发放总额(U)" value={parseFloat(d.totalRewards || 0).toFixed(2)} sub="利息+推荐奖励" color="#C9A227" />
+      </div>
+
+      {/* Row 4: Withdrawals */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard icon={ArrowDownToLine} label="今日提现(U)" value={parseFloat(d.todayWithdrawn || 0).toFixed(2)} sub={`${d.todayWithdrawalCount || 0} 笔 | 手续费 ${parseFloat(d.todayWithdrawalFees || 0).toFixed(2)}`} color="#ef4444" />
         <StatCard icon={ArrowDownToLine} label="累计提现(U)" value={parseFloat(d.totalWithdrawn || 0).toFixed(2)} sub={`${d.withdrawalCount || 0} 笔 | 手续费 ${parseFloat(d.totalFees || 0).toFixed(2)}`} color="#ef4444" />
-        <StatCard icon={TrendingUp} label="累计发放奖励(U)" value={parseFloat(d.totalBonusRewards || 0).toFixed(2)} sub="直推+间推+团队+同级" color="#22c55e" />
         <StatCard icon={Clock} label="待审提现" value={d.pendingWithdrawals?.count?.toString() || "0"} sub={`${parseFloat(d.pendingWithdrawals?.total || 0).toFixed(2)} U`} color="#f59e0b" />
       </div>
 

@@ -773,6 +773,16 @@ export async function getAdminWithdrawals(page: number, limit: number, status: s
     .range(offset, offset + limit - 1);
   if (error) throw new Error(error.message);
 
+  // Fetch summary stats
+  const { data: completedStats } = await supabase.from("withdrawals").select("amount,fee").eq("status", "completed");
+  const completedTotal = (completedStats || []).reduce((s, w) => s + parseFloat(w.amount || "0"), 0);
+  const completedFees = (completedStats || []).reduce((s, w) => s + parseFloat(w.fee || "0"), 0);
+  const completedCount = (completedStats || []).length;
+
+  const { count: pendingCount } = await supabase.from("withdrawals").select("*", { count: "exact", head: true }).eq("status", "pending");
+  const { data: pendingStats } = await supabase.from("withdrawals").select("amount").eq("status", "pending");
+  const pendingTotal = (pendingStats || []).reduce((s, w) => s + parseFloat(w.amount || "0"), 0);
+
   return {
     withdrawals: (list || []).map(w => ({
       ...w,
@@ -786,6 +796,13 @@ export async function getAdminWithdrawals(page: number, limit: number, status: s
     total: count || 0,
     page,
     limit,
+    stats: {
+      completedTotal,
+      completedFees,
+      completedCount,
+      pendingTotal,
+      pendingCount: pendingCount || 0,
+    },
   };
 }
 

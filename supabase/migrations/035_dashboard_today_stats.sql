@@ -26,8 +26,12 @@ BEGIN
       AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE),
     -- Bonus rewards (direct + indirect + team + equal)
     'totalBonusRewards', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards WHERE type != 'daily'),
-    -- Total rewards
+    'todayBonusRewards', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards WHERE type != 'daily'
+      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE),
+    -- Total rewards (interest + bonus)
     'totalRewards', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards),
+    'todayTotalRewards', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards
+      WHERE (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE),
     -- Withdrawals
     'totalWithdrawn', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM withdrawals WHERE status = 'completed'),
     'withdrawalCount', (SELECT COUNT(*)::INT FROM withdrawals WHERE status = 'completed'),

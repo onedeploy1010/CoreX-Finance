@@ -574,6 +574,27 @@ export default function AdminWithdrawals() {
       {/* System notifications */}
       <NotificationPanel />
 
+      {/* Withdrawal Stats */}
+      {d?.stats && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl p-3 text-center" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
+            <div className="text-[10px] text-muted-foreground mb-1">已审核金额</div>
+            <div className="text-lg font-black" style={{ color: "#22c55e" }}>{d.stats.completedTotal.toFixed(2)} U</div>
+            <div className="text-[10px] text-muted-foreground">{d.stats.completedCount} 笔 | 手续费 {d.stats.completedFees.toFixed(2)} U</div>
+          </div>
+          <div className="rounded-xl p-3 text-center" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
+            <div className="text-[10px] text-muted-foreground mb-1">待审核金额</div>
+            <div className="text-lg font-black" style={{ color: "#f59e0b" }}>{d.stats.pendingTotal.toFixed(2)} U</div>
+            <div className="text-[10px] text-muted-foreground">{d.stats.pendingCount} 笔</div>
+          </div>
+          <div className="rounded-xl p-3 text-center" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
+            <div className="text-[10px] text-muted-foreground mb-1">总计</div>
+            <div className="text-lg font-black" style={{ color: "#C9A227" }}>{(d.stats.completedTotal + d.stats.pendingTotal).toFixed(2)} U</div>
+            <div className="text-[10px] text-muted-foreground">{d.stats.completedCount + d.stats.pendingCount} 笔</div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-1 h-5 rounded-full" style={{ background: "linear-gradient(180deg, #C9A227, #9A7A1A)" }} />
