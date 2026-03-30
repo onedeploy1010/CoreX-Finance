@@ -145,10 +145,25 @@ export default function ProfilePage() {
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const handleCopyAddress = () => {
-    if (account?.address) {
-      navigator.clipboard.writeText(account.address);
+  const handleCopyAddress = async () => {
+    if (!account?.address) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(account.address);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = account.address;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
       toast({ title: t("profile.address_copied") });
+    } catch {
+      toast({ title: t("profile.address_copied"), description: account.address });
     }
   };
 

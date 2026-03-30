@@ -201,7 +201,7 @@ export default function InvitePage() {
     ? (hasInvested ? `${window.location.origin}/?ref=${account.address}` : t("invite.need_invest_first"))
     : t("invite.connect_first");
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!account) {
       toast({ title: t("invite.connect_first"), variant: "destructive" });
       return;
@@ -210,8 +210,24 @@ export default function InvitePage() {
       toast({ title: t("invite.need_invest_first"), variant: "destructive" });
       return;
     }
-    navigator.clipboard.writeText(referralLink);
-    toast({ title: t("invite.link_copied") });
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(referralLink);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = referralLink;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      toast({ title: t("invite.link_copied") });
+    } catch {
+      toast({ title: t("invite.link_copied"), description: referralLink });
+    }
   };
 
   const handleDrillDown = (addr: string) => setDrillPath(prev => [...prev, addr]);
