@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAdminDashboard } from "@/lib/api";
-import { Users, ShoppingCart, ArrowDownToLine, DollarSign, TrendingUp, Clock, Crown, Activity, CheckCircle2, XCircle, Loader2, RefreshCw } from "lucide-react";
+import { Users, ShoppingCart, ArrowDownToLine, DollarSign, TrendingUp, Clock, Crown, Activity, CheckCircle2, XCircle, Loader2, RefreshCw, UserPlus, PlusCircle, Wallet, Gift } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Link } from "wouter";
 import {
@@ -227,18 +227,28 @@ export default function Dashboard() {
         <h2 className="font-bold text-lg text-foreground">统计台</h2>
       </div>
 
+      {/* Row 1: Members & Orders */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard icon={UserPlus} label="今日新增会员" value={d.todayNewMembers?.toString() || "0"} />
         <StatCard icon={Users} label="总会员" value={d.memberCount?.toString() || "0"} />
+        <StatCard icon={PlusCircle} label="今日新增订单" value={d.todayNewOrders?.toString() || "0"} />
         <StatCard icon={ShoppingCart} label="总订单" value={d.orderCount?.toString() || "0"} sub={`活跃 ${d.activeOrderCount || 0}`} />
-        <StatCard icon={DollarSign} label="活跃质押(U)" value={parseFloat(d.totalStaking || 0).toFixed(6)} />
-        <StatCard icon={Clock} label="待审提现" value={d.pendingWithdrawals?.count?.toString() || "0"} sub={`${parseFloat(d.pendingWithdrawals?.total || 0).toFixed(6)} U`} color="#ef4444" />
       </div>
 
+      {/* Row 2: Staking & Interest */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon={TrendingUp} label="累计发放利息(U)" value={parseFloat(d.totalDailyEarnings || 0).toFixed(6)} color="#22c55e" />
-        <StatCard icon={TrendingUp} label="累计发放奖励(U)" value={parseFloat(d.totalBonusRewards || 0).toFixed(6)} sub="直推+间推+团队+同级" color="#22c55e" />
-        <StatCard icon={DollarSign} label="累计发放总额(U)" value={parseFloat(d.totalRewards || 0).toFixed(6)} color="#C9A227" />
-        <StatCard icon={ArrowDownToLine} label="已提现总额(U)" value={parseFloat(d.totalWithdrawn || 0).toFixed(6)} sub={`${d.withdrawalCount || 0} 笔 | 手续费 ${parseFloat(d.totalFees || 0).toFixed(6)}`} color="#ef4444" />
+        <StatCard icon={Wallet} label="今日新增质押(U)" value={parseFloat(d.todayNewStaking || 0).toFixed(2)} />
+        <StatCard icon={DollarSign} label="总质押(U)" value={parseFloat(d.totalStaking || 0).toFixed(2)} sub="活跃质押" />
+        <StatCard icon={Gift} label="今日利息发放(U)" value={parseFloat(d.todayDailyEarnings || 0).toFixed(2)} color="#22c55e" />
+        <StatCard icon={TrendingUp} label="累计利息发放(U)" value={parseFloat(d.totalDailyEarnings || 0).toFixed(2)} color="#22c55e" />
+      </div>
+
+      {/* Row 3: Withdrawals & Totals */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard icon={ArrowDownToLine} label="今日提现(U)" value={parseFloat(d.todayWithdrawn || 0).toFixed(2)} sub={`${d.todayWithdrawalCount || 0} 笔 | 手续费 ${parseFloat(d.todayWithdrawalFees || 0).toFixed(2)}`} color="#ef4444" />
+        <StatCard icon={ArrowDownToLine} label="累计提现(U)" value={parseFloat(d.totalWithdrawn || 0).toFixed(2)} sub={`${d.withdrawalCount || 0} 笔 | 手续费 ${parseFloat(d.totalFees || 0).toFixed(2)}`} color="#ef4444" />
+        <StatCard icon={TrendingUp} label="累计发放奖励(U)" value={parseFloat(d.totalBonusRewards || 0).toFixed(2)} sub="直推+间推+团队+同级" color="#22c55e" />
+        <StatCard icon={Clock} label="待审提现" value={d.pendingWithdrawals?.count?.toString() || "0"} sub={`${parseFloat(d.pendingWithdrawals?.total || 0).toFixed(2)} U`} color="#f59e0b" />
       </div>
 
       {/* System Environment Check */}
