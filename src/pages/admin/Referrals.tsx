@@ -1,15 +1,17 @@
 import { useState, useCallback, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getAdminReferralTree, getAdminMemberDetail } from "@/lib/api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getAdminReferralTree, getAdminMemberDetail, updateMemberNote, adminAddLog } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Search, Users, Network, ChevronRight, ChevronDown, Crown,
   GitBranch, UserPlus, Layers, Eye, X, ShoppingCart,
-  Wallet, ArrowDownToLine, Gift, Minimize2, Maximize2, FoldVertical, TrendingUp
+  Wallet, ArrowDownToLine, Gift, Minimize2, Maximize2, FoldVertical, TrendingUp, MessageSquare, Check
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CopyableAddress } from "@/components/CopyableAddress";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Member Detail Dialog ───────────────────────────────────────────
 function MemberDetailDialog({ address, open, onClose, onViewTree }: { address: string; open: boolean; onClose: () => void; onViewTree?: (address: string) => void }) {
@@ -175,6 +177,62 @@ function MemberDetailDialog({ address, open, onClose, onViewTree }: { address: s
 }
 
 // ─── Tree Node ──────────────────────────────────────────────────────
+function InlineNote({ member }: { member: any }) {
+  const [editing, setEditing] = useState(false);
+  const [noteValue, setNoteValue] = useState(member.note || "");
+  const { toast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: async (note: string) => {
+      await updateMemberNote(member.walletAddress, note);
+      await adminAddLog("更新会员备注", "member", member.walletAddress, { note });
+    },
+    onSuccess: () => {
+      toast({ title: "备注已更新" });
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/referrals/tree"] });
+    },
+    onError: (err: any) => toast({ title: "更新失败", description: err.message, variant: "destructive" }),
+  });
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+        <input
+          value={noteValue}
+          onChange={e => setNoteValue(e.target.value)}
+          className="text-[10px] rounded px-1.5 py-0.5 w-20"
+          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(201,162,39,0.3)", color: "#C9A227" }}
+          autoFocus
+          onKeyDown={e => { if (e.key === "Enter") mutation.mutate(noteValue); if (e.key === "Escape") setEditing(false); }}
+          placeholder="备注..."
+        />
+        <button onClick={() => mutation.mutate(noteValue)} className="p-0.5 rounded" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+          <Check size={10} />
+        </button>
+        <button onClick={() => setEditing(false)} className="p-0.5 rounded" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}>
+          <X size={10} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <span
+      className="text-[10px] px-1.5 py-0.5 rounded cursor-pointer shrink-0 truncate max-w-[80px] hover:brightness-125"
+      style={{
+        background: member.note ? "rgba(201,162,39,0.08)" : "rgba(255,255,255,0.03)",
+        color: member.note ? "#C9A227" : "rgba(255,255,255,0.2)",
+        border: member.note ? "1px solid rgba(201,162,39,0.15)" : "1px dashed rgba(255,255,255,0.1)",
+      }}
+      title={member.note || "点击添加备注"}
+      onClick={e => { e.stopPropagation(); setEditing(true); }}
+    >
+      {member.note || <MessageSquare size={9} />}
+    </span>
+  );
+}
+
 function TreeNode({
   member,
   depth = 0,
@@ -268,6 +326,9 @@ function TreeNode({
             >
               <CopyableAddress address={member.walletAddress} className="text-foreground/80" />
             </div>
+
+            {/* Inline note */}
+            <InlineNote member={member} />
 
             {/* Level badge */}
             <span

@@ -673,6 +673,7 @@ export async function getAdminTeamTree(rootAddress: string) {
       childrenCount: childrenCount || 0,
       hasChildren: (childrenCount || 0) > 0,
       isObserved: d.is_observed || false,
+      note: d.note || "",
     });
   }
   return result;
@@ -960,6 +961,7 @@ export async function getAdminReferralTree(search?: string, parentAddr?: string,
       teamCount: 0,
       hasChildren: (directCount || 0) > 0,
       isObserved: m.is_observed || false,
+      note: m.note || "",
     });
   }
 
