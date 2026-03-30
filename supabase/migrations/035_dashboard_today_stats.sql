@@ -1,47 +1,48 @@
 -- Update admin_dashboard to include today's stats
+-- Use Asia/Shanghai date comparison for all "today" calculations
 CREATE OR REPLACE FUNCTION admin_dashboard()
 RETURNS JSON
 LANGUAGE plpgsql
 AS $$
 DECLARE
   v_result JSON;
-  v_today_start TIMESTAMPTZ;
+  v_today DATE;
 BEGIN
-  v_today_start := (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE::TIMESTAMPTZ AT TIME ZONE 'Asia/Shanghai';
+  v_today := (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE;
 
   SELECT json_build_object(
     -- Members
     'memberCount', (SELECT COUNT(*)::INT FROM members),
-    'todayNewMembers', (SELECT COUNT(*)::INT FROM members WHERE created_at >= v_today_start),
+    'todayNewMembers', (SELECT COUNT(*)::INT FROM members WHERE (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = v_today),
     -- Orders
     'orderCount', (SELECT COUNT(*)::INT FROM orders),
     'activeOrderCount', (SELECT COUNT(*)::INT FROM orders WHERE status = 'active'),
-    'todayNewOrders', (SELECT COUNT(*)::INT FROM orders WHERE start_date >= v_today_start),
+    'todayNewOrders', (SELECT COUNT(*)::INT FROM orders WHERE (start_date AT TIME ZONE 'Asia/Shanghai')::DATE = v_today),
     -- Staking
     'totalStaking', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM orders WHERE status = 'active'),
-    'todayNewStaking', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM orders WHERE start_date >= v_today_start),
+    'todayNewStaking', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM orders WHERE (start_date AT TIME ZONE 'Asia/Shanghai')::DATE = v_today),
     -- Daily earnings (interest)
     'totalDailyEarnings', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards WHERE type = 'daily'),
     'todayDailyEarnings', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards WHERE type = 'daily'
-      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE),
+      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = v_today),
     -- Bonus rewards (direct + indirect + team + equal)
     'totalBonusRewards', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards WHERE type != 'daily'),
     'todayBonusRewards', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards WHERE type != 'daily'
-      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE),
+      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = v_today),
     -- Total rewards (interest + bonus)
     'totalRewards', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards),
     'todayTotalRewards', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM rewards
-      WHERE (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE),
+      WHERE (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = v_today),
     -- Withdrawals
     'totalWithdrawn', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM withdrawals WHERE status = 'completed'),
     'withdrawalCount', (SELECT COUNT(*)::INT FROM withdrawals WHERE status = 'completed'),
     'totalFees', (SELECT COALESCE(SUM(fee), 0)::TEXT FROM withdrawals WHERE status = 'completed'),
     'todayWithdrawn', (SELECT COALESCE(SUM(amount), 0)::TEXT FROM withdrawals WHERE status = 'completed'
-      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE),
+      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = v_today),
     'todayWithdrawalCount', (SELECT COUNT(*)::INT FROM withdrawals WHERE status = 'completed'
-      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE),
+      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = v_today),
     'todayWithdrawalFees', (SELECT COALESCE(SUM(fee), 0)::TEXT FROM withdrawals WHERE status = 'completed'
-      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = (NOW() AT TIME ZONE 'Asia/Shanghai')::DATE),
+      AND (created_at AT TIME ZONE 'Asia/Shanghai')::DATE = v_today),
     -- Pending withdrawals
     'pendingWithdrawals', (SELECT json_build_object(
       'count', COUNT(*)::INT,
