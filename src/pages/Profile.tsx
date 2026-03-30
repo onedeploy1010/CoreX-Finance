@@ -147,24 +147,29 @@ export default function ProfilePage() {
 
   const handleCopyAddress = async () => {
     if (!account?.address) return;
+    const text = account.address;
+    let success = false;
     try {
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(account.address);
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = account.address;
-        textarea.style.position = "fixed";
-        textarea.style.left = "-9999px";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
+        await navigator.clipboard.writeText(text);
+        success = true;
       }
-      toast({ title: t("profile.address_copied") });
-    } catch {
-      toast({ title: t("profile.address_copied"), description: account.address });
+    } catch {}
+    if (!success) {
+      try {
+        const input = document.createElement("input");
+        input.setAttribute("readonly", "readonly");
+        input.setAttribute("value", text);
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.setSelectionRange(0, text.length);
+        input.select();
+        success = document.execCommand("copy");
+        document.body.removeChild(input);
+      } catch {}
     }
+    toast({ title: t("profile.address_copied"), description: success ? undefined : text });
   };
 
   const handleDisconnect = () => {

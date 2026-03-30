@@ -11,23 +11,32 @@ export function CopyableAddress({ address, className }: { address: string; class
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    let success = false;
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(address);
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = address;
-        textarea.style.position = "fixed";
-        textarea.style.left = "-9999px";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
+        success = true;
       }
+    } catch {}
+    if (!success) {
+      try {
+        const input = document.createElement("input");
+        input.setAttribute("readonly", "readonly");
+        input.setAttribute("value", address);
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.setSelectionRange(0, address.length);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+        success = true;
+      } catch {}
+    }
+    if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {}
+    }
   };
 
   return (

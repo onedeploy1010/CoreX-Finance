@@ -210,23 +210,32 @@ export default function InvitePage() {
       toast({ title: t("invite.need_invest_first"), variant: "destructive" });
       return;
     }
+    let success = false;
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(referralLink);
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = referralLink;
-        textarea.style.position = "fixed";
-        textarea.style.left = "-9999px";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
+        success = true;
       }
+    } catch {}
+    if (!success) {
+      try {
+        const input = document.createElement("input");
+        input.setAttribute("readonly", "readonly");
+        input.setAttribute("value", referralLink);
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.setSelectionRange(0, referralLink.length);
+        input.select();
+        success = document.execCommand("copy");
+        document.body.removeChild(input);
+      } catch {}
+    }
+    if (success) {
       toast({ title: t("invite.link_copied") });
-    } catch {
-      toast({ title: t("invite.link_copied"), description: referralLink });
+    } else {
+      // If all copy methods fail, show the link for manual copy
+      toast({ title: t("invite.link_copied"), description: referralLink, duration: 10000 });
     }
   };
 
