@@ -2,15 +2,16 @@ import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getAdminReferralTree, getAdminMemberDetail, updateMemberNote, adminAddLog } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
+import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Search, Users, Network, ChevronRight, ChevronDown, Crown,
   GitBranch, UserPlus, Layers, Eye, X, ShoppingCart,
-  Wallet, ArrowDownToLine, Gift, Minimize2, Maximize2, FoldVertical, TrendingUp, MessageSquare, Check
+  Wallet, ArrowDownToLine, Gift, Minimize2, Maximize2, FoldVertical, TrendingUp, MessageSquare, Check, ArrowUp, Route
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { CopyableAddress } from "@/components/CopyableAddress";
+import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
 import { useToast } from "@/hooks/use-toast";
 
 // ─── Member Detail Dialog ───────────────────────────────────────────
@@ -439,6 +440,88 @@ function TreeNode({
   );
 }
 
+// ─── Upline Path Tracker ─────────────────────────────────────────────
+function UplineTracker({ address, onViewTree, onViewMember }: { address: string; onViewTree: (addr: string) => void; onViewMember: (addr: string) => void }) {
+  const { data: chain, isLoading } = useQuery({
+    queryKey: ["/api/admin/upline-chain", address],
+    queryFn: async () => {
+      const path: { address: string; level: number; note: string }[] = [];
+      let current = address.toLowerCase();
+      const visited = new Set<string>();
+      while (current && !visited.has(current)) {
+        visited.add(current);
+        const { data } = await supabase.from("members").select("wallet_address, level, referrer_address, note").eq("wallet_address", current).single();
+        if (!data) break;
+        path.push({ address: data.wallet_address, level: data.level, note: data.note || "" });
+        current = data.referrer_address || "";
+      }
+      return path;
+    },
+    enabled: !!address,
+  });
+
+  if (isLoading) return <div className="text-xs text-muted-foreground py-2">加载推荐路径...</div>;
+  if (!chain || chain.length <= 1) return null;
+
+  return (
+    <div className="rounded-xl p-3 space-y-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
+      <div className="flex items-center gap-2">
+        <Route size={13} style={{ color: "#C9A227" }} />
+        <span className="text-xs font-semibold text-foreground">推荐路径追踪</span>
+        <span className="text-[10px] text-muted-foreground">（从当前会员到根节点）</span>
+      </div>
+      <div className="flex items-center gap-1 flex-wrap">
+        {chain.map((node, i) => (
+          <div key={node.address} className="flex items-center gap-1">
+            {i > 0 && <ArrowUp size={10} style={{ color: "rgba(201,162,39,0.4)" }} />}
+            <button
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded transition-all hover:brightness-125"
+              style={{
+                background: i === 0 ? "rgba(201,162,39,0.15)" : "rgba(255,255,255,0.04)",
+                border: i === 0 ? "1px solid rgba(201,162,39,0.3)" : "1px solid rgba(255,255,255,0.08)",
+                color: i === 0 ? "#C9A227" : "rgba(255,255,255,0.6)",
+              }}
+              onClick={() => onViewTree(node.address)}
+              title={node.address}
+            >
+              <span className="font-mono">{shortAddr(node.address)}</span>
+              {node.note && <span style={{ color: "#C9A227" }}>({node.note})</span>}
+              <span className="px-1 rounded" style={{
+                background: node.level > 0 ? "rgba(201,162,39,0.12)" : "rgba(255,255,255,0.05)",
+                color: node.level > 0 ? "#C9A227" : "rgba(255,255,255,0.3)",
+                fontSize: "9px",
+              }}>
+                {node.level === 0 ? "普通" : `V${node.level}`}
+              </span>
+            </button>
+          </div>
+        ))}
+      </div>
+      {chain.length > 1 && (
+        <div className="flex items-center gap-2">
+          <button
+            className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded font-semibold"
+            style={{ background: "rgba(201,162,39,0.1)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227" }}
+            onClick={() => onViewTree(chain[1].address)}
+          >
+            <ArrowUp size={10} /> 查看上级 {shortAddr(chain[1].address)}
+          </button>
+          {chain.length > 2 && (
+            <button
+              className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}
+              onClick={() => onViewTree(chain[chain.length - 1].address)}
+            >
+              <Crown size={10} /> 跳到根节点
+            </button>
+          )}
+          <span className="text-[10px] text-muted-foreground">共 {chain.length - 1} 层上级</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────
 export default function AdminReferrals() {
   const [search, setSearch] = useState("");
@@ -615,6 +698,16 @@ export default function AdminReferrals() {
           )}
         </div>
       </div>
+
+      {/* Upline path tracker - show when searching */}
+      {search && treeMembers.length >= 1 && treeMembers.length <= 5 && treeMembers.map((m: any) => (
+        <UplineTracker
+          key={m.walletAddress}
+          address={m.walletAddress}
+          onViewTree={(addr) => { setSearchInput(addr); setSearch(addr); }}
+          onViewMember={openDetail}
+        />
+      ))}
 
       {/* Info bar */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
