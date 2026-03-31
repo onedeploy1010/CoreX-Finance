@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save, Plus, X, Package, Download, Shield, CircleDot, MessageSquare, Check } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Crown, Eye, Users, ArrowLeft, ChevronDown, Save, Plus, X, Package, Download, Shield, CircleDot, MessageSquare, Check, DollarSign } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
@@ -246,6 +246,56 @@ function MemberDetail({ data, onLevelChanged }: { data: any; onLevelChanged?: ()
           <div className="text-xs">{m.lifetimeLock ? "是" : "否"}</div>
         </div>
       </div>
+
+      {/* Financial Summary */}
+      {(() => {
+        const orders = data.orders || [];
+        const rewards = data.rewards || [];
+        const withdrawals = data.withdrawals || [];
+        const activeStaking = orders.filter((o: any) => o.status === "active").reduce((s: number, o: any) => s + parseFloat(o.amount || 0), 0);
+        const dailyEarnings = rewards.filter((r: any) => r.type === "daily").reduce((s: number, r: any) => s + parseFloat(r.amount || 0), 0);
+        const bonusRewards = rewards.filter((r: any) => r.type !== "daily").reduce((s: number, r: any) => s + parseFloat(r.amount || 0), 0);
+        const totalRewards = dailyEarnings + bonusRewards;
+        const completedWithdrawals = withdrawals.filter((w: any) => w.status === "completed");
+        const totalWithdrawn = completedWithdrawals.reduce((s: number, w: any) => s + parseFloat(w.amount || 0), 0);
+        const totalFees = completedWithdrawals.reduce((s: number, w: any) => s + parseFloat(w.fee || 0), 0);
+        const available = totalRewards - totalWithdrawn;
+        return (
+          <div className="rounded-lg p-3 space-y-2" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.15)" }}>
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "#C9A227" }}>
+              <DollarSign size={14} /> 资金明细
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="p-2 rounded text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-[10px] text-muted-foreground">活跃质押</div>
+                <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{activeStaking.toFixed(2)} U</div>
+              </div>
+              <div className="p-2 rounded text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-[10px] text-muted-foreground">累计利息</div>
+                <div className="text-xs font-bold" style={{ color: "#22c55e" }}>{dailyEarnings.toFixed(2)} U</div>
+              </div>
+              <div className="p-2 rounded text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-[10px] text-muted-foreground">累计奖励</div>
+                <div className="text-xs font-bold" style={{ color: "#a855f7" }}>{bonusRewards.toFixed(2)} U</div>
+                <div className="text-[9px] text-muted-foreground">直推+间推+团队+同级</div>
+              </div>
+              <div className="p-2 rounded text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-[10px] text-muted-foreground">总累计金额</div>
+                <div className="text-xs font-bold" style={{ color: "#C9A227" }}>{totalRewards.toFixed(2)} U</div>
+              </div>
+              <div className="p-2 rounded text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-[10px] text-muted-foreground">已提现</div>
+                <div className="text-xs font-bold" style={{ color: "#ef4444" }}>{totalWithdrawn.toFixed(2)} U</div>
+                <div className="text-[9px] text-muted-foreground">{completedWithdrawals.length} 笔 | 手续费 {totalFees.toFixed(2)}</div>
+              </div>
+              <div className="p-2 rounded text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="text-[10px] text-muted-foreground">未提现</div>
+                <div className="text-xs font-bold" style={{ color: available >= 0 ? "#22c55e" : "#ef4444" }}>{available.toFixed(2)} U</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Observation Controls */}
       {canWrite && (
