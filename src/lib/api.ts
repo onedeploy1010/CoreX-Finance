@@ -1180,7 +1180,7 @@ export async function getAdminRewards(page: number, limit: number, type: string,
     }
   }
   if (filters?.search) {
-    query = query.or(`wallet_address.ilike.%${filters.search}%,from_address.ilike.%${filters.search}%`);
+    query = query.ilike("wallet_address", `%${filters.search}%`);
   }
   if (filters?.dateFrom) {
     query = query.gte("created_at", filters.dateFrom);
