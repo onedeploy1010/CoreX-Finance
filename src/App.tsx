@@ -124,12 +124,7 @@ function ReferralInputPage() {
       setTimeout(() => window.location.reload(), 800);
     } catch (err: any) {
       setStatus("invalid");
-      const msg = err?.message || "";
-      if (msg === "REFERRER_NOT_INVESTED") {
-        setError(t("register.referrer_not_invested"));
-      } else {
-        setError(msg || t("register.failed"));
-      }
+      setError(err?.message || t("register.failed"));
     }
   };
 

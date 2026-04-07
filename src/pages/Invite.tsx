@@ -5,7 +5,7 @@ import { useActiveAccount } from "thirdweb/react";
 import { useQuery } from "@tanstack/react-query";
 import { getTeamStats, getEarnings, getRewardsByWallet, getDirectReferrals, getIndirectReferrals, getTeamTree, getMember, getOrdersByWallet } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Users, UserPlus, Crown, ChevronRight, ChevronDown, Star, ArrowLeft, TrendingUp, BarChart3, Loader2, Wallet, Award, Search } from "lucide-react";
+import { Copy, Users, UserPlus, Crown, ChevronRight, ChevronDown, Star, ArrowLeft, TrendingUp, BarChart3, Loader2, Wallet, Award, Search, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { LEVEL_CONFIG } from "@shared/schema";
 import { t, translateProductName } from "@/lib/i18n";
 
@@ -197,17 +197,16 @@ export default function InvitePage() {
     return r.type === rewardSubTab;
   });
 
+  // Referral link is available to anyone who has connected a wallet,
+  // even before they deposit. Unactivated users still earn nothing
+  // until they make their first deposit (enforced at the DB level).
   const referralLink = account?.address
-    ? (hasInvested ? `${window.location.origin}/?ref=${account.address}` : t("invite.need_invest_first"))
+    ? `${window.location.origin}/?ref=${account.address}`
     : t("invite.connect_first");
 
   const handleCopy = async () => {
     if (!account) {
       toast({ title: t("invite.connect_first"), variant: "destructive" });
-      return;
-    }
-    if (!hasInvested) {
-      toast({ title: t("invite.need_invest_first"), variant: "destructive" });
       return;
     }
     let success = false;
@@ -271,10 +270,43 @@ export default function InvitePage() {
 
       {/* Referral link */}
       <div className="rounded-2xl p-5 space-y-4" style={cardStyleGold}>
-        <div className="flex items-center gap-2">
-          <UserPlus size={16} style={{ color: "#D4AF37" }} />
-          <span className="text-sm font-semibold" style={{ color: "#D4AF37" }}>{t("invite.my_link")}</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <UserPlus size={16} style={{ color: "#D4AF37" }} />
+            <span className="text-sm font-semibold" style={{ color: "#D4AF37" }}>{t("invite.my_link")}</span>
+          </div>
+          {account?.address && (
+            hasInvested ? (
+              <span
+                data-testid="badge-activated"
+                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full"
+                style={{ background: "rgba(100,200,100,0.12)", color: "#6bc46b", border: "1px solid rgba(100,200,100,0.3)" }}
+              >
+                <CheckCircle2 size={10} />
+                {t("invite.activated")}
+              </span>
+            ) : (
+              <span
+                data-testid="badge-inactive"
+                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full"
+                style={{ background: "rgba(232,197,71,0.12)", color: "#E8C547", border: "1px solid rgba(232,197,71,0.35)" }}
+              >
+                <AlertTriangle size={10} />
+                {t("invite.inactive")}
+              </span>
+            )
+          )}
         </div>
+
+        {account?.address && !hasInvested && (
+          <div
+            className="rounded-lg p-3 text-xs leading-relaxed"
+            style={{ background: "rgba(232,197,71,0.08)", border: "1px solid rgba(232,197,71,0.25)", color: "#E8C547" }}
+          >
+            {t("invite.inactive_notice")}
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           <div className="flex-1 rounded-lg px-3 py-2.5 text-xs font-mono truncate"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}>

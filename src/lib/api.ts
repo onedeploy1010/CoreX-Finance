@@ -134,7 +134,11 @@ export async function registerMember(walletAddress: string, referrerAddress?: st
     throw new Error("REFERRAL_REQUIRED");
   }
 
-  // Check referrer exists
+  // Check referrer exists. The referrer does NOT need to have invested:
+  // unactivated users can still hand out referral links. Reward gating
+  // (daily / referral / team bonuses) already requires the recipient to
+  // have an active order at the database level, so an unactivated upline
+  // simply earns nothing until they deposit.
   const { data: referrer } = await supabase
     .from("members")
     .select("id, wallet_address")
@@ -142,15 +146,6 @@ export async function registerMember(walletAddress: string, referrerAddress?: st
     .single();
   if (!referrer) {
     throw new Error("REFERRAL_REQUIRED");
-  }
-
-  // Referrer must have at least one order (invested) to invite others
-  const { count: orderCount } = await supabase
-    .from("orders")
-    .select("*", { count: "exact", head: true })
-    .eq("wallet_address", refAddr);
-  if (!orderCount || orderCount === 0) {
-    throw new Error("REFERRER_NOT_INVESTED");
   }
 
   const { data, error } = await supabase
@@ -326,7 +321,18 @@ export async function getOrdersByWallet(walletAddress: string) {
     totalEarned: o.total_earned,
     lastEarningDate: o.last_earning_date,
     txHash: o.tx_hash,
+    maturedAt: o.matured_at,
+    reinvestedFromOrderId: o.reinvested_from_order_id,
   }));
+}
+
+export async function redeemMaturedOrder(walletAddress: string, orderId: number) {
+  const { data, error } = await supabase.rpc("redeem_matured_order", {
+    p_wallet_address: walletAddress.toLowerCase(),
+    p_order_id: orderId,
+  });
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 // ============ Earnings ============

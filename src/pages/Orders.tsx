@@ -1,17 +1,54 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useActiveAccount } from "thirdweb/react";
-import { useQuery } from "@tanstack/react-query";
-import { Wallet, TrendingUp, Clock, ClipboardList, Loader2, Shield, Gift, ExternalLink } from "lucide-react";
-import { getOrdersByWallet, getEarnings, getRewardsByWallet } from "@/lib/api";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { Wallet, TrendingUp, Clock, ClipboardList, Loader2, Shield, Gift, ExternalLink, Timer, RefreshCw, Coins } from "lucide-react";
+import { getOrdersByWallet, getEarnings, getRewardsByWallet, redeemMaturedOrder } from "@/lib/api";
 import { t, getLang, translateProductName } from "@/lib/i18n";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "00:00:00";
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<"orders" | "earnings">("orders");
   const [orderFilter, setOrderFilter] = useState<"all" | "active" | "completed">("all");
+  const [redeemTarget, setRedeemTarget] = useState<any | null>(null);
   const account = useActiveAccount();
   const address = account?.address?.toLowerCase();
   const lang = getLang();
+  const queryClient = useQueryClient();
+
+  // Tick every second so matured-order countdowns update live.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const redeemMutation = useMutation({
+    mutationFn: (orderId: number) => redeemMaturedOrder(address!, orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", address] });
+      queryClient.invalidateQueries({ queryKey: ["/api/earnings", address] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rewards", address] });
+      setRedeemTarget(null);
+    },
+  });
 
   const { data: orderList = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["/api/orders", address],
@@ -33,13 +70,13 @@ export default function OrdersPage() {
 
   const totalEarnings = parseFloat((earningsData as any)?.totalEarnings || "0");
 
-  // Only product/daily earnings
-  const dailyRewards = (rewardList as any[]).filter((r: any) => r.type === "daily");
+  // Product/daily earnings + principal redemption records
+  const dailyRewards = (rewardList as any[]).filter((r: any) => r.type === "daily" || r.type === "principal_return");
 
-  // Today's daily earnings only
+  // Today's daily earnings only (excludes principal redemptions)
   const today = new Date().toDateString();
   const todayDailyEarnings = dailyRewards
-    .filter((r: any) => new Date(r.createdAt).toDateString() === today)
+    .filter((r: any) => r.type === "daily" && new Date(r.createdAt).toDateString() === today)
     .reduce((s: number, r: any) => s + parseFloat(r.amount || "0"), 0);
 
   if (!account) {
@@ -136,7 +173,9 @@ export default function OrdersPage() {
           ) : (
             (orderList as any[]).filter((order: any) => {
               if (orderFilter === "all") return true;
-              return order.status === orderFilter;
+              if (orderFilter === "active") return order.status === "active" || order.status === "matured";
+              // completed bucket: historical / terminal states
+              return order.status === "completed" || order.status === "redeemed" || order.status === "reinvested";
             }).length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <ClipboardList size={40} className="mx-auto mb-3 opacity-30" />
@@ -145,11 +184,31 @@ export default function OrdersPage() {
           ) : (
             (orderList as any[]).filter((order: any) => {
               if (orderFilter === "all") return true;
-              return order.status === orderFilter;
+              if (orderFilter === "active") return order.status === "active" || order.status === "matured";
+              return order.status === "completed" || order.status === "redeemed" || order.status === "reinvested";
             }).map((order: any) => {
               const endDate = new Date(order.endDate);
               const now = new Date();
               const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+              const isMatured = order.status === "matured";
+              const maturedAt = order.maturedAt ? new Date(order.maturedAt) : endDate;
+              const redeemDeadline = new Date(maturedAt.getTime() + 24 * 60 * 60 * 1000);
+              const msLeft = redeemDeadline.getTime() - now.getTime();
+              const canRedeem = isMatured && msLeft > 0;
+              const statusLabel = order.status === "active"
+                ? t("orders.staking")
+                : order.status === "matured"
+                ? t("orders.matured")
+                : order.status === "redeemed"
+                ? t("orders.redeemed")
+                : order.status === "reinvested"
+                ? t("orders.reinvested")
+                : t("orders.expired");
+              const statusStyle = order.status === "active"
+                ? { background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
+                : order.status === "matured"
+                ? { background: "rgba(232,197,71,0.18)", color: "#E8C547", border: "1px solid rgba(232,197,71,0.4)" }
+                : { background: "rgba(100,200,100,0.1)", color: "#6bc46b", border: "1px solid rgba(100,200,100,0.2)" };
               return (
                 <div
                   key={order.id}
@@ -161,13 +220,7 @@ export default function OrdersPage() {
                       <div className="font-bold text-sm text-foreground">{translateProductName(order.productName)}</div>
                       <div className="text-xs text-muted-foreground">Order #{order.id}</div>
                     </div>
-                    <Badge
-                      style={order.status === "active"
-                        ? { background: "rgba(201,162,39,0.15)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.3)" }
-                        : { background: "rgba(100,200,100,0.1)", color: "#6bc46b", border: "1px solid rgba(100,200,100,0.2)" }}
-                    >
-                      {order.status === "active" ? t("orders.staking") : t("orders.expired")}
-                    </Badge>
+                    <Badge style={statusStyle}>{statusLabel}</Badge>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -187,13 +240,87 @@ export default function OrdersPage() {
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-muted-foreground mb-0.5">
-                        {order.status === "active" ? t("orders.days_left") : t("orders.status")}
+                        {order.status === "active"
+                          ? t("orders.days_left")
+                          : isMatured
+                          ? t("orders.redeem_countdown")
+                          : t("orders.status")}
                       </div>
-                      <div className="text-sm font-bold text-foreground">
-                        {order.status === "active" ? `${daysLeft} ${t("common.days")}` : t("orders.principal_returned")}
+                      <div className="text-sm font-bold" style={{ color: isMatured ? "#E8C547" : undefined }}>
+                        {order.status === "active"
+                          ? `${daysLeft} ${t("common.days")}`
+                          : isMatured
+                          ? formatCountdown(msLeft)
+                          : order.status === "redeemed"
+                          ? t("orders.redeemed")
+                          : order.status === "reinvested"
+                          ? t("orders.reinvested")
+                          : t("orders.principal_returned")}
                       </div>
                     </div>
                   </div>
+
+                  {isMatured && (
+                    <div
+                      className="rounded-lg p-3 space-y-2"
+                      style={{
+                        background: "rgba(232,197,71,0.08)",
+                        border: "1px solid rgba(232,197,71,0.25)",
+                      }}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs" style={{ color: "#E8C547" }}>
+                        <Timer size={12} />
+                        <span>{t("orders.auto_reinvest_notice")}</span>
+                      </div>
+                      <button
+                        data-testid={`button-redeem-${order.id}`}
+                        disabled={!canRedeem}
+                        onClick={() => setRedeemTarget(order)}
+                        className="w-full py-2 rounded-md text-sm font-bold transition-all disabled:opacity-50"
+                        style={{
+                          background: canRedeem
+                            ? "linear-gradient(135deg, #C9A227, #9A7A1A)"
+                            : "rgba(201,162,39,0.1)",
+                          color: canRedeem ? "#0c0a08" : "rgba(255,255,255,0.4)",
+                        }}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <Coins size={14} />
+                          {canRedeem
+                            ? `${t("orders.redeem_now")} (${formatCountdown(msLeft)})`
+                            : t("orders.reinvested")}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
+                  {order.status === "reinvested" && (
+                    <div
+                      className="flex items-center gap-1.5 text-xs rounded-md px-2 py-1.5"
+                      style={{
+                        background: "rgba(100,200,100,0.08)",
+                        color: "#6bc46b",
+                        border: "1px solid rgba(100,200,100,0.2)",
+                      }}
+                    >
+                      <RefreshCw size={11} />
+                      <span>{t("orders.reinvested_note")}</span>
+                    </div>
+                  )}
+
+                  {order.reinvestedFromOrderId && (
+                    <div
+                      className="flex items-center gap-1.5 text-xs rounded-md px-2 py-1.5"
+                      style={{
+                        background: "rgba(201,162,39,0.08)",
+                        color: "#C9A227",
+                        border: "1px solid rgba(201,162,39,0.2)",
+                      }}
+                    >
+                      <RefreshCw size={11} />
+                      <span>{t("orders.reinvested_from").replace("{id}", String(order.reinvestedFromOrderId))}</span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between text-xs px-1" style={{ color: "rgba(201,162,39,0.5)" }}>
                     <span>{t("orders.daily_rate")}: {order.dailyRate}%</span>
@@ -245,19 +372,23 @@ export default function OrdersPage() {
               <p>{t("reward.no_records")}</p>
             </div>
           ) : (
-            dailyRewards.map((r: any) => (
+            dailyRewards.map((r: any) => {
+              const isPrincipal = r.type === "principal_return";
+              const dotColor = isPrincipal ? "#6bc46b" : "#E8C547";
+              const label = isPrincipal ? t("reward.principal_return") : t("reward.daily");
+              return (
               <div
                 key={r.id}
                 className="product-card rounded-xl p-3 space-y-2"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ background: "#E8C547" }} />
-                    <span className="text-sm font-semibold" style={{ color: "#E8C547" }}>
-                      {t("reward.daily")}
+                    <div className="w-2 h-2 rounded-full" style={{ background: dotColor }} />
+                    <span className="text-sm font-semibold" style={{ color: dotColor }}>
+                      {label}
                     </span>
                   </div>
-                  <span className="text-sm font-bold" style={{ color: "#C9A227" }}>
+                  <span className="text-sm font-bold" style={{ color: isPrincipal ? "#6bc46b" : "#C9A227" }}>
                     +{parseFloat(r.amount).toFixed(6)} U
                   </span>
                 </div>
@@ -278,10 +409,88 @@ export default function OrdersPage() {
                   <span className="text-right">{new Date(r.createdAt).toLocaleString()}</span>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
+
+      {/* Redemption confirmation dialog */}
+      <Dialog open={!!redeemTarget} onOpenChange={(open) => !open && setRedeemTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Coins size={18} style={{ color: "#C9A227" }} />
+              {t("orders.redeem_confirm_title")}
+            </DialogTitle>
+            <DialogDescription className="text-left leading-relaxed">
+              {t("orders.redeem_explain")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {redeemTarget && (
+            <div
+              className="rounded-lg p-3 space-y-2 text-sm"
+              style={{
+                background: "rgba(201,162,39,0.08)",
+                border: "1px solid rgba(201,162,39,0.2)",
+              }}
+            >
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{translateProductName(redeemTarget.productName)}</span>
+                <span className="text-muted-foreground">#{redeemTarget.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t("orders.principal")}</span>
+                <span className="font-bold" style={{ color: "#C9A227" }}>
+                  {parseFloat(redeemTarget.amount).toFixed(2)} USDT
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t("orders.redeem_countdown")}</span>
+                <span className="font-bold" style={{ color: "#E8C547" }}>
+                  {(() => {
+                    const mAt = redeemTarget.maturedAt ? new Date(redeemTarget.maturedAt) : new Date(redeemTarget.endDate);
+                    const left = mAt.getTime() + 24 * 60 * 60 * 1000 - Date.now();
+                    return formatCountdown(left);
+                  })()}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setRedeemTarget(null)}
+              disabled={redeemMutation.isPending}
+              data-testid="button-redeem-cancel"
+            >
+              {t("orders.cancel")}
+            </Button>
+            <Button
+              onClick={() => redeemTarget && redeemMutation.mutate(redeemTarget.id)}
+              disabled={redeemMutation.isPending}
+              data-testid="button-redeem-confirm"
+              style={{
+                background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
+                color: "#0c0a08",
+              }}
+            >
+              {redeemMutation.isPending ? (
+                <Loader2 size={14} className="animate-spin mr-1" />
+              ) : null}
+              {t("orders.confirm")}
+            </Button>
+          </DialogFooter>
+
+          {redeemMutation.isError && (
+            <div className="text-xs text-red-400 mt-2">
+              {t("orders.redeem_failed")}: {(redeemMutation.error as any)?.message || ""}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -334,12 +334,7 @@ export default function HomePage() {
       setRegisterDialogOpen(false);
       setReferrerInfo(null);
     } catch (err: any) {
-      const msg = err?.message || "";
-      if (msg === "REFERRER_NOT_INVESTED") {
-        toast({ title: t("register.referrer_not_invested"), description: t("register.referrer_not_invested_desc"), variant: "destructive" });
-      } else {
-        toast({ title: t("register.failed"), description: msg, variant: "destructive" });
-      }
+      toast({ title: t("register.failed"), description: err?.message || "", variant: "destructive" });
     } finally {
       setRegisterLoading(false);
     }
@@ -513,6 +508,13 @@ export default function HomePage() {
                 <Shield size={12} style={{ color: "#C9A227" }} />
                 <span>{t("register.invest_note")}</span>
               </div>
+            </div>
+
+            <div
+              className="rounded-lg p-2.5 text-[11px] leading-relaxed"
+              style={{ background: "rgba(232,197,71,0.08)", border: "1px solid rgba(232,197,71,0.25)", color: "#E8C547" }}
+            >
+              {t("register.inactive_after_register")}
             </div>
 
             <div className="flex gap-3">
