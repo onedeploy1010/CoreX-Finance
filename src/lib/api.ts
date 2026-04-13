@@ -267,41 +267,32 @@ export async function createOrder(params: {
   endDate: Date;
 }) {
   if (params.txHash) {
-    // Use RPC function for atomic duplicate check + insert + settlement
-    const { data, error } = await supabase.rpc("create_order_from_tx", {
-      p_wallet_address: params.walletAddress,
-      p_product_id: params.productId,
-      p_amount: params.amount,
-      p_tx_hash: params.txHash,
-      p_product_name: params.productName,
-      p_daily_rate: params.dailyRate,
-      p_days: params.days,
+    // Route through edge function for on-chain tx verification
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const resp = await fetch(`${supabaseUrl}/functions/v1/investment-callback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        walletAddress: params.walletAddress,
+        productId: params.productId,
+        amount: params.amount,
+        txHash: params.txHash,
+        productName: params.productName,
+        dailyRate: params.dailyRate,
+        days: params.days,
+      }),
     });
-    if (error) throw new Error(error.message);
-    return { id: data };
+    const result = await resp.json();
+    if (!result.success) throw new Error(result.message || "Order creation failed");
+    return { id: result.orderId };
   }
 
-  // Fallback for non-contract orders
-  const { data, error } = await supabase
-    .from("orders")
-    .insert({
-      wallet_address: params.walletAddress.toLowerCase(),
-      product_id: params.productId,
-      product_name: params.productName,
-      amount: params.amount,
-      daily_rate: params.dailyRate,
-      days: params.days,
-      end_date: params.endDate.toISOString(),
-      tx_hash: null,
-    })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-
-  await supabase.rpc("process_wallet_orders", { p_wallet_address: params.walletAddress.toLowerCase() }).then(() => {});
-  await supabase.rpc("check_and_upgrade_level", { p_wallet_address: params.walletAddress.toLowerCase() }).then(() => {});
-
-  return data;
+  // No txHash = invalid for user-facing orders (must go through contract)
+  throw new Error("Transaction hash is required for investment orders");
 }
 
 export async function getOrdersByWallet(walletAddress: string) {
@@ -1370,6 +1361,9 @@ export async function deleteAdminUser(id: number) {
 }
 
 export async function adminCreateOrderForMember(walletAddress: string, productId: number, amount: number) {
+  const session = getAdminSession();
+  if (!session) throw new Error("未登录");
+
   // Fetch product from DB
   const { data: dbProduct } = await supabase.from("products").select("*").eq("id", productId).single();
   if (!dbProduct) throw new Error("产品不存在");
@@ -1383,32 +1377,24 @@ export async function adminCreateOrderForMember(walletAddress: string, productId
     throw new Error("份数不足，无法投资");
   }
 
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() + dbProduct.days);
-
-  const { data, error } = await supabase
-    .from("orders")
-    .insert({
-      wallet_address: walletAddress.toLowerCase(),
-      product_id: productId,
-      product_name: dbProduct.name,
-      amount: amount.toString(),
-      daily_rate: dbProduct.daily_rate.toString(),
-      days: dbProduct.days,
-      end_date: endDate.toISOString(),
-      tx_hash: null,
-    })
-    .select()
-    .single();
+  // Use secure RPC function with admin verification
+  const { data, error } = await supabase.rpc("admin_create_order", {
+    p_admin_id: session.id,
+    p_wallet_address: walletAddress,
+    p_product_id: productId,
+    p_amount: amount,
+    p_product_name: dbProduct.name,
+    p_daily_rate: parseFloat(dbProduct.daily_rate),
+    p_days: dbProduct.days,
+  });
   if (error) throw new Error(error.message);
 
   // Increment used shares
   await incrementProductShares(productId, sharesNeeded);
 
   await supabase.rpc("process_wallet_orders", { p_wallet_address: walletAddress.toLowerCase() }).then(() => {});
-  await supabase.rpc("check_and_upgrade_level", { p_wallet_address: walletAddress.toLowerCase() }).then(() => {});
 
-  return data;
+  return { id: data };
 }
 
 export async function adminCancelOrder(orderId: number) {

@@ -3,7 +3,7 @@ import { bsc } from "thirdweb/chains";
 import { createWallet, walletConnect } from "thirdweb/wallets";
 
 export const client = createThirdwebClient({
-  clientId: "55c901cbfcccbc3592ae2157f8c7c3b5",
+  clientId: import.meta.env.VITE_THIRDWEB_CLIENT_ID || "",
 });
 
 export const bscChain = bsc;
