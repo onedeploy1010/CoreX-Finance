@@ -79,13 +79,12 @@ function ReferralInputPage() {
   const account = useActiveAccount();
   const refParam = new URLSearchParams(window.location.search).get("ref") || "";
   const [refInput, setRefInput] = useState(refParam);
-  const [status, setStatus] = useState<"idle" | "checking" | "valid" | "invalid" | "registering" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "registering" | "done" | "invalid">("idle");
   const [error, setError] = useState("");
-  const [referrerLevel, setReferrerLevel] = useState(0);
 
   const isValidAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
 
-  const handleCheck = async () => {
+  const handleRegister = async () => {
     const addr = refInput.trim().toLowerCase();
     if (!isValidAddress(addr)) {
       setStatus("invalid");
@@ -97,30 +96,12 @@ function ReferralInputPage() {
       setError(t("register.cannot_refer_self"));
       return;
     }
-    setStatus("checking");
-    setError("");
-    try {
-      const member = await getMember(addr);
-      if (!member) {
-        setStatus("invalid");
-        setError(t("register.referrer_not_found"));
-        return;
-      }
-      setReferrerLevel(member.level ?? 0);
-      setStatus("valid");
-    } catch {
-      setStatus("invalid");
-      setError(t("register.check_failed"));
-    }
-  };
-
-  const handleRegister = async () => {
     if (!account?.address) return;
     setStatus("registering");
+    setError("");
     try {
       await registerMember(account.address, refInput.trim());
       setStatus("done");
-      // Reload to enter platform
       setTimeout(() => window.location.reload(), 800);
     } catch (err: any) {
       setStatus("invalid");
@@ -150,22 +131,24 @@ function ReferralInputPage() {
             className="w-full px-4 py-3 rounded-xl text-sm font-mono"
             style={{
               background: "rgba(255,255,255,0.04)",
-              border: `1px solid ${status === "valid" ? "rgba(34,197,94,0.4)" : status === "invalid" ? "rgba(239,68,68,0.4)" : "rgba(201,162,39,0.2)"}`,
+              border: `1px solid ${status === "invalid" ? "rgba(239,68,68,0.4)" : "rgba(201,162,39,0.2)"}`,
               color: "#fff",
               outline: "none",
             }}
           />
 
-          {/* Error / Valid feedback */}
+          {isValidAddress(refInput.trim()) && status !== "invalid" && (
+            <div className="rounded-lg p-3 text-center" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
+              <div className="text-xs text-muted-foreground mb-1">{t("register.your_referrer")}</div>
+              <div className="font-mono font-bold text-sm" style={{ color: "#f5e6b8" }}>
+                {refInput.trim().slice(0, 6)}...{refInput.trim().slice(-4)}
+              </div>
+            </div>
+          )}
+
           {status === "invalid" && error && (
             <div className="flex items-center gap-2 text-xs" style={{ color: "#ef4444" }}>
               <AlertCircle size={12} /> {error}
-            </div>
-          )}
-          {status === "valid" && (
-            <div className="flex items-center gap-2 text-xs" style={{ color: "#22c55e" }}>
-              <CheckCircle2 size={12} />
-              {t("register.referrer_found")} (V{referrerLevel})
             </div>
           )}
           {status === "done" && (
@@ -177,29 +160,16 @@ function ReferralInputPage() {
 
         {/* Buttons */}
         <div className="space-y-2">
-          {(status === "valid" || status === "registering") ? (
-            <button
-              className="w-full py-3 rounded-xl font-bold text-sm transition-all"
-              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
-              onClick={handleRegister}
-              disabled={status === "registering"}
-            >
-              {status === "registering" ? (
-                <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> {t("register.registering")}</span>
-              ) : t("register.confirm_bind")}
-            </button>
-          ) : (
-            <button
-              className="w-full py-3 rounded-xl font-bold text-sm transition-all"
-              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
-              onClick={handleCheck}
-              disabled={!refInput.trim() || status === "checking"}
-            >
-              {status === "checking" ? (
-                <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> {t("register.checking")}</span>
-              ) : t("register.verify_referrer")}
-            </button>
-          )}
+          <button
+            className="w-full py-3 rounded-xl font-bold text-sm transition-all"
+            style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+            onClick={handleRegister}
+            disabled={!refInput.trim() || status === "registering"}
+          >
+            {status === "registering" ? (
+              <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> {t("register.registering")}</span>
+            ) : t("register.confirm_bind")}
+          </button>
 
           <button
             className="w-full py-3 rounded-xl font-bold text-sm transition-all"
