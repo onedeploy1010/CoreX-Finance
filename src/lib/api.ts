@@ -326,6 +326,15 @@ export async function redeemMaturedOrder(walletAddress: string, orderId: number)
   return data;
 }
 
+export async function reinvestMaturedOrder(walletAddress: string, orderId: number) {
+  const { data, error } = await supabase.rpc("reinvest_matured_order", {
+    p_wallet_address: walletAddress.toLowerCase(),
+    p_order_id: orderId,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // ============ Earnings ============
 
 export async function getEarnings(walletAddress: string) {

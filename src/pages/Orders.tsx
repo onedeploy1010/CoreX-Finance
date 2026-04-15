@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useActiveAccount } from "thirdweb/react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Wallet, TrendingUp, Clock, ClipboardList, Loader2, Shield, Gift, ExternalLink, Timer, RefreshCw, Coins } from "lucide-react";
-import { getOrdersByWallet, getEarnings, getRewardsByWallet, redeemMaturedOrder } from "@/lib/api";
+import { getOrdersByWallet, getEarnings, getRewardsByWallet, redeemMaturedOrder, reinvestMaturedOrder } from "@/lib/api";
 import { t, getLang, translateProductName } from "@/lib/i18n";
 import {
   Dialog,
@@ -15,30 +15,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return "00:00:00";
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-}
-
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<"orders" | "earnings">("orders");
   const [orderFilter, setOrderFilter] = useState<"all" | "active" | "completed">("all");
   const [redeemTarget, setRedeemTarget] = useState<any | null>(null);
+  const [reinvestTarget, setReinvestTarget] = useState<any | null>(null);
   const account = useActiveAccount();
   const address = account?.address?.toLowerCase();
   const lang = getLang();
   const queryClient = useQueryClient();
 
-  // Tick every second so matured-order countdowns update live.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick(n => n + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   const redeemMutation = useMutation({
     mutationFn: (orderId: number) => redeemMaturedOrder(address!, orderId),
@@ -47,6 +33,15 @@ export default function OrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/earnings", address] });
       queryClient.invalidateQueries({ queryKey: ["/api/rewards", address] });
       setRedeemTarget(null);
+    },
+  });
+
+  const reinvestMutation = useMutation({
+    mutationFn: (orderId: number) => reinvestMaturedOrder(address!, orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", address] });
+      queryClient.invalidateQueries({ queryKey: ["/api/earnings", address] });
+      setReinvestTarget(null);
     },
   });
 
@@ -191,10 +186,6 @@ export default function OrdersPage() {
               const now = new Date();
               const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
               const isMatured = order.status === "matured";
-              const maturedAt = order.maturedAt ? new Date(order.maturedAt) : endDate;
-              const redeemDeadline = new Date(maturedAt.getTime() + 24 * 60 * 60 * 1000);
-              const msLeft = redeemDeadline.getTime() - now.getTime();
-              const canRedeem = isMatured && msLeft > 0;
               const statusLabel = order.status === "active"
                 ? t("orders.staking")
                 : order.status === "matured"
@@ -242,20 +233,12 @@ export default function OrdersPage() {
                       <div className="text-xs text-muted-foreground mb-0.5">
                         {order.status === "active"
                           ? t("orders.days_left")
-                          : isMatured
-                          ? t("orders.redeem_countdown")
                           : t("orders.status")}
                       </div>
                       <div className="text-sm font-bold" style={{ color: isMatured ? "#E8C547" : undefined }}>
                         {order.status === "active"
                           ? `${daysLeft} ${t("common.days")}`
-                          : isMatured
-                          ? formatCountdown(msLeft)
-                          : order.status === "redeemed"
-                          ? t("orders.redeemed")
-                          : order.status === "reinvested"
-                          ? t("orders.reinvested")
-                          : t("orders.principal_returned")}
+                          : statusLabel}
                       </div>
                     </div>
                   </div>
@@ -270,27 +253,38 @@ export default function OrdersPage() {
                     >
                       <div className="flex items-center gap-1.5 text-xs" style={{ color: "#E8C547" }}>
                         <Timer size={12} />
-                        <span>{t("orders.auto_reinvest_notice")}</span>
+                        <span>{t("orders.matured_choose")}</span>
                       </div>
-                      <button
-                        data-testid={`button-redeem-${order.id}`}
-                        disabled={!canRedeem}
-                        onClick={() => setRedeemTarget(order)}
-                        className="w-full py-2 rounded-md text-sm font-bold transition-all disabled:opacity-50"
-                        style={{
-                          background: canRedeem
-                            ? "linear-gradient(135deg, #C9A227, #9A7A1A)"
-                            : "rgba(201,162,39,0.1)",
-                          color: canRedeem ? "#0c0a08" : "rgba(255,255,255,0.4)",
-                        }}
-                      >
-                        <span className="inline-flex items-center gap-1.5">
-                          <Coins size={14} />
-                          {canRedeem
-                            ? `${t("orders.redeem_now")} (${formatCountdown(msLeft)})`
-                            : t("orders.reinvested")}
-                        </span>
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          data-testid={`button-reinvest-${order.id}`}
+                          onClick={() => setReinvestTarget(order)}
+                          className="flex-1 py-2 rounded-md text-sm font-bold transition-all"
+                          style={{
+                            background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                            color: "#fff",
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            <RefreshCw size={14} />
+                            {t("orders.reinvest_now")}
+                          </span>
+                        </button>
+                        <button
+                          data-testid={`button-redeem-${order.id}`}
+                          onClick={() => setRedeemTarget(order)}
+                          className="flex-1 py-2 rounded-md text-sm font-bold transition-all"
+                          style={{
+                            background: "linear-gradient(135deg, #C9A227, #9A7A1A)",
+                            color: "#0c0a08",
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            <Coins size={14} />
+                            {t("orders.redeem_now")}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -446,16 +440,6 @@ export default function OrdersPage() {
                   {parseFloat(redeemTarget.amount).toFixed(2)} USDT
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("orders.redeem_countdown")}</span>
-                <span className="font-bold" style={{ color: "#E8C547" }}>
-                  {(() => {
-                    const mAt = redeemTarget.maturedAt ? new Date(redeemTarget.maturedAt) : new Date(redeemTarget.endDate);
-                    const left = mAt.getTime() + 24 * 60 * 60 * 1000 - Date.now();
-                    return formatCountdown(left);
-                  })()}
-                </span>
-              </div>
             </div>
           )}
 
@@ -487,6 +471,85 @@ export default function OrdersPage() {
           {redeemMutation.isError && (
             <div className="text-xs text-red-400 mt-2">
               {t("orders.redeem_failed")}: {(redeemMutation.error as any)?.message || ""}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reinvest confirmation dialog */}
+      <Dialog open={!!reinvestTarget} onOpenChange={(open) => !open && setReinvestTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw size={18} style={{ color: "#22c55e" }} />
+              {t("orders.reinvest_confirm_title")}
+            </DialogTitle>
+            <DialogDescription className="text-left leading-relaxed">
+              {t("orders.reinvest_explain")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {reinvestTarget && (
+            <div
+              className="rounded-lg p-3 space-y-2 text-sm"
+              style={{
+                background: "rgba(34,197,94,0.08)",
+                border: "1px solid rgba(34,197,94,0.2)",
+              }}
+            >
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{translateProductName(reinvestTarget.productName)}</span>
+                <span className="text-muted-foreground">#{reinvestTarget.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t("orders.principal")}</span>
+                <span className="font-bold" style={{ color: "#22c55e" }}>
+                  {parseFloat(reinvestTarget.amount).toFixed(2)} USDT
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t("orders.total_days")}</span>
+                <span className="font-bold" style={{ color: "#22c55e" }}>
+                  {reinvestTarget.days} {t("common.days")}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t("orders.daily_rate")}</span>
+                <span className="font-bold" style={{ color: "#22c55e" }}>
+                  {reinvestTarget.dailyRate}%
+                </span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setReinvestTarget(null)}
+              disabled={reinvestMutation.isPending}
+              data-testid="button-reinvest-cancel"
+            >
+              {t("orders.cancel")}
+            </Button>
+            <Button
+              onClick={() => reinvestTarget && reinvestMutation.mutate(reinvestTarget.id)}
+              disabled={reinvestMutation.isPending}
+              data-testid="button-reinvest-confirm"
+              style={{
+                background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                color: "#fff",
+              }}
+            >
+              {reinvestMutation.isPending ? (
+                <Loader2 size={14} className="animate-spin mr-1" />
+              ) : null}
+              {t("orders.reinvest_now")}
+            </Button>
+          </DialogFooter>
+
+          {reinvestMutation.isError && (
+            <div className="text-xs text-red-400 mt-2">
+              {t("orders.reinvest_failed")}: {(reinvestMutation.error as any)?.message || ""}
             </div>
           )}
         </DialogContent>
