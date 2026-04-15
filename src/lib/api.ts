@@ -352,6 +352,7 @@ export async function getEarnings(walletAddress: string) {
   const indirectRewards = await getRewardSum("indirect_referral");
   const teamRewards = await getRewardSum("team_bonus");
   const dailyRewards = await getRewardSum("daily");
+  const principalReturn = await getRewardSum("principal_return");
   // totalRewards excludes daily to avoid double counting with totalEarnings
   const totalRewards = directRewards + indirectRewards + teamRewards;
 
@@ -362,8 +363,8 @@ export async function getEarnings(walletAddress: string) {
     .neq("status", "rejected");
   const totalWithdrawn = (wData || []).reduce((s, w) => s + parseFloat(w.amount), 0);
 
-  // Use dailyRewards (from rewards table) + referral/team rewards - withdrawn
-  const availableBalance = dailyRewards + totalRewards - totalWithdrawn;
+  // Use dailyRewards (from rewards table) + referral/team rewards + redeemed principal - withdrawn
+  const availableBalance = dailyRewards + totalRewards + principalReturn - totalWithdrawn;
 
   return {
     totalEarnings: totalEarnings.toFixed(6),
@@ -372,6 +373,7 @@ export async function getEarnings(walletAddress: string) {
     indirectRewards: indirectRewards.toFixed(6),
     teamRewards: teamRewards.toFixed(6),
     dailyRewards: dailyRewards.toFixed(6),
+    principalReturn: principalReturn.toFixed(6),
     availableBalance: availableBalance.toFixed(6),
     totalWithdrawn: totalWithdrawn.toFixed(6),
   };
