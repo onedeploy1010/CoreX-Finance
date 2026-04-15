@@ -7,8 +7,8 @@ import { useActiveAccount } from "thirdweb/react";
 import { useSendTransaction } from "thirdweb/react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { registerMember, createOrder, getMember, getProducts, DBProduct } from "@/lib/api";
-import { TrendingUp, Clock, DollarSign, Shield, UserPlus, Loader2 } from "lucide-react";
+import { registerMember, createOrder, createOrderWithBalance, getMember, getProducts, getEarnings, DBProduct } from "@/lib/api";
+import { TrendingUp, Clock, DollarSign, Shield, UserPlus, Loader2, Wallet } from "lucide-react";
 import { t, getLang } from "@/lib/i18n";
 import {
   prepareApproveUSDT,
@@ -34,15 +34,24 @@ const COLORS = ["#C9A227", "#E8C547", "#D4A832", "#C9A227", "#E8C547"];
 
 function InvestDialog({ product, open, onClose, color }: { product: Product | null; open: boolean; onClose: () => void; color: string }) {
   const [amount, setAmount] = useState("");
+  const [payMethod, setPayMethod] = useState<"on_chain" | "balance">("on_chain");
   const account = useActiveAccount();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"idle" | "approving" | "investing" | "confirming">("idle");
   const { mutateAsync: sendTransaction } = useSendTransaction();
 
+  const { data: earningsData } = useQuery({
+    queryKey: ["/api/earnings", account?.address?.toLowerCase()],
+    queryFn: () => getEarnings(account!.address!),
+    enabled: !!account?.address && open,
+  });
+  const availableBalance = parseFloat((earningsData as any)?.availableBalance || "0");
+
   useEffect(() => {
     if (open && product) {
       setAmount(product.minAmount.toString());
+      setPayMethod("on_chain");
     }
   }, [open, product]);
 
@@ -65,6 +74,45 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
       toast({ title: t("invest.multiple_amount", undefined, { amount: product.minAmount }), variant: "destructive" });
       return;
     }
+
+    // Balance payment path
+    if (payMethod === "balance") {
+      if (amt > availableBalance) {
+        toast({ title: t("home.insufficient_balance"), variant: "destructive" });
+        return;
+      }
+      setLoading(true);
+      setStep("confirming");
+      try {
+        await createOrderWithBalance({
+          walletAddress: account.address,
+          productId: product.id,
+          amount: amount,
+          productName: product.nameEn,
+          dailyRate: product.dailyRate.toString(),
+          days: product.days,
+        });
+
+        queryClient.invalidateQueries({ queryKey: ["/api/orders", account.address.toLowerCase()] });
+        queryClient.invalidateQueries({ queryKey: ["/api/earnings", account.address.toLowerCase()] });
+        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+
+        toast({
+          title: t("invest.success"),
+          description: t("invest.success_desc", undefined, { amount, product: getProductName(product) }),
+        });
+        onClose();
+        setAmount("");
+      } catch (err: any) {
+        toast({ title: t("invest.failed"), description: err?.message || "", variant: "destructive" });
+      } finally {
+        setLoading(false);
+        setStep("idle");
+      }
+      return;
+    }
+
+    // On-chain payment path
     setLoading(true);
 
     try {
@@ -173,6 +221,44 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
               <div className="font-bold" style={{ color }}>{product.minAmount} U</div>
             </div>
           </div>
+
+          {/* Payment method selector */}
+          {availableBalance > 0 && (
+            <div>
+              <label className="text-sm text-muted-foreground mb-2 block">{t("home.pay_onchain")}/{t("home.pay_balance")}</label>
+              <div className="flex rounded-lg p-1 gap-1" style={{ background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.15)" }}>
+                <button
+                  className="flex-1 py-2 text-xs font-semibold rounded-md transition-all"
+                  style={payMethod === "on_chain"
+                    ? { background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }
+                    : { color: "rgba(255,255,255,0.5)" }}
+                  onClick={() => setPayMethod("on_chain")}
+                >
+                  {t("home.pay_onchain")}
+                </button>
+                <button
+                  className="flex-1 py-2 text-xs font-semibold rounded-md transition-all"
+                  style={payMethod === "balance"
+                    ? { background: "linear-gradient(135deg, #22c55e, #16a34a)", color: "#fff" }
+                    : { color: "rgba(255,255,255,0.5)" }}
+                  onClick={() => setPayMethod("balance")}
+                >
+                  {t("home.pay_balance")}
+                </button>
+              </div>
+              {payMethod === "balance" && (
+                <div className="flex items-center justify-between mt-2 px-1">
+                  <div className="flex items-center gap-1 text-xs" style={{ color: "#22c55e" }}>
+                    <Wallet size={12} />
+                    <span>{t("home.available_balance")}</span>
+                  </div>
+                  <span className="text-xs font-bold" style={{ color: "#22c55e" }}>
+                    {availableBalance.toFixed(2)} USDT
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">{t("home.invest_amount_usdt")}</label>

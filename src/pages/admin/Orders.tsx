@@ -52,6 +52,12 @@ function OrderCard({ o, onView }: { o: any; onView: () => void }) {
           <span className="text-xs font-semibold">{o.productName}</span>
         </div>
         <div className="flex items-center gap-2">
+          {o.payment_method === "balance" && (
+            <span className="text-[10px] px-1 py-0.5 rounded"
+              style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+              余额
+            </span>
+          )}
           <span className="text-xs px-1.5 py-0.5 rounded"
             style={{
               background: STATUS_BG[o.status] || "rgba(255,255,255,0.05)",
@@ -487,6 +493,7 @@ function OrderDetail({ data }: { data: any }) {
         {data.reinvested_from_order_id && (
           <InfoItem label="复投来源" value={`订单 #${data.reinvested_from_order_id}`} color="#a855f7" />
         )}
+        <InfoItem label="支付方式" value={data.payment_method === "balance" ? "余额支付" : "链上支付"} color={data.payment_method === "balance" ? "#22c55e" : undefined} />
       </div>
 
       {data.txHash && (

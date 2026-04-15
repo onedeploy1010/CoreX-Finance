@@ -335,6 +335,26 @@ export async function reinvestMaturedOrder(walletAddress: string, orderId: numbe
   return data;
 }
 
+export async function createOrderWithBalance(params: {
+  walletAddress: string;
+  productId: number;
+  amount: string;
+  productName: string;
+  dailyRate: string;
+  days: number;
+}) {
+  const { data, error } = await supabase.rpc("create_order_with_balance", {
+    p_wallet_address: params.walletAddress.toLowerCase(),
+    p_product_id: params.productId,
+    p_amount: parseFloat(params.amount),
+    p_product_name: params.productName,
+    p_daily_rate: parseFloat(params.dailyRate),
+    p_days: params.days,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // ============ Earnings ============
 
 export async function getEarnings(walletAddress: string) {

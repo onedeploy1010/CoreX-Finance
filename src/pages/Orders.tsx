@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useActiveAccount } from "thirdweb/react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -15,12 +15,28 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "00:00:00";
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<"orders" | "earnings">("orders");
   const [orderFilter, setOrderFilter] = useState<"all" | "active" | "completed">("all");
   const [redeemTarget, setRedeemTarget] = useState<any | null>(null);
   const [reinvestTarget, setReinvestTarget] = useState<any | null>(null);
   const account = useActiveAccount();
+
+  // Tick every second so matured-order countdowns update live.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
   const address = account?.address?.toLowerCase();
   const lang = getLang();
   const queryClient = useQueryClient();
@@ -186,6 +202,9 @@ export default function OrdersPage() {
               const now = new Date();
               const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
               const isMatured = order.status === "matured";
+              const maturedAt = order.maturedAt ? new Date(order.maturedAt) : endDate;
+              const redeemDeadline = new Date(maturedAt.getTime() + 24 * 60 * 60 * 1000);
+              const msLeft = redeemDeadline.getTime() - now.getTime();
               const statusLabel = order.status === "active"
                 ? t("orders.staking")
                 : order.status === "matured"
@@ -233,11 +252,15 @@ export default function OrdersPage() {
                       <div className="text-xs text-muted-foreground mb-0.5">
                         {order.status === "active"
                           ? t("orders.days_left")
+                          : isMatured
+                          ? t("orders.auto_reinvest_countdown")
                           : t("orders.status")}
                       </div>
                       <div className="text-sm font-bold" style={{ color: isMatured ? "#E8C547" : undefined }}>
                         {order.status === "active"
                           ? `${daysLeft} ${t("common.days")}`
+                          : isMatured
+                          ? formatCountdown(msLeft)
                           : statusLabel}
                       </div>
                     </div>
@@ -253,7 +276,7 @@ export default function OrdersPage() {
                     >
                       <div className="flex items-center gap-1.5 text-xs" style={{ color: "#E8C547" }}>
                         <Timer size={12} />
-                        <span>{t("orders.matured_choose")}</span>
+                        <span>{t("orders.auto_reinvest_notice")}</span>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -265,9 +288,10 @@ export default function OrdersPage() {
                             color: "#fff",
                           }}
                         >
-                          <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1.5 flex-wrap justify-center">
                             <RefreshCw size={14} />
                             {t("orders.reinvest_now")}
+                            <span className="text-xs opacity-80">({formatCountdown(msLeft)})</span>
                           </span>
                         </button>
                         <button
