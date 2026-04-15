@@ -10,8 +10,38 @@ import { CopyableAddress } from "@/components/CopyableAddress";
 const STATUS_TABS = [
   { value: "all", label: "全部" },
   { value: "active", label: "进行中" },
+  { value: "matured", label: "已到期" },
+  { value: "redeemed", label: "已赎回" },
+  { value: "reinvested", label: "已复投" },
   { value: "completed", label: "已完成" },
 ];
+
+const STATUS_LABELS: Record<string, string> = {
+  active: "进行中",
+  matured: "已到期",
+  redeemed: "已赎回",
+  reinvested: "已复投",
+  completed: "已完成",
+  cancelled: "已取消",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  active: "#22c55e",
+  matured: "#E8C547",
+  redeemed: "#3b82f6",
+  reinvested: "#a855f7",
+  completed: "#888",
+  cancelled: "#ef4444",
+};
+
+const STATUS_BG: Record<string, string> = {
+  active: "rgba(34,197,94,0.1)",
+  matured: "rgba(232,197,71,0.1)",
+  redeemed: "rgba(59,130,246,0.1)",
+  reinvested: "rgba(168,85,247,0.1)",
+  completed: "rgba(255,255,255,0.05)",
+  cancelled: "rgba(239,68,68,0.1)",
+};
 
 function OrderCard({ o, onView }: { o: any; onView: () => void }) {
   return (
@@ -24,10 +54,10 @@ function OrderCard({ o, onView }: { o: any; onView: () => void }) {
         <div className="flex items-center gap-2">
           <span className="text-xs px-1.5 py-0.5 rounded"
             style={{
-              background: o.status === "active" ? "rgba(34,197,94,0.1)" : o.status === "cancelled" ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)",
-              color: o.status === "active" ? "#22c55e" : o.status === "cancelled" ? "#ef4444" : "#888"
+              background: STATUS_BG[o.status] || "rgba(255,255,255,0.05)",
+              color: STATUS_COLORS[o.status] || "#888"
             }}>
-            {o.status === "active" ? "进行中" : o.status === "cancelled" ? "已取消" : "已完成"}
+            {STATUS_LABELS[o.status] || o.status}
           </span>
           <button onClick={onView} className="p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.1)", color: "#C9A227", minWidth: "36px", minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Eye size={16} />
@@ -440,7 +470,7 @@ function OrderDetail({ data }: { data: any }) {
     <div className="space-y-4 text-sm">
       <div className="grid grid-cols-2 gap-2">
         <InfoItem label="产品" value={data.productName} />
-        <InfoItem label="状态" value={data.status === "active" ? "进行中" : data.status === "cancelled" ? "已取消" : "已完成"} color={data.status === "active" ? "#22c55e" : data.status === "cancelled" ? "#ef4444" : "#888"} />
+        <InfoItem label="状态" value={STATUS_LABELS[data.status] || data.status} color={STATUS_COLORS[data.status] || "#888"} />
         <InfoItem label="质押金额" value={`${parseFloat(data.amount).toFixed(6)} U`} />
         <InfoItem label="日利率" value={`${data.dailyRate}%`} />
         <InfoItem label="日利息" value={`${parseFloat(data.dailyEarning).toFixed(6)} U`} highlight />
@@ -451,6 +481,12 @@ function OrderDetail({ data }: { data: any }) {
         <InfoItem label="开始日期" value={new Date(data.startDate).toLocaleDateString()} />
         <InfoItem label="结束日期" value={new Date(data.endDate).toLocaleDateString()} />
         <InfoItem label="创建时间" value={new Date(data.startDate).toLocaleString()} />
+        {data.matured_at && (
+          <InfoItem label="到期时间" value={new Date(data.matured_at).toLocaleString()} color="#E8C547" />
+        )}
+        {data.reinvested_from_order_id && (
+          <InfoItem label="复投来源" value={`订单 #${data.reinvested_from_order_id}`} color="#a855f7" />
+        )}
       </div>
 
       {data.txHash && (

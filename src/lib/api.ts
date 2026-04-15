@@ -1310,7 +1310,7 @@ export async function exportOrdersCSV(status: string, filters?: { search?: strin
   if (error) throw new Error(error.message);
 
   const headers = ["ID", "产品", "钱包地址", "金额", "日利率", "天数", "已赚", "状态", "开始日期", "结束日期", "交易哈希"];
-  const statusLabels: Record<string, string> = { active: "进行中", completed: "已完成", cancelled: "已取消" };
+  const statusLabels: Record<string, string> = { active: "进行中", matured: "已到期", redeemed: "已赎回", reinvested: "已复投", completed: "已完成", cancelled: "已取消" };
   const rows = (data || []).map(o => [
     o.id,
     o.product_name,
