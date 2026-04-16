@@ -220,6 +220,12 @@ const translations: Record<string, Partial<Record<Lang, string>>> = {
     id: "Investasi ulang gagal", ms: "Pelaburan semula gagal",
     fr: "Échec du réinvestissement", ar: "فشلت إعادة الاستثمار",
   },
+  "orders.auto_reinvest_toggle": {
+    zh: "自动复投", "zh-TW": "自動複投", en: "Auto-reinvest", ja: "自動再投資",
+    ko: "자동 재투자", vi: "Tự động tái đầu tư", th: "ลงทุนใหม่อัตโนมัติ",
+    id: "Investasi ulang otomatis", ms: "Labur semula automatik",
+    fr: "Réinvestissement auto", ar: "إعادة استثمار تلقائي",
+  },
   "orders.auto_reinvest_countdown": {
     zh: "自动复投倒计时", "zh-TW": "自動複投倒計時",
     en: "Auto-reinvest countdown", ja: "自動再投資カウントダウン",

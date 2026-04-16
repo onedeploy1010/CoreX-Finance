@@ -29,6 +29,7 @@ export default function OrdersPage() {
   const [orderFilter, setOrderFilter] = useState<"all" | "active" | "completed">("all");
   const [redeemTarget, setRedeemTarget] = useState<any | null>(null);
   const [reinvestTarget, setReinvestTarget] = useState<any | null>(null);
+  const [autoReinvestMap, setAutoReinvestMap] = useState<Record<number, boolean>>({});
   const account = useActiveAccount();
 
   // Tick every second so matured-order countdowns update live.
@@ -266,7 +267,9 @@ export default function OrdersPage() {
                     </div>
                   </div>
 
-                  {isMatured && (
+                  {isMatured && (() => {
+                    const isAutoOn = autoReinvestMap[order.id] !== false;
+                    return (
                     <div
                       className="rounded-lg p-3 space-y-2"
                       style={{
@@ -274,10 +277,31 @@ export default function OrdersPage() {
                         border: "1px solid rgba(232,197,71,0.25)",
                       }}
                     >
-                      <div className="flex items-center gap-1.5 text-xs" style={{ color: "#E8C547" }}>
-                        <Timer size={12} />
-                        <span>{t("orders.auto_reinvest_notice")}</span>
-                      </div>
+                      {/* Auto-reinvest toggle */}
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div
+                          className="relative w-8 h-4 rounded-full transition-colors"
+                          style={{ background: isAutoOn ? "rgba(34,197,94,0.4)" : "rgba(255,255,255,0.1)" }}
+                          onClick={() => setAutoReinvestMap(m => ({ ...m, [order.id]: !isAutoOn }))}
+                        >
+                          <div
+                            className="absolute top-0.5 w-3 h-3 rounded-full transition-all"
+                            style={{
+                              left: isAutoOn ? "18px" : "2px",
+                              background: isAutoOn ? "#22c55e" : "#888",
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs" style={{ color: isAutoOn ? "#22c55e" : "rgba(255,255,255,0.4)" }}>
+                          {t("orders.auto_reinvest_toggle")}
+                        </span>
+                        {isAutoOn && (
+                          <span className="text-xs font-mono" style={{ color: "#E8C547" }}>
+                            {formatCountdown(msLeft)}
+                          </span>
+                        )}
+                      </label>
+
                       <div className="flex gap-2">
                         <button
                           data-testid={`button-reinvest-${order.id}`}
@@ -288,10 +312,9 @@ export default function OrdersPage() {
                             color: "#fff",
                           }}
                         >
-                          <span className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                          <span className="inline-flex items-center gap-1.5">
                             <RefreshCw size={14} />
                             {t("orders.reinvest_now")}
-                            <span className="text-xs opacity-80">({formatCountdown(msLeft)})</span>
                           </span>
                         </button>
                         <button
@@ -310,7 +333,8 @@ export default function OrdersPage() {
                         </button>
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {order.status === "reinvested" && (
                     <div
