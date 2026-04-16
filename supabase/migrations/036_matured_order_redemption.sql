@@ -287,6 +287,8 @@ BEGIN
     PERFORM settle_order(v_order.id);
   END LOOP;
 
+  PERFORM process_team_bonuses_daily();
+
   PERFORM process_matured_reinvestments();
 
   FOR v_member IN SELECT wallet_address FROM members
