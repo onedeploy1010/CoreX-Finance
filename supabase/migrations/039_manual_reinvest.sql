@@ -199,8 +199,8 @@ BEGIN
   END IF;
 
   -- Deduct from balance by creating a withdrawal-like record
-  INSERT INTO withdrawals (wallet_address, amount, fee, status, tx_hash)
-  VALUES (v_addr, p_amount, 0, 'completed', 'balance_payment');
+  INSERT INTO withdrawals (wallet_address, amount, fee, actual_amount, status, tx_hash)
+  VALUES (v_addr, p_amount, 0, p_amount, 'completed', 'balance_payment');
 
   -- Create order
   v_end_date := NOW() + (p_days || ' days')::INTERVAL;
