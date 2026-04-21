@@ -52,10 +52,20 @@ function OrderCard({ o, onView }: { o: any; onView: () => void }) {
           <span className="text-xs font-semibold">{o.productName}</span>
         </div>
         <div className="flex items-center gap-2">
-          {o.payment_method === "balance" && (
+          {o.reinvested_from_order_id ? (
+            <span className="text-[10px] px-1 py-0.5 rounded"
+              style={{ background: "rgba(168,85,247,0.1)", color: "#a855f7" }}>
+              复投
+            </span>
+          ) : o.payment_method === "balance" ? (
+            <span className="text-[10px] px-1 py-0.5 rounded"
+              style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6" }}>
+              余额
+            </span>
+          ) : (
             <span className="text-[10px] px-1 py-0.5 rounded"
               style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
-              余额
+              USDT
             </span>
           )}
           <span className="text-xs px-1.5 py-0.5 rounded"
@@ -97,9 +107,17 @@ function OrderCard({ o, onView }: { o: any; onView: () => void }) {
   );
 }
 
+const SOURCE_TABS = [
+  { value: "all", label: "全部来源" },
+  { value: "on_chain", label: "真实USDT入金" },
+  { value: "balance", label: "余额投资" },
+  { value: "reinvest", label: "复投" },
+];
+
 export default function AdminOrders() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
+  const [source, setSource] = useState<"all" | "on_chain" | "balance" | "reinvest">("all");
   const [detailId, setDetailId] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -127,12 +145,13 @@ export default function AdminOrders() {
   const [appliedProductFilter, setAppliedProductFilter] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/admin/orders", `?page=${page}&limit=20&status=${status}&search=${search}&product=${appliedProductFilter}&from=${appliedDateFrom}&to=${appliedDateTo}`],
+    queryKey: ["/api/admin/orders", `?page=${page}&limit=20&status=${status}&source=${source}&search=${search}&product=${appliedProductFilter}&from=${appliedDateFrom}&to=${appliedDateTo}`],
     queryFn: () => getAdminOrders(page, 20, status, {
       search,
       productId: appliedProductFilter,
       dateFrom: appliedDateFrom || undefined,
       dateTo: appliedDateTo || undefined,
+      source: source === "all" ? null : source,
     }),
   });
 
@@ -414,6 +433,25 @@ export default function AdminOrders() {
           </button>
         </div>
       )}
+
+      {/* Source tabs (入金来源) */}
+      <div className="flex gap-2 flex-wrap">
+        {SOURCE_TABS.map(tab => (
+          <button
+            key={tab.value}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all"
+            style={{
+              background: source === tab.value ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.03)",
+              color: source === tab.value ? "#22c55e" : "rgba(255,255,255,0.5)",
+              border: source === tab.value ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(255,255,255,0.06)",
+              minHeight: "32px",
+            }}
+            onClick={() => { setSource(tab.value as any); setPage(1); }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {/* Status tabs */}
       <div className="flex gap-2 flex-wrap">

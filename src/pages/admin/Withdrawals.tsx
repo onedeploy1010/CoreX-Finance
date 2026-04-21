@@ -12,7 +12,7 @@ import { useActiveAccount, useSendTransaction, ConnectButton } from "thirdweb/re
 import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { getWithdrawalContract, getUSDTContract, formatUSDT, prepareApproveUSDTForWithdrawal, getWithdrawalAllowance, getFundingWallet, COREX_WITHDRAWAL_ADDRESS } from "@/lib/contracts";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck, Download, Calendar } from "lucide-react";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
 
 const STATUS_TABS = [
@@ -498,10 +498,33 @@ export default function AdminWithdrawals() {
   const [status, setStatus] = useState("all");
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [appliedFrom, setAppliedFrom] = useState("");
+  const [appliedTo, setAppliedTo] = useState("");
   const { toast } = useToast();
 
-  const qk = ["/api/admin/withdrawals", `?page=${page}&limit=20&status=${status}`];
-  const { data, isLoading } = useQuery({ queryKey: qk, queryFn: () => getAdminWithdrawals(page, 20, status) });
+  const qk = ["/api/admin/withdrawals", `?page=${page}&limit=20&status=${status}&from=${appliedFrom}&to=${appliedTo}`];
+  const { data, isLoading } = useQuery({
+    queryKey: qk,
+    queryFn: () => getAdminWithdrawals(page, 20, status, {
+      dateFrom: appliedFrom || undefined,
+      dateTo: appliedTo || undefined,
+    }),
+  });
+
+  const applyPresetRange = (days: number) => {
+    const end = new Date().toISOString().slice(0, 10);
+    const start = new Date(Date.now() - (days - 1) * 86400000).toISOString().slice(0, 10);
+    setDateFrom(start); setDateTo(end);
+    setAppliedFrom(start); setAppliedTo(end);
+    setPage(1);
+  };
+  const clearRange = () => {
+    setDateFrom(""); setDateTo("");
+    setAppliedFrom(""); setAppliedTo("");
+    setPage(1);
+  };
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
@@ -620,6 +643,52 @@ export default function AdminWithdrawals() {
             <><Send size={14} className="mr-1.5" /> 批量上链提现</>
           )}
         </Button>
+        </div>
+      </div>
+
+      {/* Date range filter */}
+      <div className="rounded-xl p-3 space-y-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
+        <div className="flex items-center gap-2">
+          <Calendar size={13} style={{ color: "#C9A227" }} />
+          <span className="text-xs font-bold text-foreground">日期区间筛选</span>
+          {(appliedFrom || appliedTo) && (
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              {appliedFrom || "…"} ~ {appliedTo || "…"}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            className="text-xs rounded-lg px-2.5 py-2 flex-1 min-w-[120px]"
+            style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227", colorScheme: "dark" }} />
+          <span className="text-xs text-muted-foreground">至</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            className="text-xs rounded-lg px-2.5 py-2 flex-1 min-w-[120px]"
+            style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227", colorScheme: "dark" }} />
+          <Button size="sm" onClick={() => { setAppliedFrom(dateFrom); setAppliedTo(dateTo); setPage(1); }}
+            style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "36px" }}>
+            应用
+          </Button>
+          {(appliedFrom || appliedTo) && (
+            <Button size="sm" variant="outline" onClick={clearRange}
+              style={{ border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", minHeight: "36px" }}>
+              清除
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { label: "近 7 天", fn: () => applyPresetRange(7) },
+            { label: "近 14 天", fn: () => applyPresetRange(14) },
+            { label: "近 30 天", fn: () => applyPresetRange(30) },
+            { label: "近 90 天", fn: () => applyPresetRange(90) },
+          ].map(p => (
+            <button key={p.label} onClick={p.fn}
+              className="text-[10px] px-2 py-1 rounded-full"
+              style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227" }}>
+              {p.label}
+            </button>
+          ))}
         </div>
       </div>
 

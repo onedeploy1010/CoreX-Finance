@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminFinance, getAdminFinanceMonthly, getAdminWithdrawalForecast } from "@/lib/api";
-import { DollarSign, TrendingUp, TrendingDown, ArrowDownToLine, Wallet, Percent, AlertTriangle, Calendar, BarChart3, Loader2, Clock, ChevronLeft, ChevronRight, List, LayoutGrid } from "lucide-react";
+import { getAdminFinance, getAdminFinanceMonthly, getAdminWithdrawalForecast, getAdminDateRangeStats } from "@/lib/api";
+import { DollarSign, TrendingUp, TrendingDown, ArrowDownToLine, Wallet, Percent, AlertTriangle, Calendar, BarChart3, Loader2, Clock, ChevronLeft, ChevronRight, List, LayoutGrid, CreditCard, Recycle } from "lucide-react";
 
 const cardBg = { background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" };
 
@@ -35,6 +35,250 @@ function MonthLabel({ month }: { month: string }) {
 
 function shortAddr(addr: string) {
   return addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "";
+}
+
+function DateRangeTab() {
+  const today = new Date();
+  const shDateStr = (dt: Date) => {
+    const sh = new Date(dt.getTime() + 8 * 3600 * 1000);
+    return sh.toISOString().slice(0, 10);
+  };
+  const defaultFrom = shDateStr(new Date(today.getTime() - 6 * 86400000));
+  const defaultTo = shDateStr(today);
+
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(defaultTo);
+  const [appliedFrom, setAppliedFrom] = useState(defaultFrom);
+  const [appliedTo, setAppliedTo] = useState(defaultTo);
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["/api/admin/finance/range", appliedFrom, appliedTo],
+    queryFn: () => getAdminDateRangeStats(appliedFrom, appliedTo),
+    enabled: !!appliedFrom && !!appliedTo,
+  });
+
+  const applyPreset = (days: number) => {
+    const end = shDateStr(new Date());
+    const start = shDateStr(new Date(Date.now() - (days - 1) * 86400000));
+    setFrom(start); setTo(end);
+    setAppliedFrom(start); setAppliedTo(end);
+  };
+  const applyMonth = (offset: number) => {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth() + offset;
+    const first = new Date(y, m, 1);
+    const last = new Date(y, m + 1, 0);
+    const start = shDateStr(first), end = shDateStr(last);
+    setFrom(start); setTo(end);
+    setAppliedFrom(start); setAppliedTo(end);
+  };
+
+  const r = data as any;
+  const onChain = r?.orders?.onChain || { count: 0, amount: "0" };
+  const balance = r?.orders?.balance || { count: 0, amount: "0" };
+  const reinvest = r?.orders?.reinvest || { count: 0, amount: "0" };
+  const withdrawals = r?.withdrawals?.completed || { count: 0, amount: "0", actualAmount: "0", fees: "0" };
+  const pendingW = r?.withdrawals?.pending || { count: 0, amount: "0" };
+  const byDayOrders: any[] = r?.orders?.byDay || [];
+  const byDayWithdrawals: any[] = r?.withdrawals?.byDay || [];
+  const byProductOnChain: any[] = r?.orders?.byProductOnChain || [];
+
+  const days = r?.range?.days || 0;
+  const depositNet = fmtN(onChain.amount);
+
+  return (
+    <div className="space-y-4">
+      {/* Date range picker */}
+      <div className="rounded-xl p-4 space-y-3" style={cardBg}>
+        <div className="flex items-center gap-2">
+          <Calendar size={14} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-bold text-foreground">选择日期区间</span>
+          {isFetching && <Loader2 size={12} className="animate-spin text-muted-foreground" />}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)}
+            className="text-xs rounded-lg px-2.5 py-2"
+            style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227", colorScheme: "dark" }} />
+          <span className="text-xs text-muted-foreground">至</span>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)}
+            className="text-xs rounded-lg px-2.5 py-2"
+            style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227", colorScheme: "dark" }} />
+          <button onClick={() => { setAppliedFrom(from); setAppliedTo(to); }}
+            className="text-xs px-3 py-2 rounded-lg font-semibold"
+            style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}>
+            应用
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { label: "近 7 天", fn: () => applyPreset(7) },
+            { label: "近 14 天", fn: () => applyPreset(14) },
+            { label: "近 30 天", fn: () => applyPreset(30) },
+            { label: "本月", fn: () => applyMonth(0) },
+            { label: "上月", fn: () => applyMonth(-1) },
+          ].map(p => (
+            <button key={p.label} onClick={p.fn}
+              className="text-[10px] px-2 py-1 rounded-full"
+              style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.2)", color: "#C9A227" }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={24} className="animate-spin" style={{ color: "#C9A227" }} />
+        </div>
+      ) : !r ? null : (
+        <>
+          {/* Summary strip */}
+          <div className="rounded-xl p-4" style={cardBg}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-xs text-muted-foreground">{appliedFrom} ~ {appliedTo}</div>
+                <div className="text-[10px] text-muted-foreground">共 {days} 天</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] text-muted-foreground">区间净入金</div>
+                <div className="font-black text-lg" style={{ color: "#22c55e" }}>+{fmt(depositNet)} U</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg p-3" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)" }}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <TrendingUp size={11} style={{ color: "#22c55e" }} />
+                  <span className="text-[10px] text-muted-foreground">真实USDT入金</span>
+                </div>
+                <div className="font-black text-sm" style={{ color: "#22c55e" }}>{fmt(onChain.amount)} U</div>
+                <div className="text-[9px] text-muted-foreground">{onChain.count} 笔</div>
+              </div>
+              <div className="rounded-lg p-3" style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)" }}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <CreditCard size={11} style={{ color: "#3b82f6" }} />
+                  <span className="text-[10px] text-muted-foreground">余额投资</span>
+                </div>
+                <div className="font-black text-sm" style={{ color: "#3b82f6" }}>{fmt(balance.amount)} U</div>
+                <div className="text-[9px] text-muted-foreground">{balance.count} 笔</div>
+              </div>
+              <div className="rounded-lg p-3" style={{ background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.15)" }}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Recycle size={11} style={{ color: "#a855f7" }} />
+                  <span className="text-[10px] text-muted-foreground">复投</span>
+                </div>
+                <div className="font-black text-sm" style={{ color: "#a855f7" }}>{fmt(reinvest.amount)} U</div>
+                <div className="text-[9px] text-muted-foreground">{reinvest.count} 笔</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Withdrawals summary */}
+          <div className="rounded-xl p-4" style={cardBg}>
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingDown size={14} style={{ color: "#ef4444" }} />
+              <span className="text-sm font-bold text-foreground">提现（区间内）</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg p-3" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                <div className="text-[10px] text-muted-foreground mb-1">已完成</div>
+                <div className="font-black text-sm" style={{ color: "#ef4444" }}>{fmt(withdrawals.amount)} U</div>
+                <div className="text-[9px] text-muted-foreground">{withdrawals.count} 笔 · 实付 {fmt(withdrawals.actualAmount)} · 费 {fmt(withdrawals.fees)}</div>
+              </div>
+              <div className="rounded-lg p-3" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
+                <div className="text-[10px] text-muted-foreground mb-1">待审核</div>
+                <div className="font-black text-sm" style={{ color: "#f59e0b" }}>{fmt(pendingW.amount)} U</div>
+                <div className="text-[9px] text-muted-foreground">{pendingW.count} 笔</div>
+              </div>
+              <div className="rounded-lg p-3" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)" }}>
+                <div className="text-[10px] text-muted-foreground mb-1">区间净流（入−出）</div>
+                <div className="font-black text-sm" style={{ color: depositNet - fmtN(withdrawals.amount) >= 0 ? "#22c55e" : "#ef4444" }}>
+                  {(depositNet - fmtN(withdrawals.amount)) >= 0 ? "+" : ""}{fmt(depositNet - fmtN(withdrawals.amount))} U
+                </div>
+                <div className="text-[9px] text-muted-foreground">真实入金 − 链上提现</div>
+              </div>
+            </div>
+          </div>
+
+          {/* By day table */}
+          <div className="rounded-xl p-4" style={cardBg}>
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 size={14} style={{ color: "#C9A227" }} />
+              <span className="text-sm font-bold text-foreground">按日明细</span>
+            </div>
+            {byDayOrders.length === 0 && byDayWithdrawals.length === 0 ? (
+              <div className="text-xs text-muted-foreground text-center py-6">区间内无数据</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(201,162,39,0.15)" }}>
+                      <th className="text-left py-2 px-2 text-muted-foreground font-medium">日期</th>
+                      <th className="text-right py-2 px-2 font-medium" style={{ color: "#22c55e" }}>真实USDT入金</th>
+                      <th className="text-right py-2 px-2 font-medium" style={{ color: "#3b82f6" }}>余额投资</th>
+                      <th className="text-right py-2 px-2 font-medium" style={{ color: "#a855f7" }}>复投</th>
+                      <th className="text-right py-2 px-2 font-medium" style={{ color: "#ef4444" }}>提现</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const dates = Array.from(new Set([
+                        ...byDayOrders.map(d => d.date),
+                        ...byDayWithdrawals.map(d => d.date),
+                      ])).sort();
+                      const oMap = new Map(byDayOrders.map(d => [d.date, d]));
+                      const wMap = new Map(byDayWithdrawals.map(d => [d.date, d]));
+                      return dates.map(date => {
+                        const oo = oMap.get(date) || {};
+                        const ww = wMap.get(date) || {};
+                        return (
+                          <tr key={date} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                            <td className="py-2.5 px-2 text-muted-foreground font-mono text-[11px]">{date}</td>
+                            <td className="py-2.5 px-2 text-right" style={{ color: "#22c55e" }}>
+                              {fmtN(oo.on_chain || 0) > 0 ? `${fmt(oo.on_chain)} (${oo.on_chain_count || 0})` : "-"}
+                            </td>
+                            <td className="py-2.5 px-2 text-right" style={{ color: "#3b82f6" }}>
+                              {fmtN(oo.balance || 0) > 0 ? `${fmt(oo.balance)} (${oo.balance_count || 0})` : "-"}
+                            </td>
+                            <td className="py-2.5 px-2 text-right" style={{ color: "#a855f7" }}>
+                              {fmtN(oo.reinvest || 0) > 0 ? `${fmt(oo.reinvest)} (${oo.reinvest_count || 0})` : "-"}
+                            </td>
+                            <td className="py-2.5 px-2 text-right" style={{ color: "#ef4444" }}>
+                              {fmtN(ww.amount || 0) > 0 ? `${fmt(ww.amount)} (${ww.count || 0})` : "-"}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* By product (on_chain only) */}
+          {byProductOnChain.length > 0 && (
+            <div className="rounded-xl p-4" style={cardBg}>
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign size={14} style={{ color: "#C9A227" }} />
+                <span className="text-sm font-bold text-foreground">真实入金按配套</span>
+              </div>
+              <div className="space-y-2">
+                {byProductOnChain.map((p, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "rgba(34,197,94,0.04)", border: "1px solid rgba(34,197,94,0.1)" }}>
+                    <span className="text-xs font-semibold text-foreground">{p.name}</span>
+                    <div className="text-right">
+                      <span className="text-xs font-bold" style={{ color: "#22c55e" }}>{fmt(p.amount)} U</span>
+                      <span className="text-[9px] text-muted-foreground ml-2">{p.count} 笔</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 function ForecastTab({ fc }: { fc: any }) {
@@ -635,7 +879,7 @@ function ForecastTab({ fc }: { fc: any }) {
 }
 
 export default function AdminFinance() {
-  const [activeSection, setActiveSection] = useState<"overview" | "monthly" | "forecast">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "monthly" | "range" | "forecast">("overview");
   const { data, isLoading } = useQuery({ queryKey: ["/api/admin/finance"], queryFn: getAdminFinance });
   const { data: monthlyData, isLoading: monthlyLoading } = useQuery({ queryKey: ["/api/admin/finance/monthly"], queryFn: getAdminFinanceMonthly });
   const { data: forecastData, isLoading: forecastLoading } = useQuery({ queryKey: ["/api/admin/finance/forecast"], queryFn: getAdminWithdrawalForecast });
@@ -649,6 +893,7 @@ export default function AdminFinance() {
   const sections = [
     { key: "overview" as const, label: "总览" },
     { key: "monthly" as const, label: "月度分析" },
+    { key: "range" as const, label: "区间统计" },
     { key: "forecast" as const, label: "提现预测" },
   ];
 
@@ -705,10 +950,24 @@ export default function AdminFinance() {
       {/* ===== OVERVIEW ===== */}
       {activeSection === "overview" && (
         <>
+          {/* Deposit breakdown — 3 categories */}
+          <div className="rounded-xl p-4" style={cardBg}>
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp size={14} style={{ color: "#22c55e" }} />
+              <span className="text-sm font-bold text-foreground">入金分类统计</span>
+              <span className="text-[10px] text-muted-foreground ml-auto">总入金仅计算真实 USDT 入金</span>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <StatCard icon={TrendingUp} label="真实USDT入金(U)" value={fmt(d.onChainDeposits || 0)} sub={`${d.onChainDepositCount || 0} 笔 · 计入总入金`} color="#22c55e" />
+              <StatCard icon={CreditCard} label="余额投资(U)" value={fmt(d.balanceDeposits || 0)} sub={`${d.balanceDepositCount || 0} 笔 · 不重复计入`} color="#3b82f6" />
+              <StatCard icon={Recycle} label="复投金额(U)" value={fmt(d.reinvestDeposits || 0)} sub={`${d.reinvestDepositCount || 0} 笔 · 不重复计入`} color="#a855f7" />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-            <StatCard icon={TrendingUp} label="总入金(U)" value={fmt(d.totalDeposits)} sub={`${d.totalDepositCount || 0} 笔订单`} color="#22c55e" />
+            <StatCard icon={TrendingUp} label="总入金(U)" value={fmt(d.totalDeposits)} sub={`${d.totalDepositCount || 0} 笔 · 真实入金`} color="#22c55e" />
             <StatCard icon={TrendingDown} label="总出金(U)" value={fmt(d.totalWithdrawn)} sub={`实付 ${fmt(d.totalActualPaid || 0)} + 手续费 ${fmt(d.totalFees || 0)}`} color="#ef4444" />
-            <StatCard icon={Wallet} label="净余额(U)" value={fmt(d.netBalance)} />
+            <StatCard icon={Wallet} label="净余额(U)" value={fmt(d.netBalance)} sub="真实入金 − 链上提现" />
             <StatCard icon={DollarSign} label="活跃质押(U)" value={fmt(d.activeStaking)} />
             <StatCard icon={ArrowDownToLine} label="累计发放收益(U)" value={fmt(d.totalEarned)} />
             <StatCard icon={Percent} label="手续费收入(U)" value={fmt(d.totalFees)} />
@@ -903,6 +1162,9 @@ export default function AdminFinance() {
           </div>
         )
       )}
+
+      {/* ===== DATE RANGE STATS ===== */}
+      {activeSection === "range" && <DateRangeTab />}
 
       {/* ===== WITHDRAWAL FORECAST ===== */}
       {activeSection === "forecast" && (

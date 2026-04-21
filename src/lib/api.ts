@@ -707,7 +707,7 @@ export async function getAdminTeamTree(rootAddress: string) {
   return result;
 }
 
-export async function getAdminOrders(page: number, limit: number, status: string, filters?: { search?: string; productId?: number | null; dateFrom?: string; dateTo?: string }) {
+export async function getAdminOrders(page: number, limit: number, status: string, filters?: { search?: string; productId?: number | null; dateFrom?: string; dateTo?: string; source?: "on_chain" | "balance" | "reinvest" | null }) {
   const offset = (page - 1) * limit;
 
   let query = supabase.from("orders").select("*", { count: "exact" });
@@ -725,6 +725,13 @@ export async function getAdminOrders(page: number, limit: number, status: string
   }
   if (filters?.dateTo) {
     query = query.lte("start_date", filters.dateTo + "T23:59:59");
+  }
+  if (filters?.source === "on_chain") {
+    query = query.eq("payment_method", "on_chain").is("reinvested_from_order_id", null);
+  } else if (filters?.source === "balance") {
+    query = query.eq("payment_method", "balance").is("reinvested_from_order_id", null);
+  } else if (filters?.source === "reinvest") {
+    query = query.not("reinvested_from_order_id", "is", null);
   }
   const { data: orderList, count, error } = await query
     .order("start_date", { ascending: false })
@@ -790,27 +797,39 @@ export async function getOrderShareStats() {
   }));
 }
 
-export async function getAdminWithdrawals(page: number, limit: number, status: string) {
+export async function getAdminWithdrawals(page: number, limit: number, status: string, filters?: { dateFrom?: string; dateTo?: string }) {
   const offset = (page - 1) * limit;
 
-  let query = supabase.from("withdrawals").select("*", { count: "exact" });
+  let query = supabase.from("withdrawals").select("*", { count: "exact" }).neq("tx_hash", "balance_payment");
   if (status && status !== "all") {
     query = query.eq("status", status);
+  }
+  if (filters?.dateFrom) {
+    query = query.gte("created_at", filters.dateFrom);
+  }
+  if (filters?.dateTo) {
+    query = query.lte("created_at", filters.dateTo + "T23:59:59");
   }
   const { data: list, count, error } = await query
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw new Error(error.message);
 
-  // Fetch summary stats
-  const { data: completedStats } = await supabase.from("withdrawals").select("amount,fee").eq("status", "completed");
+  // Summary stats — exclude balance_payment, optionally constrained by date range
+  const buildStatsQuery = (qstatus: string) => {
+    let q = supabase.from("withdrawals").select("amount,fee,tx_hash").eq("status", qstatus).neq("tx_hash", "balance_payment");
+    if (filters?.dateFrom) q = q.gte("created_at", filters.dateFrom);
+    if (filters?.dateTo) q = q.lte("created_at", filters.dateTo + "T23:59:59");
+    return q;
+  };
+  const { data: completedStats } = await buildStatsQuery("completed");
   const completedTotal = (completedStats || []).reduce((s, w) => s + parseFloat(w.amount || "0"), 0);
   const completedFees = (completedStats || []).reduce((s, w) => s + parseFloat(w.fee || "0"), 0);
   const completedCount = (completedStats || []).length;
 
-  const { count: pendingCount } = await supabase.from("withdrawals").select("*", { count: "exact", head: true }).eq("status", "pending");
-  const { data: pendingStats } = await supabase.from("withdrawals").select("amount").eq("status", "pending");
+  const { data: pendingStats } = await buildStatsQuery("pending");
   const pendingTotal = (pendingStats || []).reduce((s, w) => s + parseFloat(w.amount || "0"), 0);
+  const pendingCount = (pendingStats || []).length;
 
   return {
     withdrawals: (list || []).map(w => ({
@@ -908,6 +927,15 @@ export async function deleteAdminMessage(id: number) {
 
 export async function getAdminFinance() {
   const { data, error } = await supabase.rpc("admin_finance");
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getAdminDateRangeStats(from: string, to: string) {
+  const { data, error } = await supabase.rpc("admin_date_range_stats", {
+    p_start: from,
+    p_end: to,
+  });
   if (error) throw new Error(error.message);
   return data;
 }
@@ -1428,14 +1456,16 @@ export async function adminCreateOrderForMember(walletAddress: string, productId
   return { id: data };
 }
 
-export async function adminCancelOrder(orderId: number) {
-  const { data, error } = await supabase
-    .from("orders")
-    .update({ status: "cancelled" })
-    .eq("id", orderId)
-    .eq("status", "active")
-    .select()
-    .single();
+export async function adminCancelOrder(orderId: number, options?: { refund?: boolean; reason?: string }) {
+  const session = getAdminSession();
+  if (!session) throw new Error("未登录");
+
+  const { data, error } = await supabase.rpc("admin_cancel_order_refund", {
+    p_admin_id: session.id,
+    p_order_id: orderId,
+    p_refund: options?.refund ?? true,
+    p_reason: options?.reason ?? null,
+  });
   if (error) throw new Error(error.message);
   return data;
 }

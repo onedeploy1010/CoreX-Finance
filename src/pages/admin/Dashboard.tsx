@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAdminDashboard } from "@/lib/api";
-import { Users, ShoppingCart, ArrowDownToLine, DollarSign, TrendingUp, Clock, Crown, Activity, CheckCircle2, XCircle, Loader2, RefreshCw, UserPlus, PlusCircle, Wallet, Gift } from "lucide-react";
+import { Users, ShoppingCart, ArrowDownToLine, DollarSign, TrendingUp, Clock, Crown, Activity, CheckCircle2, XCircle, Loader2, RefreshCw, UserPlus, PlusCircle, Wallet, Gift, CreditCard, Recycle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Link } from "wouter";
 import {
@@ -241,6 +241,43 @@ export default function Dashboard() {
         <StatCard icon={DollarSign} label="总质押(U)" value={parseFloat(d.totalStaking || 0).toFixed(2)} sub="活跃质押" />
         <StatCard icon={Gift} label="今日利息发放(U)" value={parseFloat(d.todayDailyEarnings || 0).toFixed(2)} color="#22c55e" />
         <StatCard icon={TrendingUp} label="累计利息发放(U)" value={parseFloat(d.totalDailyEarnings || 0).toFixed(2)} color="#22c55e" />
+      </div>
+
+      {/* Row 2.5: Deposit breakdown by source — on_chain / balance / reinvest */}
+      <div className="rounded-xl p-4" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp size={14} style={{ color: "#C9A227" }} />
+          <span className="text-sm font-bold text-foreground">入金来源分类</span>
+          <span className="text-[10px] text-muted-foreground ml-auto">真实 USDT 入金 / 余额投资 / 复投分开统计</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard
+            icon={TrendingUp}
+            label="真实USDT入金(U)"
+            value={parseFloat(d.onChainDeposits || 0).toFixed(2)}
+            sub={`${d.onChainDepositCount || 0} 笔 | 今日 ${parseFloat(d.todayOnChainDeposits || 0).toFixed(2)}U (${d.todayOnChainDepositCount || 0}笔)`}
+            color="#22c55e"
+          />
+          <StatCard
+            icon={CreditCard}
+            label="余额投资(U)"
+            value={parseFloat(d.balanceDeposits || 0).toFixed(2)}
+            sub={`${d.balanceDepositCount || 0} 笔 | 今日 ${parseFloat(d.todayBalanceDeposits || 0).toFixed(2)}U (${d.todayBalanceDepositCount || 0}笔)`}
+            color="#3b82f6"
+          />
+          <StatCard
+            icon={Recycle}
+            label="复投金额(U)"
+            value={parseFloat(d.reinvestDeposits || 0).toFixed(2)}
+            sub={`${d.reinvestDepositCount || 0} 笔 | 今日 ${parseFloat(d.todayReinvestDeposits || 0).toFixed(2)}U (${d.todayReinvestDepositCount || 0}笔)`}
+            color="#a855f7"
+          />
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-3 pl-1">
+          总入金（计入财务）= <span style={{ color: "#22c55e" }}>真实USDT入金 {parseFloat(d.onChainDeposits || 0).toFixed(2)} U</span>
+          <span className="mx-1">·</span>
+          余额投资与复投不重复计入
+        </div>
       </div>
 
       {/* Row 3: Bonus Rewards */}
