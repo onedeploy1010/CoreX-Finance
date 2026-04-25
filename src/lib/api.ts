@@ -1470,6 +1470,22 @@ export async function adminCancelOrder(orderId: number, options?: { refund?: boo
   return data;
 }
 
+export async function adminBackfillByTx(txHash: string) {
+  const session = getAdminSession();
+  if (!session) throw new Error("未登录");
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const resp = await fetch(`${supabaseUrl}/functions/v1/chain-reconcile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
+    body: JSON.stringify({ txHash: txHash.trim().toLowerCase() }),
+  });
+  const result = await resp.json();
+  if (!result.success) throw new Error(result.message || "Backfill failed");
+  return result as { scanned: number; inserted: number; skipped: number; errored: number; errors: any[] };
+}
+
 export async function updateMemberNote(walletAddress: string, note: string) {
   const { data, error } = await supabase.rpc("admin_update_member_note", {
     p_wallet_address: walletAddress, p_note: note || null,

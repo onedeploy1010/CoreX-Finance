@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getAdminOrders, getProducts, getOrderShareStats, DBProduct, exportOrdersCSV } from "@/lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getAdminOrders, getProducts, getOrderShareStats, DBProduct, exportOrdersCSV, adminBackfillByTx } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Eye, Search, Filter, Calendar, BarChart3, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Search, Filter, Calendar, BarChart3, Download, Plus } from "lucide-react";
 import { CopyableAddress } from "@/components/CopyableAddress";
+import { useToast } from "@/hooks/use-toast";
 
 const STATUS_TABS = [
   { value: "all", label: "全部" },
@@ -123,6 +124,39 @@ export default function AdminOrders() {
 
   const [showStats, setShowStats] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [backfillOpen, setBackfillOpen] = useState(false);
+  const [backfillTx, setBackfillTx] = useState("");
+  const [backfilling, setBackfilling] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const handleBackfill = async () => {
+    const tx = backfillTx.trim();
+    if (!/^0x[0-9a-fA-F]{64}$/.test(tx)) {
+      toast({ title: "无效的 txHash", description: "需要 0x 开头的 66 位十六进制", variant: "destructive" });
+      return;
+    }
+    setBackfilling(true);
+    try {
+      const result = await adminBackfillByTx(tx);
+      if (result.inserted > 0) {
+        toast({ title: "补单成功", description: `已新建 ${result.inserted} 条订单` });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      } else if (result.skipped > 0) {
+        toast({ title: "已存在", description: "该 tx 对应的订单已经在系统里", variant: "destructive" });
+      } else if (result.errored > 0) {
+        toast({ title: "补单失败", description: result.errors[0]?.error || "未知错误", variant: "destructive" });
+      }
+      if (result.inserted > 0) {
+        setBackfillOpen(false);
+        setBackfillTx("");
+      }
+    } catch (e: any) {
+      toast({ title: "补单失败", description: e?.message || "", variant: "destructive" });
+    } finally {
+      setBackfilling(false);
+    }
+  };
 
   const { data: dbProducts = [] } = useQuery({
     queryKey: ["/api/products"],
@@ -196,6 +230,11 @@ export default function AdminOrders() {
           <span className="text-xs text-muted-foreground ml-2">共 {d?.total || 0} 条</span>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline"
+            style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "36px" }}
+            onClick={() => setBackfillOpen(true)}>
+            <Plus size={14} className="mr-1" /> 按txHash补单
+          </Button>
           <Button size="sm" variant="outline" disabled={exporting}
             style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "36px" }}
             onClick={async () => { setExporting(true); try { await exportOrdersCSV(status, { search, productId: appliedProductFilter, dateFrom: appliedDateFrom, dateTo: appliedDateTo }); } finally { setExporting(false); } }}>
@@ -503,6 +542,37 @@ export default function AdminOrders() {
             <DialogTitle style={{ color: "#C9A227" }}>订单详情 #{detailId}</DialogTitle>
           </DialogHeader>
           {detailOrder ? <OrderDetail data={detailOrder} /> : <div className="text-center text-muted-foreground py-4">加载中...</div>}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={backfillOpen} onOpenChange={(o) => { if (!backfilling) setBackfillOpen(o); }}>
+        <DialogContent className="max-w-md mx-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.3)" }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: "#C9A227" }}>按 txHash 补单</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              输入 BSC 上 CoreXInvestment 合约的 InvestmentCreated 事件的 txHash。系统将从链上读取并自动补录订单（去重，金额、产品、钱包均按链上为准）。
+            </p>
+            <Input
+              value={backfillTx}
+              onChange={(e) => setBackfillTx(e.target.value)}
+              placeholder="0x..."
+              disabled={backfilling}
+              style={{ fontFamily: "monospace", fontSize: "12px" }}
+            />
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" disabled={backfilling}
+                onClick={() => { setBackfillOpen(false); setBackfillTx(""); }}>
+                取消
+              </Button>
+              <Button size="sm" disabled={backfilling || !backfillTx.trim()}
+                style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+                onClick={handleBackfill}>
+                {backfilling ? "补录中..." : "补录"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
