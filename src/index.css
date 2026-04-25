@@ -219,6 +219,187 @@
   border-radius: 2px;
 }
 
+/* ==========================================
+   Admin Panel - Enlarged Typography System
+   统一后台管理字体大小，方便老板查看
+   ========================================== */
+
+/* Base admin font size */
+.admin-panel {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* --- Tiny arbitrary sizes → readable minimums --- */
+.admin-panel [class*="text-[7px]"],
+.admin-panel [class*="text-[8px]"] {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+.admin-panel [class*="text-[9px]"] {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.admin-panel [class*="text-[10px]"],
+.admin-panel [class*="text-[11px]"] {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+/* --- Standard Tailwind text classes scaled up --- */
+.admin-panel .text-xs {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.admin-panel .text-sm {
+  font-size: 16px !important;
+  line-height: 1.5 !important;
+}
+
+.admin-panel .text-base {
+  font-size: 18px !important;
+  line-height: 1.6 !important;
+}
+
+.admin-panel .text-lg {
+  font-size: 22px !important;
+  line-height: 1.5 !important;
+}
+
+.admin-panel .text-xl {
+  font-size: 26px !important;
+  line-height: 1.4 !important;
+}
+
+.admin-panel .text-2xl {
+  font-size: 32px !important;
+  line-height: 1.3 !important;
+}
+
+.admin-panel .text-3xl {
+  font-size: 38px !important;
+  line-height: 1.3 !important;
+}
+
+/* --- Table & data content readability --- */
+.admin-panel table {
+  font-size: 15px;
+}
+
+.admin-panel table th {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 16px !important;
+}
+
+.admin-panel table td {
+  padding: 10px 16px !important;
+}
+
+/* --- Inputs & Buttons --- */
+.admin-panel input,
+.admin-panel select,
+.admin-panel textarea {
+  font-size: 16px !important;
+  min-height: 42px;
+}
+
+.admin-panel button {
+  font-size: 15px;
+  min-height: 40px;
+}
+
+.admin-panel label {
+  font-size: 14px !important;
+}
+
+/* --- Dialog / Modal readability --- */
+.admin-panel [role="dialog"] .text-xs {
+  font-size: 14px !important;
+}
+
+.admin-panel [role="dialog"] .text-sm {
+  font-size: 15px !important;
+}
+
+.admin-panel [role="dialog"] input,
+.admin-panel [role="dialog"] select,
+.admin-panel [role="dialog"] textarea {
+  font-size: 15px !important;
+  min-height: 40px;
+}
+
+/* --- Badge / Tag readability --- */
+.admin-panel span[class*="px-1"][class*="py-0"],
+.admin-panel span[class*="px-1.5"][class*="py-0.5"] {
+  font-size: 13px !important;
+  padding: 3px 8px !important;
+}
+
+/* --- Mobile responsive adjustments --- */
+@media (max-width: 1023px) {
+  .admin-panel {
+    font-size: 15px;
+  }
+
+  .admin-panel .text-xs {
+    font-size: 13px !important;
+  }
+
+  .admin-panel .text-sm {
+    font-size: 15px !important;
+  }
+
+  .admin-panel .text-xl {
+    font-size: 24px !important;
+  }
+
+  .admin-panel .text-2xl {
+    font-size: 28px !important;
+  }
+
+  /* Better touch targets on mobile */
+  .admin-panel button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .admin-panel input,
+  .admin-panel select,
+  .admin-panel textarea {
+    min-height: 44px;
+    font-size: 16px !important; /* prevents iOS zoom */
+  }
+
+  /* Cards need more padding on mobile for readability */
+  .admin-panel [class*="rounded-xl"][class*="p-3"],
+  .admin-panel [class*="rounded-xl"][class*="p-4"] {
+    padding: 16px !important;
+  }
+
+  /* Grid items on mobile: ensure readable spacing */
+  .admin-panel .grid {
+    gap: 12px !important;
+  }
+}
+
+/* --- Sidebar typography (separate from main panel) --- */
+.admin-sidebar .text-xs {
+  font-size: 13px !important;
+}
+
+.admin-sidebar .text-sm {
+  font-size: 15px !important;
+}
+
+.admin-sidebar button {
+  font-size: 15px !important;
+  min-height: 42px;
+}
+
 /* Thirdweb button override */
 [data-rk] button,
 .tw-connected-wallet,

@@ -113,38 +113,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       />
 
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-60 flex flex-col transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`admin-sidebar fixed lg:static inset-y-0 left-0 z-50 w-64 flex flex-col transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{ background: "linear-gradient(180deg, #1a1510, #0e0c08)", borderRight: "1px solid rgba(201,162,39,0.15)" }}
       >
-        <div className="p-4 flex items-center gap-3" style={{ borderBottom: "1px solid rgba(201,162,39,0.15)" }}>
-          <img src="/corex.png" alt="CoreX" className="w-9 h-9 rounded-lg" />
+        <div className="p-5 flex items-center gap-3" style={{ borderBottom: "1px solid rgba(201,162,39,0.15)" }}>
+          <img src="/corex.png" alt="CoreX" className="w-10 h-10 rounded-lg" />
           <div>
-            <div className="font-bold text-sm" style={{ color: "#C9A227" }}>CoreX Admin</div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">{admin.username}</span>
-              <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>{roleLabel}</span>
+            <div className="font-bold text-base" style={{ color: "#C9A227" }}>CoreX Admin</div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">{admin.username}</span>
+              <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(201,162,39,0.12)", color: "#C9A227" }}>{roleLabel}</span>
             </div>
           </div>
-          <button className="lg:hidden ml-auto p-1" onClick={() => setSidebarOpen(false)}>
-            <X size={18} className="text-muted-foreground" />
+          <button className="lg:hidden ml-auto p-2" onClick={() => setSidebarOpen(false)}>
+            <X size={22} className="text-muted-foreground" />
           </button>
         </div>
 
-        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 py-3 px-2.5 space-y-1 overflow-y-auto">
           {filteredNav.map(item => {
             const active = location === item.path;
             return (
               <Link key={item.path} href={item.path}>
                 <div
                   data-testid={`nav-${item.label}`}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all"
+                  className="flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all"
                   style={{
                     background: active ? "rgba(201,162,39,0.12)" : "transparent",
                     border: active ? "1px solid rgba(201,162,39,0.2)" : "1px solid transparent",
                   }}
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <item.icon size={16} style={{ color: active ? "#C9A227" : "rgba(255,255,255,0.4)" }} />
+                  <item.icon size={20} style={{ color: active ? "#C9A227" : "rgba(255,255,255,0.4)" }} />
                   <span className="text-sm font-medium" style={{ color: active ? "#C9A227" : "rgba(255,255,255,0.6)" }}>
                     {item.label}
                   </span>
@@ -156,20 +156,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div className="p-3 space-y-1" style={{ borderTop: "1px solid rgba(201,162,39,0.15)" }}>
           <button
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-all"
+            className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg text-sm transition-all"
             style={{ color: "#C9A227" }}
             onClick={() => setPwdOpen(true)}
           >
-            <KeyRound size={14} />
+            <KeyRound size={18} />
             修改密码
           </button>
           <button
             data-testid="button-admin-logout"
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-all"
+            className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg text-sm transition-all"
             style={{ color: "#ef4444" }}
             onClick={handleLogout}
           >
-            <LogOut size={14} />
+            <LogOut size={18} />
             退出登录
           </button>
         </div>
@@ -228,18 +228,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Dialog>
       </aside>
 
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="admin-panel flex-1 flex flex-col min-h-screen">
         <header
-          className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 lg:hidden"
+          className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3.5 lg:hidden"
           style={{ background: "rgba(12,10,8,0.95)", borderBottom: "1px solid rgba(201,162,39,0.15)", backdropFilter: "blur(8px)" }}
         >
-          <button data-testid="button-menu-toggle" onClick={() => setSidebarOpen(true)}>
-            <Menu size={20} style={{ color: "#C9A227" }} />
+          <button data-testid="button-menu-toggle" className="p-1" onClick={() => setSidebarOpen(true)}>
+            <Menu size={24} style={{ color: "#C9A227" }} />
           </button>
-          <span className="font-bold text-sm" style={{ color: "#C9A227" }}>CoreX Admin</span>
+          <span className="font-bold text-base" style={{ color: "#C9A227" }}>CoreX Admin</span>
         </header>
 
-        <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
+        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
           {children}
         </main>
       </div>

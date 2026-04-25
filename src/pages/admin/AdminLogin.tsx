@@ -44,44 +44,44 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0c0a08" }}>
-      <div className="w-full max-w-sm mx-4">
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#0c0a08" }}>
+      <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+          <div className="w-20 h-20 rounded-2xl mx-auto mb-5 flex items-center justify-center"
             style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)" }}>
-            <Lock size={28} className="text-black" />
+            <Lock size={36} className="text-black" />
           </div>
-          <h1 className="text-xl font-bold text-foreground">CoreX 管理后台</h1>
-          <p className="text-sm text-muted-foreground mt-1">请使用管理员账号登录</p>
+          <h1 className="text-2xl font-bold text-foreground">CoreX 管理后台</h1>
+          <p className="text-base text-muted-foreground mt-2">请使用管理员账号登录</p>
         </div>
 
-        <form onSubmit={handleLogin} className="rounded-xl p-6 space-y-4"
+        <form onSubmit={handleLogin} className="rounded-xl p-8 space-y-5"
           style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.25)" }}>
           <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">用户名</Label>
+            <Label className="text-base text-muted-foreground">用户名</Label>
             <div className="relative">
-              <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 data-testid="input-username"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 placeholder="请输入用户名"
-                className="pl-10"
+                className="pl-10 h-12 text-base"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)" }}
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">密码</Label>
+            <Label className="text-base text-muted-foreground">密码</Label>
             <div className="relative">
-              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 data-testid="input-password"
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="请输入密码"
-                className="pl-10"
+                className="pl-10 h-12 text-base"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)" }}
               />
             </div>
@@ -90,7 +90,7 @@ export default function AdminLogin() {
             data-testid="button-login"
             type="submit"
             disabled={loading || !username || !password}
-            className="w-full font-bold"
+            className="w-full font-bold h-12 text-base"
             style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
           >
             {loading ? "登录中..." : "登 录"}
