@@ -168,7 +168,7 @@ export default function SystemHealth() {
           label: "每日结算",
           status: settled ? (matchOrders ? "ok" : "warn") : "error",
           detail: settled
-            ? `已发放 ${dailyCount}/${settlementOrders} 笔 | ${sData.today_daily_sum} U` + (newAfterSettlement > 0 ? ` (${newAfterSettlement} 笔结算后新增)` : "")
+            ? `已结算 ${dailyCount}/${settlementOrders} 笔 · ${sData.today_daily_sum} U` + (newAfterSettlement > 0 ? ` · ${newAfterSettlement} 笔今日新增 待明日` : "")
             : `未结算 (活跃订单 ${activeOrders})`,
         });
       }
@@ -415,7 +415,7 @@ export default function SystemHealth() {
           <div className="grid grid-cols-3 gap-2 mb-3">
             <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(201,162,39,0.04)" }}>
               <div className="text-base font-bold" style={{ color: "#C9A227" }}>{settlement.active_orders}</div>
-              <div className="text-[10px] text-muted-foreground">活跃订单{(settlement.active_orders - (settlement.active_orders_at_settlement || settlement.active_orders)) > 0 ? ` (${settlement.active_orders - settlement.active_orders_at_settlement} 新增)` : ""}</div>
+              <div className="text-[10px] text-muted-foreground">活跃订单{(settlement.active_orders - (settlement.active_orders_at_settlement || settlement.active_orders)) > 0 ? ` · ${settlement.active_orders - settlement.active_orders_at_settlement} 待明日` : ""}</div>
             </div>
             <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(201,162,39,0.04)" }}>
               <div className="text-base font-bold" style={{ color: settlement.today_daily_count === (settlement.active_orders_at_settlement || settlement.active_orders) ? "#22c55e" : "#f59e0b" }}>
