@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 
 import { useActiveAccount } from "thirdweb/react";
 import { useSendTransaction } from "thirdweb/react";
+import { waitForReceipt } from "thirdweb";
+import { client, bscChain } from "@/lib/thirdweb";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { registerMember, createOrder, createOrderWithBalance, getMember, getProducts, getEarnings, DBProduct } from "@/lib/api";
@@ -118,12 +120,14 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
     try {
       const amountWei = parseUSDT(amount);
 
-      // Step 1: Approve USDT
+      // Step 1: Approve USDT (and wait for on-chain confirmation so the
+      // allowance is visible to the next call's RPC node)
       setStep("approving");
       const allowance = await getUSDTAllowance(account.address);
       if (allowance < amountWei) {
         const approveTx = prepareApproveUSDT(amountWei);
-        await sendTransaction(approveTx);
+        const approveResult = await sendTransaction(approveTx);
+        await waitForReceipt({ client, chain: bscChain, transactionHash: approveResult.transactionHash });
       }
 
       // Step 2: Call invest on smart contract
@@ -137,8 +141,11 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
         return;
       }
 
-      // Step 3: Create order in database via callback
+      // Step 3: Wait for on-chain receipt before calling the backend, otherwise
+      // investment-callback may query an RPC node that hasn't synced the tx yet
+      // and reject with "Transaction not found".
       setStep("confirming");
+      await waitForReceipt({ client, chain: bscChain, transactionHash: txHash });
 
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + product.days);

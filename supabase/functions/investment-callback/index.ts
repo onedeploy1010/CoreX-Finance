@@ -36,8 +36,13 @@ async function verifyTransactionOnChain(
     chainId: 56,
   });
 
-  // 1. Get transaction receipt
-  const receipt = await provider.getTransactionReceipt(txHash);
+  // 1. Get transaction receipt — poll briefly to defend against RPC node sync
+  // lag (frontend may have seen the tx confirmed on a different node).
+  let receipt = await provider.getTransactionReceipt(txHash);
+  for (let i = 0; i < 5 && !receipt; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    receipt = await provider.getTransactionReceipt(txHash);
+  }
   if (!receipt) {
     return { valid: false, error: "Transaction not found or not yet confirmed" };
   }
