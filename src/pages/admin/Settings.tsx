@@ -358,37 +358,36 @@ export default function AdminSettings() {
               style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
             />
             <span className="text-xs text-muted-foreground">USDT</span>
+            <Button
+              size="sm"
+              className="font-bold text-xs px-4 shrink-0"
+              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "38px" }}
+              disabled={savingLimit || withdrawLimit === ""}
+              onClick={async () => {
+                setSavingLimit(true);
+                try {
+                  const val = parseFloat(withdrawLimit);
+                  if (isNaN(val) || val < 0) throw new Error("请输入有效金额");
+                  await setAutoWithdrawLimit(val);
+                  await adminAddLog("修改自动提现额度", "settings", "auto_withdraw_limit", { limit: val });
+                  queryClient.invalidateQueries({ queryKey: ["/api/admin/auto-withdraw-limit"] });
+                  toast({ title: "自动提现额度已更新", description: val > 0 ? `${val} USDT 以下自动处理` : "已关闭自动提现" });
+                  setWithdrawLimit("");
+                } catch (err: any) {
+                  toast({ title: "更新失败", description: err.message, variant: "destructive" });
+                } finally {
+                  setSavingLimit(false);
+                }
+              }}
+            >
+              {savingLimit ? <Loader2 size={14} className="animate-spin" /> : "确定"}
+            </Button>
           </div>
           <div className="text-[10px] text-muted-foreground space-y-0.5">
             <div>设为 0 = 关闭自动提现</div>
             <div>例: 设为 500，则 500U 以下的提现将自动审批+上链</div>
           </div>
         </div>
-
-        <Button
-          className="w-full font-bold text-sm"
-          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
-          disabled={savingLimit || withdrawLimit === ""}
-          onClick={async () => {
-            setSavingLimit(true);
-            try {
-              const val = parseFloat(withdrawLimit);
-              if (isNaN(val) || val < 0) throw new Error("请输入有效金额");
-              await setAutoWithdrawLimit(val);
-              await adminAddLog("修改自动提现额度", "settings", "auto_withdraw_limit", { limit: val });
-              queryClient.invalidateQueries({ queryKey: ["/api/admin/auto-withdraw-limit"] });
-              toast({ title: "自动提现额度已更新", description: val > 0 ? `${val} USDT 以下自动处理` : "已关闭自动提现" });
-              setWithdrawLimit("");
-            } catch (err: any) {
-              toast({ title: "更新失败", description: err.message, variant: "destructive" });
-            } finally {
-              setSavingLimit(false);
-            }
-          }}
-        >
-          {savingLimit ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
-          保存额度
-        </Button>
       </div>
 
       {/* Contract Min Balance Threshold */}
@@ -418,6 +417,30 @@ export default function AdminSettings() {
               style={{ background: "rgba(201,162,39,0.08)", border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227" }}
             />
             <span className="text-xs text-muted-foreground">USDT</span>
+            <Button
+              size="sm"
+              className="font-bold text-xs px-4 shrink-0"
+              style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "38px" }}
+              disabled={savingMinBal || contractMinBal === ""}
+              onClick={async () => {
+                setSavingMinBal(true);
+                try {
+                  const val = parseFloat(contractMinBal);
+                  if (isNaN(val) || val < 0) throw new Error("请输入有效金额");
+                  await setWithdrawalContractMinBalance(val);
+                  await adminAddLog("修改提现合约最低余额", "settings", "withdrawal_contract_min_balance", { amount: val });
+                  queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawal-contract-min-balance"] });
+                  toast({ title: "提现合约最低余额已更新", description: val > 0 ? `合约将保留至少 ${val} USDT` : "已关闭自动充值" });
+                  setContractMinBal("");
+                } catch (err: any) {
+                  toast({ title: "更新失败", description: err.message, variant: "destructive" });
+                } finally {
+                  setSavingMinBal(false);
+                }
+              }}
+            >
+              {savingMinBal ? <Loader2 size={14} className="animate-spin" /> : "确定"}
+            </Button>
           </div>
           <div className="text-[10px] text-muted-foreground space-y-0.5">
             <div>设为 0 = 关闭自动充值</div>
@@ -425,31 +448,6 @@ export default function AdminSettings() {
             <div>提现钱包余额不足时会通知管理员</div>
           </div>
         </div>
-
-        <Button
-          className="w-full font-bold text-sm"
-          style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
-          disabled={savingMinBal || contractMinBal === ""}
-          onClick={async () => {
-            setSavingMinBal(true);
-            try {
-              const val = parseFloat(contractMinBal);
-              if (isNaN(val) || val < 0) throw new Error("请输入有效金额");
-              await setWithdrawalContractMinBalance(val);
-              await adminAddLog("修改提现合约最低余额", "settings", "withdrawal_contract_min_balance", { amount: val });
-              queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawal-contract-min-balance"] });
-              toast({ title: "提现合约最低余额已更新", description: val > 0 ? `合约将保留至少 ${val} USDT` : "已关闭自动充值" });
-              setContractMinBal("");
-            } catch (err: any) {
-              toast({ title: "更新失败", description: err.message, variant: "destructive" });
-            } finally {
-              setSavingMinBal(false);
-            }
-          }}
-        >
-          {savingMinBal ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
-          保存设置
-        </Button>
       </div>
 
     </div>

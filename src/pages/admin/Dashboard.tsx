@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAdminDashboard } from "@/lib/api";
-import { Users, ShoppingCart, ArrowDownToLine, DollarSign, TrendingUp, Clock, Crown, Activity, CheckCircle2, XCircle, Loader2, RefreshCw, UserPlus, PlusCircle, Wallet, Gift, CreditCard, Recycle } from "lucide-react";
+import { Users, ShoppingCart, ArrowDownToLine, DollarSign, TrendingUp, Clock, Crown, Activity, CheckCircle2, XCircle, AlertCircle, Loader2, RefreshCw, UserPlus, PlusCircle, Wallet, Gift, CreditCard, Recycle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Link } from "wouter";
 import {
@@ -201,7 +201,7 @@ function SystemCheckCard() {
               <div className="flex items-center gap-2">
                 {c.status === "ok" ? <CheckCircle2 size={12} style={{ color: "#22c55e" }} /> :
                  c.status === "error" ? <XCircle size={12} style={{ color: "#ef4444" }} /> :
-                 <CheckCircle2 size={12} style={{ color: "#f59e0b" }} />}
+                 <AlertCircle size={12} style={{ color: "#f59e0b" }} />}
                 <span className="text-foreground">{c.label}</span>
               </div>
               <span className="text-muted-foreground">{c.detail}</span>

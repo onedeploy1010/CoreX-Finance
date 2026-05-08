@@ -163,11 +163,6 @@ export default function AdminOrders() {
     queryFn: getProducts,
   });
 
-  const { data: shareStats } = useQuery({
-    queryKey: ["/api/admin/order-share-stats"],
-    queryFn: getOrderShareStats,
-  });
-
   // Filter states
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -178,15 +173,23 @@ export default function AdminOrders() {
   const [appliedDateTo, setAppliedDateTo] = useState("");
   const [appliedProductFilter, setAppliedProductFilter] = useState<number | null>(null);
 
+  const sharedFilters = {
+    search,
+    productId: appliedProductFilter,
+    dateFrom: appliedDateFrom || undefined,
+    dateTo: appliedDateTo || undefined,
+    source: source === "all" ? null : source,
+  };
+  const filterKey = `?status=${status}&source=${source}&search=${search}&product=${appliedProductFilter}&from=${appliedDateFrom}&to=${appliedDateTo}`;
+
+  const { data: shareStats } = useQuery({
+    queryKey: ["/api/admin/order-share-stats", filterKey],
+    queryFn: () => getOrderShareStats(status, sharedFilters),
+  });
+
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/admin/orders", `?page=${page}&limit=20&status=${status}&source=${source}&search=${search}&product=${appliedProductFilter}&from=${appliedDateFrom}&to=${appliedDateTo}`],
-    queryFn: () => getAdminOrders(page, 20, status, {
-      search,
-      productId: appliedProductFilter,
-      dateFrom: appliedDateFrom || undefined,
-      dateTo: appliedDateTo || undefined,
-      source: source === "all" ? null : source,
-    }),
+    queryKey: ["/api/admin/orders", `?page=${page}&limit=20${filterKey}`],
+    queryFn: () => getAdminOrders(page, 20, status, sharedFilters),
   });
 
   const d = data as any;

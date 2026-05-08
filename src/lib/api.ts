@@ -766,10 +766,20 @@ export async function getAdminOrders(page: number, limit: number, status: string
   return { orders: enriched, total: count || 0, page, limit };
 }
 
-export async function getOrderShareStats() {
-  const { data, error } = await supabase
-    .from("orders")
-    .select("product_id, product_name, amount, status");
+export async function getOrderShareStats(
+  status: string = "all",
+  filters?: { search?: string; productId?: number | null; dateFrom?: string; dateTo?: string; source?: "on_chain" | "balance" | "reinvest" | null }
+) {
+  let q = supabase.from("orders").select("product_id, product_name, amount, status");
+  if (status && status !== "all") q = q.eq("status", status);
+  if (filters?.search) q = q.ilike("wallet_address", `%${filters.search}%`);
+  if (filters?.productId) q = q.eq("product_id", filters.productId);
+  if (filters?.dateFrom) q = q.gte("start_date", filters.dateFrom);
+  if (filters?.dateTo) q = q.lte("start_date", filters.dateTo + "T23:59:59");
+  if (filters?.source === "on_chain") q = q.eq("payment_method", "on_chain").is("reinvested_from_order_id", null);
+  else if (filters?.source === "balance") q = q.eq("payment_method", "balance").is("reinvested_from_order_id", null);
+  else if (filters?.source === "reinvest") q = q.not("reinvested_from_order_id", "is", null);
+  const { data, error } = await q;
   if (error) throw new Error(error.message);
 
   // Group by product, compute shares = floor(amount / minAmount)
@@ -800,7 +810,10 @@ export async function getOrderShareStats() {
 export async function getAdminWithdrawals(page: number, limit: number, status: string, filters?: { dateFrom?: string; dateTo?: string }) {
   const offset = (page - 1) * limit;
 
-  let query = supabase.from("withdrawals").select("*", { count: "exact" }).neq("tx_hash", "balance_payment");
+  // NULL-safe exclusion of internal balance_payment markers — pending rows have tx_hash IS NULL
+  const NOT_BALANCE_PAYMENT = "tx_hash.is.null,tx_hash.neq.balance_payment";
+
+  let query = supabase.from("withdrawals").select("*", { count: "exact" }).or(NOT_BALANCE_PAYMENT);
   if (status && status !== "all") {
     query = query.eq("status", status);
   }
@@ -817,7 +830,7 @@ export async function getAdminWithdrawals(page: number, limit: number, status: s
 
   // Summary stats — exclude balance_payment, optionally constrained by date range
   const buildStatsQuery = (qstatus: string) => {
-    let q = supabase.from("withdrawals").select("amount,fee,tx_hash").eq("status", qstatus).neq("tx_hash", "balance_payment");
+    let q = supabase.from("withdrawals").select("amount,fee,tx_hash").eq("status", qstatus).or(NOT_BALANCE_PAYMENT);
     if (filters?.dateFrom) q = q.gte("created_at", filters.dateFrom);
     if (filters?.dateTo) q = q.lte("created_at", filters.dateTo + "T23:59:59");
     return q;
