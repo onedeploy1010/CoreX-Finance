@@ -16,6 +16,10 @@ export interface DBProduct {
   dailyGrowth: number;
   isActive: boolean;
   sortOrder: number;
+  // When true, a user can only hold one 'active' order on this product at a
+  // time — they must wait for it to mature (or reinvest) before buying again.
+  // Enforced server-side by assert_single_active_order().
+  singleActiveOrderPerUser: boolean;
   // Real order count from the orders table (admin-only, ground truth — not the
   // marketing-padded used_shares). Populated by getAdminProducts.
   realOrderCount?: number;
@@ -40,7 +44,17 @@ export async function getProducts(): Promise<DBProduct[]> {
     dailyGrowth: p.daily_growth,
     isActive: p.is_active,
     sortOrder: p.sort_order,
+    singleActiveOrderPerUser: !!p.single_active_order_per_user,
   }));
+}
+
+export async function getActiveOrderProductIds(walletAddress: string): Promise<number[]> {
+  const { data } = await supabase
+    .from("orders")
+    .select("product_id")
+    .eq("wallet_address", walletAddress.toLowerCase())
+    .eq("status", "active");
+  return Array.from(new Set((data || []).map(o => o.product_id as number)));
 }
 
 export async function getAdminProducts(): Promise<DBProduct[]> {
@@ -65,6 +79,7 @@ export async function getAdminProducts(): Promise<DBProduct[]> {
     dailyGrowth: p.daily_growth,
     isActive: p.is_active,
     sortOrder: p.sort_order,
+    singleActiveOrderPerUser: !!p.single_active_order_per_user,
     realOrderCount: counts.get(p.id) ?? 0,
   }));
 }
@@ -73,6 +88,7 @@ export async function adminCreateProduct(params: {
   name: string; nameEn: string; days: number; dailyRate: number;
   minAmount: number; description: string; totalShares: number;
   usedShares: number; dailyGrowth: number;
+  singleActiveOrderPerUser?: boolean;
 }) {
   const { data: maxOrder } = await supabase.from("products").select("sort_order").order("sort_order", { ascending: false }).limit(1);
   const sortOrder = maxOrder && maxOrder.length > 0 ? maxOrder[0].sort_order + 1 : 0;
@@ -81,6 +97,7 @@ export async function adminCreateProduct(params: {
     daily_rate: params.dailyRate, min_amount: params.minAmount,
     description: params.description, total_shares: params.totalShares,
     used_shares: params.usedShares, daily_growth: params.dailyGrowth,
+    single_active_order_per_user: !!params.singleActiveOrderPerUser,
     sort_order: sortOrder,
   }).select().single();
   if (error) throw new Error(error.message);
@@ -91,6 +108,7 @@ export async function adminUpdateProduct(id: number, params: Partial<{
   name: string; nameEn: string; days: number; dailyRate: number;
   minAmount: number; description: string; totalShares: number;
   usedShares: number; dailyGrowth: number; isActive: boolean; sortOrder: number;
+  singleActiveOrderPerUser: boolean;
 }>) {
   const updates: any = {};
   if (params.name !== undefined) updates.name = params.name;
@@ -104,6 +122,7 @@ export async function adminUpdateProduct(id: number, params: Partial<{
   if (params.dailyGrowth !== undefined) updates.daily_growth = params.dailyGrowth;
   if (params.isActive !== undefined) updates.is_active = params.isActive;
   if (params.sortOrder !== undefined) updates.sort_order = params.sortOrder;
+  if (params.singleActiveOrderPerUser !== undefined) updates.single_active_order_per_user = params.singleActiveOrderPerUser;
   const { error } = await supabase.from("products").update(updates).eq("id", id);
   if (error) throw new Error(error.message);
 }

@@ -31,6 +31,7 @@ function ShareBar({ used, total }: { used: number; total: number }) {
 const emptyForm = {
   name: "", nameEn: "", days: 30, dailyRate: 0.3, minAmount: 200,
   description: "", totalShares: 1000000, usedShares: 0, dailyGrowth: 0,
+  singleActiveOrderPerUser: false,
 };
 
 const TEAM_LEVEL_LABELS = ["V1", "V2", "V3", "V4", "V5", "V6", "V7"];
@@ -180,6 +181,7 @@ export default function AdminProducts() {
         dailyRate: form.dailyRate, minAmount: form.minAmount,
         description: form.description, totalShares: form.totalShares,
         usedShares: form.usedShares, dailyGrowth: form.dailyGrowth,
+        singleActiveOrderPerUser: form.singleActiveOrderPerUser,
       });
       await adminAddLog("编辑产品", "product", editProduct.id.toString(), { name: form.name });
     },
@@ -233,6 +235,7 @@ export default function AdminProducts() {
       name: p.name, nameEn: p.nameEn, days: p.days, dailyRate: p.dailyRate,
       minAmount: p.minAmount, description: p.description, totalShares: p.totalShares,
       usedShares: p.usedShares, dailyGrowth: p.dailyGrowth,
+      singleActiveOrderPerUser: !!p.singleActiveOrderPerUser,
     });
     setEditProduct(p);
   };
@@ -270,9 +273,15 @@ export default function AdminProducts() {
                 opacity: p.isActive ? 1 : 0.5,
               }}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-semibold" style={{ color: "#C9A227" }}>{p.nameEn}</span>
                   <span className="text-xs text-muted-foreground">({p.name})</span>
+                  {p.singleActiveOrderPerUser && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded" title="开启后，每位用户在此产品上有未到期订单时无法再下新单"
+                      style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.25)" }}>
+                      单活动订单
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <button className="p-1.5 rounded" style={{ background: "rgba(201,162,39,0.1)" }}
@@ -397,6 +406,29 @@ export default function AdminProducts() {
               </div>
               <ShareBar used={form.usedShares} total={form.totalShares} />
             </div>
+
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, singleActiveOrderPerUser: !form.singleActiveOrderPerUser })}
+              className="w-full p-2.5 rounded-lg flex items-center justify-between text-left"
+              style={{
+                background: form.singleActiveOrderPerUser ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
+                border: form.singleActiveOrderPerUser ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(201,162,39,0.15)",
+              }}
+            >
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-foreground">单用户单活动订单</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5">
+                  开启后，每位用户在此产品上有未到期订单时无法再下新单（到期/复投后可再投）
+                </span>
+              </div>
+              <div className="w-10 h-5 rounded-full relative shrink-0 ml-2" style={{
+                background: form.singleActiveOrderPerUser ? "#22c55e" : "rgba(255,255,255,0.15)",
+              }}>
+                <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
+                  style={{ left: form.singleActiveOrderPerUser ? "calc(100% - 18px)" : "2px" }} />
+              </div>
+            </button>
 
             <Button
               className="w-full font-bold text-sm"

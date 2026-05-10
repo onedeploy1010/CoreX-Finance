@@ -9,7 +9,7 @@ import { waitForReceipt } from "thirdweb";
 import { client, bscChain } from "@/lib/thirdweb";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { registerMember, createOrder, createOrderWithBalance, getMember, getProducts, getEarnings, DBProduct } from "@/lib/api";
+import { registerMember, createOrder, createOrderWithBalance, getMember, getProducts, getEarnings, getActiveOrderProductIds, DBProduct } from "@/lib/api";
 import { TrendingUp, Clock, DollarSign, Shield, UserPlus, Loader2, Wallet } from "lucide-react";
 import { t, getLang } from "@/lib/i18n";
 import {
@@ -34,7 +34,7 @@ function getProductDesc(product: { id: number; description: string }): string {
 
 const COLORS = ["#C9A227", "#E8C547", "#D4A832", "#C9A227", "#E8C547"];
 
-function InvestDialog({ product, open, onClose, color }: { product: Product | null; open: boolean; onClose: () => void; color: string }) {
+function InvestDialog({ product, open, onClose, color, blockedByActiveOrder }: { product: Product | null; open: boolean; onClose: () => void; color: string; blockedByActiveOrder: boolean }) {
   const [amount, setAmount] = useState("");
   const [payMethod, setPayMethod] = useState<"on_chain" | "balance">("on_chain");
   const account = useActiveAccount();
@@ -76,6 +76,10 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
       toast({ title: t("invest.multiple_amount", undefined, { amount: product.minAmount }), variant: "destructive" });
       return;
     }
+    if (blockedByActiveOrder) {
+      toast({ title: "该产品有未到期订单", description: "到期后即可复投或下新单", variant: "destructive" });
+      return;
+    }
 
     // Balance payment path
     if (payMethod === "balance") {
@@ -97,6 +101,7 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
 
         queryClient.invalidateQueries({ queryKey: ["/api/orders", account.address.toLowerCase()] });
         queryClient.invalidateQueries({ queryKey: ["/api/earnings", account.address.toLowerCase()] });
+        queryClient.invalidateQueries({ queryKey: ["/api/orders/active-products", account.address.toLowerCase()] });
         queryClient.invalidateQueries({ queryKey: ["/api/products"] });
 
         toast({
@@ -106,7 +111,12 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
         onClose();
         setAmount("");
       } catch (err: any) {
-        toast({ title: t("invest.failed"), description: err?.message || "", variant: "destructive" });
+        const msg = err?.message || "";
+        if (msg.includes("PRODUCT_SINGLE_ACTIVE_ORDER")) {
+          toast({ title: "该产品有未到期订单", description: "到期后即可复投或下新单", variant: "destructive" });
+        } else {
+          toast({ title: t("invest.failed"), description: msg, variant: "destructive" });
+        }
       } finally {
         setLoading(false);
         setStep("idle");
@@ -163,6 +173,7 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
 
       queryClient.invalidateQueries({ queryKey: ["/api/orders", account.address.toLowerCase()] });
       queryClient.invalidateQueries({ queryKey: ["/api/earnings", account.address.toLowerCase()] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders/active-products", account.address.toLowerCase()] });
       queryClient.invalidateQueries({ queryKey: ["/api/members", account.address.toLowerCase()] });
       queryClient.invalidateQueries({ queryKey: ["/api/members", account.address.toLowerCase(), "team-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -177,6 +188,8 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
       const msg = err?.message || "";
       if (msg.includes("user rejected") || msg.includes("User denied")) {
         toast({ title: t("invest.cancelled"), variant: "destructive" });
+      } else if (msg.includes("PRODUCT_SINGLE_ACTIVE_ORDER")) {
+        toast({ title: "该产品有未到期订单", description: "到期后即可复投或下新单", variant: "destructive" });
       } else {
         toast({ title: t("invest.failed"), description: msg, variant: "destructive" });
       }
@@ -353,14 +366,20 @@ function InvestDialog({ product, open, onClose, color }: { product: Product | nu
             </div>
           </div>
 
+          {blockedByActiveOrder && (
+            <div className="rounded-lg p-2.5 text-xs text-center" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444" }}>
+              该产品有未到期订单，到期后才可复投或下新单
+            </div>
+          )}
+
           <Button
             data-testid="button-confirm-invest"
             className="w-full font-bold text-sm"
-            disabled={loading}
-            style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08" }}
+            disabled={loading || blockedByActiveOrder}
+            style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", opacity: blockedByActiveOrder ? 0.5 : undefined }}
             onClick={handleInvest}
           >
-            {getButtonText()}
+            {blockedByActiveOrder ? "未到期，无法投资" : getButtonText()}
           </Button>
         </div>
       </DialogContent>
@@ -386,6 +405,17 @@ export default function HomePage() {
     queryKey: ["/api/products"],
     queryFn: getProducts,
   });
+
+  // Which product IDs the connected user already holds an active order for.
+  // Drives the "未到期不可再投" gating for products with single_active_order_per_user.
+  const { data: activeProductIds = [] } = useQuery({
+    queryKey: ["/api/orders/active-products", account?.address?.toLowerCase()],
+    queryFn: () => getActiveOrderProductIds(account!.address!),
+    enabled: !!account?.address,
+  });
+  const activeProductIdSet = new Set(activeProductIds);
+  const isProductBlocked = (p: Product) =>
+    p.singleActiveOrderPerUser && activeProductIdSet.has(p.id);
 
   useEffect(() => {
     if (!account?.address) return;
@@ -455,6 +485,7 @@ export default function HomePage() {
       {products.map((product, index) => {
         const color = COLORS[index % COLORS.length];
         const sharePercent = product.totalShares > 0 ? Math.min(100, (product.usedShares / product.totalShares) * 100) : 0;
+        const blocked = isProductBlocked(product);
         return (
           <div
             key={product.id}
@@ -470,10 +501,16 @@ export default function HomePage() {
                 data-testid={`button-invest-${product.id}`}
                 size="sm"
                 className="font-bold text-xs shrink-0"
-                style={{ background: `linear-gradient(135deg, ${color}, #9A7A1A)`, color: "#0c0a08", padding: "6px 14px" }}
+                style={{
+                  background: blocked ? "rgba(255,255,255,0.06)" : `linear-gradient(135deg, ${color}, #9A7A1A)`,
+                  color: blocked ? "rgba(255,255,255,0.4)" : "#0c0a08",
+                  padding: "6px 14px",
+                  border: blocked ? "1px solid rgba(255,255,255,0.1)" : undefined,
+                }}
                 onClick={() => handleInvest(product)}
+                disabled={blocked}
               >
-                {t("home.invest")}
+                {blocked ? "未到期" : t("home.invest")}
               </Button>
             </div>
 
@@ -546,6 +583,7 @@ export default function HomePage() {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         color={selectedProduct ? COLORS[products.indexOf(selectedProduct) % COLORS.length] : "#C9A227"}
+        blockedByActiveOrder={selectedProduct ? isProductBlocked(selectedProduct) : false}
       />
 
       {/* Registration Confirmation Dialog */}
