@@ -385,21 +385,24 @@ export default function AdminProducts() {
 
             <div className="p-2.5 rounded-lg space-y-2" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
               <div className="text-xs font-semibold flex items-center gap-1" style={{ color: "#C9A227" }}>
-                <TrendingUp size={12} /> 份数管理
+                <TrendingUp size={12} /> 首页虚增展示（仅影响 C 端展示，不影响真实订单）
+              </div>
+              <div className="text-[10px] text-muted-foreground leading-relaxed">
+                这三个值控制首页"投资份数"进度条的展示效果（营销）。后台订单/份数统计始终读真实订单数。
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-1 block">总份数</label>
+                  <label className="text-[10px] text-muted-foreground mb-1 block">总份数（展示上限）</label>
                   <Input type="number" value={form.totalShares} onChange={e => setForm({ ...form, totalShares: parseInt(e.target.value) || 0 })}
                     className="text-xs" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "36px" }} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-1 block">已用份数</label>
+                  <label className="text-[10px] text-muted-foreground mb-1 block">虚增基数</label>
                   <Input type="number" value={form.usedShares} onChange={e => setForm({ ...form, usedShares: parseInt(e.target.value) || 0 })}
                     className="text-xs" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "36px" }} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-1 block">每日增长</label>
+                  <label className="text-[10px] text-muted-foreground mb-1 block">每日自动+N</label>
                   <Input type="number" value={form.dailyGrowth} onChange={e => setForm({ ...form, dailyGrowth: parseInt(e.target.value) || 0 })}
                     className="text-xs" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "36px" }} />
                 </div>

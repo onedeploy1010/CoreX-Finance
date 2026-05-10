@@ -620,7 +620,7 @@ export async function getAdminDashboard() {
   return data;
 }
 
-export async function getAdminMembers(page: number, limit: number, search: string, levelFilter?: number | null, observedFilter?: boolean | null) {
+export async function getAdminMembers(page: number, limit: number, search: string, levelFilter?: number | null, observedFilter?: boolean | null, dateFrom?: string, dateTo?: string) {
   const offset = (page - 1) * limit;
 
   let query = supabase.from("members").select("*", { count: "exact" });
@@ -633,6 +633,8 @@ export async function getAdminMembers(page: number, limit: number, search: strin
   if (observedFilter === true) {
     query = query.eq("is_observed", true);
   }
+  if (dateFrom) query = query.gte("created_at", dateFrom);
+  if (dateTo) query = query.lte("created_at", dateTo + "T23:59:59");
   const { data: memberList, count, error } = await query
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
@@ -1099,8 +1101,15 @@ export async function adminAddLog(action: string, targetType?: string, targetId?
   } catch {};
 }
 
-export async function getAdminLogs(page: number, limit: number) {
-  const { data, error } = await supabase.rpc("admin_get_logs", { p_page: page, p_limit: limit });
+export async function getAdminLogs(page: number, limit: number, filters?: { search?: string; role?: string; dateFrom?: string; dateTo?: string }) {
+  const { data, error } = await supabase.rpc("admin_get_logs", {
+    p_page: page,
+    p_limit: limit,
+    p_search: filters?.search?.trim() || null,
+    p_role: filters?.role?.trim() || null,
+    p_date_from: filters?.dateFrom || null,
+    p_date_to: filters?.dateTo || null,
+  });
   if (error) throw new Error(error.message);
   return data;
 }
@@ -1374,11 +1383,13 @@ export async function exportRewardsCSV(type: string, filters?: { search?: string
   downloadCSV(`rewards_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
 }
 
-export async function exportMembersCSV(search?: string, levelFilter?: number | null, observedFilter?: boolean | null) {
+export async function exportMembersCSV(search?: string, levelFilter?: number | null, observedFilter?: boolean | null, dateFrom?: string, dateTo?: string) {
   let query = supabase.from("members").select("*");
   if (search) query = query.or(`wallet_address.ilike.%${search}%,note.ilike.%${search}%`);
   if (levelFilter !== null && levelFilter !== undefined && levelFilter >= 0) query = query.eq("level", levelFilter);
   if (observedFilter === true) query = query.eq("is_observed", true);
+  if (dateFrom) query = query.gte("created_at", dateFrom);
+  if (dateTo) query = query.lte("created_at", dateTo + "T23:59:59");
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
