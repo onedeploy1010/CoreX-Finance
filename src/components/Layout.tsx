@@ -69,7 +69,10 @@ export function BottomNav() {
   const [location] = useLocation();
 
   return (
-    <nav className="bottom-nav fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around py-2 pb-safe">
+    <nav
+      className="bottom-nav fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around py-2"
+      style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0.5rem)" }}
+    >
       {NAV_ITEMS.map(({ path, labelKey, icon: Icon }) => {
         const isActive = location === path;
         return (
@@ -112,7 +115,10 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#0c0a08" }}>
       <AppHeader />
-      <main className="flex-1 overflow-y-auto pb-20">
+      <main
+        className="flex-1 overflow-y-auto"
+        style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}
+      >
         {children}
       </main>
       <BottomNav />
