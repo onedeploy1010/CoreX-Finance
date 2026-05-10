@@ -12,8 +12,9 @@ import { useActiveAccount, useSendTransaction, ConnectButton } from "thirdweb/re
 import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { getWithdrawalContract, getUSDTContract, formatUSDT, prepareApproveUSDTForWithdrawal, getWithdrawalAllowance, getFundingWallet, COREX_WITHDRAWAL_ADDRESS } from "@/lib/contracts";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck, Download, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck, Download, Calendar, Search } from "lucide-react";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
+import { Input } from "@/components/ui/input";
 
 const STATUS_TABS = [
   { value: "all", label: "全部" },
@@ -498,20 +499,33 @@ export default function AdminWithdrawals() {
   const [status, setStatus] = useState("all");
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [appliedFrom, setAppliedFrom] = useState("");
   const [appliedTo, setAppliedTo] = useState("");
   const { toast } = useToast();
 
-  const qk = ["/api/admin/withdrawals", `?page=${page}&limit=20&status=${status}&from=${appliedFrom}&to=${appliedTo}`];
+  const qk = ["/api/admin/withdrawals", `?page=${page}&limit=20&status=${status}&search=${search}&from=${appliedFrom}&to=${appliedTo}`];
   const { data, isLoading } = useQuery({
     queryKey: qk,
     queryFn: () => getAdminWithdrawals(page, 20, status, {
+      search: search || undefined,
       dateFrom: appliedFrom || undefined,
       dateTo: appliedTo || undefined,
     }),
   });
+
+  const handleSearch = () => {
+    setSearch(searchInput.trim());
+    setPage(1);
+  };
+  const clearSearch = () => {
+    setSearchInput("");
+    setSearch("");
+    setPage(1);
+  };
 
   const applyPresetRange = (days: number) => {
     const end = new Date().toISOString().slice(0, 10);
@@ -597,26 +611,30 @@ export default function AdminWithdrawals() {
       {/* System notifications */}
       <NotificationPanel />
 
-      {/* Withdrawal Stats */}
-      {d?.stats && (
+      {/* Withdrawal Stats — labels reflect whether filters are active so admin sees scope at a glance */}
+      {d?.stats && (() => {
+        const filtered = !!(search || appliedFrom || appliedTo);
+        const scopeTag = filtered ? "（已筛选）" : "（全部）";
+        return (
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl p-3 text-center" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
-            <div className="text-[10px] text-muted-foreground mb-1">已审核金额</div>
+            <div className="text-[10px] text-muted-foreground mb-1">已审核金额{scopeTag}</div>
             <div className="text-lg font-black" style={{ color: "#22c55e" }}>{d.stats.completedTotal.toFixed(2)} U</div>
             <div className="text-[10px] text-muted-foreground">{d.stats.completedCount} 笔 | 手续费 {d.stats.completedFees.toFixed(2)} U</div>
           </div>
           <div className="rounded-xl p-3 text-center" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
-            <div className="text-[10px] text-muted-foreground mb-1">待审核金额</div>
+            <div className="text-[10px] text-muted-foreground mb-1">待审核金额{scopeTag}</div>
             <div className="text-lg font-black" style={{ color: "#f59e0b" }}>{d.stats.pendingTotal.toFixed(2)} U</div>
             <div className="text-[10px] text-muted-foreground">{d.stats.pendingCount} 笔</div>
           </div>
           <div className="rounded-xl p-3 text-center" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>
-            <div className="text-[10px] text-muted-foreground mb-1">总计</div>
+            <div className="text-[10px] text-muted-foreground mb-1">总计{scopeTag}</div>
             <div className="text-lg font-black" style={{ color: "#C9A227" }}>{(d.stats.completedTotal + d.stats.pendingTotal).toFixed(2)} U</div>
             <div className="text-[10px] text-muted-foreground">{d.stats.completedCount + d.stats.pendingCount} 笔</div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -627,7 +645,16 @@ export default function AdminWithdrawals() {
         <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" disabled={exporting}
           style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "36px" }}
-          onClick={async () => { setExporting(true); try { await exportWithdrawalsCSV(status); } finally { setExporting(false); } }}>
+          onClick={async () => {
+            setExporting(true);
+            try {
+              await exportWithdrawalsCSV(status, {
+                search: search || undefined,
+                dateFrom: appliedFrom || undefined,
+                dateTo: appliedTo || undefined,
+              });
+            } finally { setExporting(false); }
+          }}>
           <Download size={14} className="mr-1" /> {exporting ? "导出中..." : "导出CSV"}
         </Button>
         <Button
@@ -645,6 +672,35 @@ export default function AdminWithdrawals() {
         </Button>
         </div>
       </div>
+
+      {/* Wallet search */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSearch()}
+            placeholder="搜索钱包地址..."
+            className="pl-9 text-sm"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,39,0.2)", minHeight: "40px" }}
+          />
+        </div>
+        <Button onClick={handleSearch} className="text-sm" style={{ background: "linear-gradient(135deg, #C9A227, #9A7A1A)", color: "#0c0a08", minHeight: "40px" }}>
+          搜索
+        </Button>
+        {search && (
+          <Button variant="outline" onClick={clearSearch} className="text-sm"
+            style={{ border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", minHeight: "40px" }}>
+            清除
+          </Button>
+        )}
+      </div>
+      {search && (
+        <div className="text-[10px] text-muted-foreground -mt-2">
+          已按钱包地址筛选: <span className="font-mono">{search}</span>
+        </div>
+      )}
 
       {/* Date range filter */}
       <div className="rounded-xl p-3 space-y-2" style={{ background: "linear-gradient(145deg, #1a1510, #110e0a)", border: "1px solid rgba(201,162,39,0.15)" }}>

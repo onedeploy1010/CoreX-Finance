@@ -587,7 +587,7 @@ export default function Members() {
         </div>
         <Button size="sm" variant="outline" disabled={exporting}
           style={{ border: "1px solid rgba(201,162,39,0.25)", color: "#C9A227", minHeight: "36px" }}
-          onClick={async () => { setExporting(true); try { await exportMembersCSV(search, levelFilter); } finally { setExporting(false); } }}>
+          onClick={async () => { setExporting(true); try { await exportMembersCSV(search, levelFilter, observedFilter); } finally { setExporting(false); } }}>
           <Download size={14} className="mr-1" /> {exporting ? "导出中..." : "导出CSV"}
         </Button>
       </div>

@@ -815,15 +815,19 @@ export async function getOrderShareStats(
   }));
 }
 
-export async function getAdminWithdrawals(page: number, limit: number, status: string, filters?: { dateFrom?: string; dateTo?: string }) {
+export async function getAdminWithdrawals(page: number, limit: number, status: string, filters?: { search?: string; dateFrom?: string; dateTo?: string }) {
   const offset = (page - 1) * limit;
 
   // NULL-safe exclusion of internal balance_payment markers — pending rows have tx_hash IS NULL
   const NOT_BALANCE_PAYMENT = "tx_hash.is.null,tx_hash.neq.balance_payment";
+  const search = filters?.search?.trim();
 
   let query = supabase.from("withdrawals").select("*", { count: "exact" }).or(NOT_BALANCE_PAYMENT);
   if (status && status !== "all") {
     query = query.eq("status", status);
+  }
+  if (search) {
+    query = query.ilike("wallet_address", `%${search}%`);
   }
   if (filters?.dateFrom) {
     query = query.gte("created_at", filters.dateFrom);
@@ -836,9 +840,10 @@ export async function getAdminWithdrawals(page: number, limit: number, status: s
     .range(offset, offset + limit - 1);
   if (error) throw new Error(error.message);
 
-  // Summary stats — exclude balance_payment, optionally constrained by date range
+  // Summary stats — exclude balance_payment, scoped by the same filters as the list
   const buildStatsQuery = (qstatus: string) => {
     let q = supabase.from("withdrawals").select("amount,fee,tx_hash").eq("status", qstatus).or(NOT_BALANCE_PAYMENT);
+    if (search) q = q.ilike("wallet_address", `%${search}%`);
     if (filters?.dateFrom) q = q.gte("created_at", filters.dateFrom);
     if (filters?.dateTo) q = q.lte("created_at", filters.dateTo + "T23:59:59");
     return q;
@@ -1350,10 +1355,11 @@ export async function exportRewardsCSV(type: string, filters?: { search?: string
   downloadCSV(`rewards_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
 }
 
-export async function exportMembersCSV(search?: string, levelFilter?: number | null) {
+export async function exportMembersCSV(search?: string, levelFilter?: number | null, observedFilter?: boolean | null) {
   let query = supabase.from("members").select("*");
-  if (search) query = query.ilike("wallet_address", `%${search}%`);
+  if (search) query = query.or(`wallet_address.ilike.%${search}%,note.ilike.%${search}%`);
   if (levelFilter !== null && levelFilter !== undefined && levelFilter >= 0) query = query.eq("level", levelFilter);
+  if (observedFilter === true) query = query.eq("is_observed", true);
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -1407,9 +1413,15 @@ export async function exportOrdersCSV(status: string, filters?: { search?: strin
   downloadCSV(`orders_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
 }
 
-export async function exportWithdrawalsCSV(status: string) {
-  let query = supabase.from("withdrawals").select("*");
+export async function exportWithdrawalsCSV(status: string, filters?: { search?: string; dateFrom?: string; dateTo?: string }) {
+  // Match the list view: exclude balance_payment internal markers and apply search/date filters
+  const NOT_BALANCE_PAYMENT = "tx_hash.is.null,tx_hash.neq.balance_payment";
+  const search = filters?.search?.trim();
+  let query = supabase.from("withdrawals").select("*").or(NOT_BALANCE_PAYMENT);
   if (status && status !== "all") query = query.eq("status", status);
+  if (search) query = query.ilike("wallet_address", `%${search}%`);
+  if (filters?.dateFrom) query = query.gte("created_at", filters.dateFrom);
+  if (filters?.dateTo) query = query.lte("created_at", filters.dateTo + "T23:59:59");
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
