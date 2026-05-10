@@ -316,7 +316,7 @@ export default function AdminProducts() {
                 </div>
               </div>
 
-              <ShareBar used={p.usedShares} total={p.totalShares} />
+              <ShareBar used={p.realOrderCount ?? p.usedShares} total={p.totalShares} />
             </div>
           ))}
         </div>

@@ -16,6 +16,9 @@ export interface DBProduct {
   dailyGrowth: number;
   isActive: boolean;
   sortOrder: number;
+  // Real order count from the orders table (admin-only, ground truth — not the
+  // marketing-padded used_shares). Populated by getAdminProducts.
+  realOrderCount?: number;
 }
 
 export async function getProducts(): Promise<DBProduct[]> {
@@ -41,11 +44,15 @@ export async function getProducts(): Promise<DBProduct[]> {
 }
 
 export async function getAdminProducts(): Promise<DBProduct[]> {
-  const { data } = await supabase
-    .from("products")
-    .select("*")
-    .order("sort_order", { ascending: true });
-  return (data || []).map(p => ({
+  const [{ data: products }, { data: orderRows }] = await Promise.all([
+    supabase.from("products").select("*").order("sort_order", { ascending: true }),
+    supabase.from("orders").select("product_id"),
+  ]);
+  const counts = new Map<number, number>();
+  for (const row of orderRows || []) {
+    counts.set(row.product_id, (counts.get(row.product_id) || 0) + 1);
+  }
+  return (products || []).map(p => ({
     id: p.id,
     name: p.name,
     nameEn: p.name_en,
@@ -58,6 +65,7 @@ export async function getAdminProducts(): Promise<DBProduct[]> {
     dailyGrowth: p.daily_growth,
     isActive: p.is_active,
     sortOrder: p.sort_order,
+    realOrderCount: counts.get(p.id) ?? 0,
   }));
 }
 
