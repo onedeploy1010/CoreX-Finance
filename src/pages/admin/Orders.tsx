@@ -259,7 +259,7 @@ export default function AdminOrders() {
           <div className="flex items-center gap-2 mb-1">
             <BarChart3 size={13} style={{ color: "#C9A227" }} />
             <span className="text-xs font-bold text-foreground">配套份数统计</span>
-            <span className="text-[9px] text-muted-foreground">（按最低金额为1份计算）</span>
+            <span className="text-[9px] text-muted-foreground">（1 笔订单 = 1 份）</span>
           </div>
           <div className="space-y-2">
             {dbProducts.map((p: DBProduct) => {
@@ -272,17 +272,11 @@ export default function AdminOrders() {
                   </div>
                 </div>
               );
-              const minAmt = p.minAmount || 1;
-              const totalShares = Math.floor(stats.totalAmount / minAmt);
-              const activeShares = Math.floor(stats.activeAmount / minAmt);
               return (
                 <div key={p.id} className="rounded-lg px-3 py-2.5" style={{ background: "rgba(201,162,39,0.04)", border: "1px solid rgba(201,162,39,0.1)" }}>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-foreground">{p.name}</span>
-                      <span className="text-[10px] text-muted-foreground">{minAmt}U/份</span>
-                    </div>
-                    <span className="font-black text-sm" style={{ color: "#C9A227" }}>{totalShares} 份</span>
+                    <span className="text-xs font-bold text-foreground">{p.name}</span>
+                    <span className="font-black text-sm" style={{ color: "#C9A227" }}>{stats.orderCount} 份</span>
                   </div>
                   <div className="grid grid-cols-4 gap-2 text-[10px]">
                     <div>
@@ -295,7 +289,7 @@ export default function AdminOrders() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">活跃份数</span>
-                      <div className="font-semibold" style={{ color: "#22c55e" }}>{activeShares} 份</div>
+                      <div className="font-semibold" style={{ color: "#22c55e" }}>{stats.activeCount} 份</div>
                     </div>
                     <div>
                       <span className="text-muted-foreground">活跃金额</span>
@@ -311,16 +305,12 @@ export default function AdminOrders() {
             const allStats = shareStats as any[];
             const totalOrders = allStats.reduce((s, x) => s + x.orderCount, 0);
             const totalAmount = allStats.reduce((s, x) => s + x.totalAmount, 0);
-            const totalShares = allStats.reduce((s, x) => {
-              const product = dbProducts.find((p: DBProduct) => p.id === x.productId);
-              return s + Math.floor(x.totalAmount / (product?.minAmount || 1));
-            }, 0);
             const activeAmount = allStats.reduce((s, x) => s + x.activeAmount, 0);
             return (
               <div className="rounded-lg px-3 py-2.5 mt-1" style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.1)" }}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold" style={{ color: "#ef4444" }}>合计</span>
-                  <span className="font-black text-sm" style={{ color: "#ef4444" }}>{totalShares} 份</span>
+                  <span className="font-black text-sm" style={{ color: "#ef4444" }}>{totalOrders} 份</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-[10px] mt-1">
                   <div>
