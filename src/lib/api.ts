@@ -1493,13 +1493,11 @@ export async function adminCreateOrderForMember(walletAddress: string, productId
   if (amount < minAmount) throw new Error(`最低投资 ${minAmount} USDT`);
   if (amount % minAmount !== 0) throw new Error(`金额必须是 ${minAmount} 的倍数`);
 
-  // Check shares availability
-  const sharesNeeded = Math.floor(amount / minAmount);
-  if (dbProduct.used_shares + sharesNeeded > dbProduct.total_shares) {
-    throw new Error("份数不足，无法投资");
-  }
+  // No used_shares check here: that field is the marketing-padded
+  // front-end counter (driven by the daily-share-growth cron). End-user
+  // on-chain orders don't touch it either, so admin manual orders
+  // shouldn't either, and certainly shouldn't be blocked by it.
 
-  // Use secure RPC function with admin verification
   const { data, error } = await supabase.rpc("admin_create_order", {
     p_admin_id: session.id,
     p_wallet_address: walletAddress,
@@ -1510,9 +1508,6 @@ export async function adminCreateOrderForMember(walletAddress: string, productId
     p_days: dbProduct.days,
   });
   if (error) throw new Error(error.message);
-
-  // Increment used shares
-  await incrementProductShares(productId, sharesNeeded);
 
   await supabase.rpc("process_wallet_orders", { p_wallet_address: walletAddress.toLowerCase() }).then(() => {});
 
