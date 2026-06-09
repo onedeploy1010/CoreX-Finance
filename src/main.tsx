@@ -3,7 +3,7 @@ import App from "./App";
 import "./index.css";
 
 // Anti-phishing: block cloned sites running on unauthorized domains
-const ALLOWED_HOSTS = ["corex-ai.io", "www.corex-ai.io", "localhost", "127.0.0.1"];
+const ALLOWED_HOSTS = ["corex-ai.app", "www.corex-ai.app", "localhost", "127.0.0.1"];
 const currentHost = window.location.hostname;
 
 if (!ALLOWED_HOSTS.includes(currentHost) && !currentHost.endsWith(".vercel.app")) {
@@ -14,7 +14,7 @@ if (!ALLOWED_HOSTS.includes(currentHost) && !currentHost.endsWith(".vercel.app")
         <h1 style="font-size:24px;font-weight:bold;margin-bottom:12px">⚠ Warning: Unauthorized Website</h1>
         <p style="color:#fca5a5;margin-bottom:8px">This is NOT the official CoreX Finance website.</p>
         <p style="color:#fca5a5;margin-bottom:24px">DO NOT connect your wallet or make any transactions here.</p>
-        <a href="https://corex-ai.io" style="color:#C9A227;text-decoration:underline;font-size:18px">Go to the official site: corex-ai.io</a>
+        <a href="https://corex-ai.app" style="color:#C9A227;text-decoration:underline;font-size:18px">Go to the official site: corex-ai.app</a>
       </div>
     </div>
   `;
