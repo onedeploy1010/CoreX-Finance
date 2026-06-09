@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getMember, getEarnings, getRewardsByWallet, getWithdrawalsByWallet, getOrdersByWallet, createWithdrawal } from "@/lib/api";
-import { WITHDRAW_MIN, WITHDRAW_FEE, WITHDRAW_MULTIPLE } from "@shared/schema";
+import { WITHDRAW_MIN, WITHDRAW_FEE_RATE, WITHDRAW_MULTIPLE } from "@shared/schema";
 import { t, getLang, shortAddr, translateProductName } from "@/lib/i18n";
 import {
   User, Bell, Globe, ChevronRight, Check, Clock,
@@ -206,10 +206,11 @@ export default function ProfilePage() {
     }
     setWithdrawLoading(true);
     try {
-      await createWithdrawal(account.address, amt, WITHDRAW_FEE);
+      const fee = amt * WITHDRAW_FEE_RATE;
+      await createWithdrawal(account.address, amt, fee);
       queryClient.invalidateQueries({ queryKey: ["/api/earnings", address] });
       queryClient.invalidateQueries({ queryKey: ["/api/withdrawals", address] });
-      toast({ title: "OK", description: `${amt} USDT - ${WITHDRAW_FEE} = ${(amt - WITHDRAW_FEE).toFixed(2)} USDT` });
+      toast({ title: "OK", description: `${amt} USDT - ${(WITHDRAW_FEE_RATE * 100).toFixed(0)}% = ${(amt - fee).toFixed(2)} USDT` });
       setWithdrawDialogOpen(false);
       setWithdrawAmount("");
     } catch (err: any) {
@@ -556,11 +557,11 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t("withdraw.fee")}</span>
-                  <span style={{ color: "#ef4444" }}>-{WITHDRAW_FEE} USDT</span>
+                  <span style={{ color: "#ef4444" }}>-{(parseFloat(withdrawAmount) * WITHDRAW_FEE_RATE).toFixed(6)} USDT ({(WITHDRAW_FEE_RATE * 100).toFixed(0)}%)</span>
                 </div>
                 <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: "rgba(201,162,39,0.15)" }}>
                   <span className="text-muted-foreground">{t("withdraw.actual")}</span>
-                  <span style={{ color: "#C9A227" }}>{(parseFloat(withdrawAmount) - WITHDRAW_FEE).toFixed(6)} USDT</span>
+                  <span style={{ color: "#C9A227" }}>{(parseFloat(withdrawAmount) * (1 - WITHDRAW_FEE_RATE)).toFixed(6)} USDT</span>
                 </div>
               </div>
             )}
@@ -572,7 +573,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <AlertCircle size={11} style={{ color: "#C9A227" }} />
-                <span>{t("withdraw.fee_per")} {WITHDRAW_FEE} USDT</span>
+                <span>{t("withdraw.fee_per")} {(WITHDRAW_FEE_RATE * 100).toFixed(0)}%</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield size={11} style={{ color: "#C9A227" }} />

@@ -77,5 +77,5 @@ export const LEVEL_CONFIG = [
 
 export const EQUAL_LEVEL_BONUS = 10;
 export const WITHDRAW_MIN = 10;
-export const WITHDRAW_FEE = 1;
+export const WITHDRAW_FEE_RATE = 0.03; // 3% withdrawal fee (matches CoreXWithdrawal feeBps=300)
 export const WITHDRAW_MULTIPLE = 10;

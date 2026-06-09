@@ -6,7 +6,7 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const BSC_RPC = Deno.env.get("BSC_RPC_URL") || "https://bsc-dataseed1.binance.org";
 
 // Our contract addresses (must match deployed contracts)
-const COREX_INVESTMENT_ADDRESS = "0xD1dA72B8DF0db5d6c61DF96F1E186E73608B5fCB".toLowerCase();
+const COREX_INVESTMENT_ADDRESS = "0xaa6882633A0179815208c18780321218B44D6f2c".toLowerCase();
 const USDT_ADDRESS = "0x55d398326f99059fF775485246999027B3197955".toLowerCase();
 
 // InvestmentCreated(address indexed investor, uint256 indexed productId, uint256 amount, uint256 timestamp)

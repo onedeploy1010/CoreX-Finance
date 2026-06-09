@@ -1572,3 +1572,40 @@ export async function updateMemberObservation(
   });
   if (error) throw new Error(error.message);
 }
+
+// ---- Delete member ----
+
+export interface MemberDeletePreview {
+  exists: boolean;
+  wallet?: string;
+  upline?: string | null;
+  direct_count?: number;
+  umbrella_total?: number;   // includes self
+  umbrella_others?: number;  // downline excluding self
+}
+
+export async function getMemberDeletePreview(walletAddress: string): Promise<MemberDeletePreview> {
+  const { data, error } = await supabase.rpc("admin_member_delete_preview", {
+    p_wallet_address: walletAddress,
+  });
+  if (error) throw new Error(error.message);
+  return data as MemberDeletePreview;
+}
+
+/** Delete a single account; its direct downline is rebound to its upline. */
+export async function deleteMemberSingle(walletAddress: string) {
+  const { data, error } = await supabase.rpc("admin_delete_member_single", {
+    p_wallet_address: walletAddress,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/** Delete an account and its entire umbrella (downline tree). */
+export async function deleteMemberWithDownline(walletAddress: string) {
+  const { data, error } = await supabase.rpc("admin_delete_member_with_downline", {
+    p_wallet_address: walletAddress,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}

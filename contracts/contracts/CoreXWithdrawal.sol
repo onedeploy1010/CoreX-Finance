@@ -14,7 +14,9 @@ contract CoreXWithdrawal is Ownable, ReentrancyGuard, Pausable {
     address public feeCollector;
 
     uint256 public minWithdrawal = 10 * 1e18;
-    uint256 public feePerWithdrawal = 1 * 1e18;
+    uint256 public feeBps = 300; // withdrawal fee in basis points (300 = 3%)
+    uint256 public constant BPS_DENOMINATOR = 10000;
+    uint256 public constant MAX_FEE_BPS = 1000; // hard cap 10%
     uint256 public constant MAX_BATCH_SIZE = 100;
 
     mapping(address => bool) public operators;
@@ -74,16 +76,17 @@ contract CoreXWithdrawal is Ownable, ReentrancyGuard, Pausable {
             require(_recipients[i] != address(0), "Invalid recipient");
             require(_amounts[i] >= minWithdrawal, "Below minimum withdrawal");
 
-            uint256 netAmount = _amounts[i] - feePerWithdrawal;
+            uint256 fee = (_amounts[i] * feeBps) / BPS_DENOMINATOR;
+            uint256 netAmount = _amounts[i] - fee;
             totalAmount += netAmount;
-            totalFee += feePerWithdrawal;
+            totalFee += fee;
 
             usdt.safeTransfer(_recipients[i], netAmount);
 
             emit WithdrawalProcessed(
                 _recipients[i],
                 netAmount,
-                feePerWithdrawal,
+                fee,
                 _batchId,
                 block.timestamp
             );
@@ -131,8 +134,9 @@ contract CoreXWithdrawal is Ownable, ReentrancyGuard, Pausable {
         minWithdrawal = _min;
     }
 
-    function setFeePerWithdrawal(uint256 _fee) external onlyOwner {
-        feePerWithdrawal = _fee;
+    function setFeeBps(uint256 _bps) external onlyOwner {
+        require(_bps <= MAX_FEE_BPS, "Fee too high");
+        feeBps = _bps;
     }
 
     function getContractBalance() external view returns (uint256) {
