@@ -568,7 +568,8 @@ export default function Members() {
   const [observedFilter, setObservedFilter] = useState<boolean | null>(null);
   const [detailAddr, setDetailAddr] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
-  const isSuperAdmin = getAdminSession()?.role === "superadmin";
+  const _role = getAdminSession()?.role;
+  const canDeleteMembers = _role === "superadmin" || _role === "tech";
   const [exporting, setExporting] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -713,7 +714,7 @@ export default function Members() {
       ) : (
         <div className="space-y-2">
           {(d?.members || []).map((m: any) => (
-            <MemberCard key={m.id} m={m} onView={() => setDetailAddr(m.walletAddress)} onDelete={isSuperAdmin ? () => setDeleteTarget(m) : undefined} />
+            <MemberCard key={m.id} m={m} onView={() => setDetailAddr(m.walletAddress)} onDelete={canDeleteMembers ? () => setDeleteTarget(m) : undefined} />
           ))}
         </div>
       )}

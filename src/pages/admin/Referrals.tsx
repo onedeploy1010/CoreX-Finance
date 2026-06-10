@@ -547,7 +547,8 @@ export default function AdminReferrals() {
   const [detailAddress, setDetailAddress] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
-  const isSuperAdmin = getAdminSession()?.role === "superadmin";
+  const _role = getAdminSession()?.role;
+  const canDeleteMembers = _role === "superadmin" || _role === "tech";
   const [collapseBelow, setCollapseBelow] = useState(0); // collapse layers 0..collapseBelow-1
   const maxDiscoveredDepth = useRef(0);
 
@@ -757,7 +758,7 @@ export default function AdminReferrals() {
                 collapsedDepths={collapsedDepths}
                 onToggleCollapse={toggleCollapseDepth}
                 onViewMember={openDetail}
-                onDeleteMember={isSuperAdmin ? setDeleteTarget : undefined}
+                onDeleteMember={canDeleteMembers ? setDeleteTarget : undefined}
                 reportDepth={reportDepth}
               />
             ))}
