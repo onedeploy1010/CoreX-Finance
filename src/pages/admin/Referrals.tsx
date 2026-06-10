@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getAdminReferralTree, getAdminMemberDetail, updateMemberNote, adminAddLog } from "@/lib/api";
+import { getAdminReferralTree, getAdminMemberDetail, updateMemberNote, adminAddLog, getAdminSession } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import {
   Search, Users, Network, ChevronRight, ChevronDown, Crown,
   GitBranch, UserPlus, Layers, Eye, X, ShoppingCart,
-  Wallet, ArrowDownToLine, Gift, Minimize2, Maximize2, FoldVertical, TrendingUp, MessageSquare, Check, ArrowUp, Route
+  Wallet, ArrowDownToLine, Gift, Minimize2, Maximize2, FoldVertical, TrendingUp, MessageSquare, Check, ArrowUp, Route, Trash2
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
 import { useToast } from "@/hooks/use-toast";
+import DeleteMemberDialog from "@/components/DeleteMemberDialog";
 
 // ─── Member Detail Dialog ───────────────────────────────────────────
 function MemberDetailDialog({ address, open, onClose, onViewTree }: { address: string; open: boolean; onClose: () => void; onViewTree?: (address: string) => void }) {
@@ -240,6 +241,7 @@ function TreeNode({
   collapsedDepths,
   onToggleCollapse,
   onViewMember,
+  onDeleteMember,
   reportDepth,
 }: {
   member: any;
@@ -247,6 +249,7 @@ function TreeNode({
   collapsedDepths: Set<number>;
   onToggleCollapse: (depth: number) => void;
   onViewMember: (address: string) => void;
+  onDeleteMember?: (member: any) => void;
   reportDepth?: (d: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -366,6 +369,18 @@ function TreeNode({
               <Eye size={11} style={{ color: "#C9A227" }} />
             </button>
 
+            {/* Delete member (superadmin only) */}
+            {onDeleteMember && (
+              <button
+                className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                style={{ background: "rgba(239,68,68,0.1)" }}
+                onClick={(e) => { e.stopPropagation(); onDeleteMember(member); }}
+                title="删除会员"
+              >
+                <Trash2 size={11} style={{ color: "#ef4444" }} />
+              </button>
+            )}
+
             {/* Collapse this layer */}
             {depth > 0 && (
               <button
@@ -413,6 +428,7 @@ function TreeNode({
                 collapsedDepths={collapsedDepths}
                 onToggleCollapse={onToggleCollapse}
                 onViewMember={onViewMember}
+                onDeleteMember={onDeleteMember}
                 reportDepth={reportDepth}
               />
             ))
@@ -530,6 +546,8 @@ export default function AdminReferrals() {
   const [collapsedDepths, setCollapsedDepths] = useState<Set<number>>(new Set());
   const [detailAddress, setDetailAddress] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const isSuperAdmin = getAdminSession()?.role === "superadmin";
   const [collapseBelow, setCollapseBelow] = useState(0); // collapse layers 0..collapseBelow-1
   const maxDiscoveredDepth = useRef(0);
 
@@ -739,6 +757,7 @@ export default function AdminReferrals() {
                 collapsedDepths={collapsedDepths}
                 onToggleCollapse={toggleCollapseDepth}
                 onViewMember={openDetail}
+                onDeleteMember={isSuperAdmin ? setDeleteTarget : undefined}
                 reportDepth={reportDepth}
               />
             ))}
@@ -753,6 +772,10 @@ export default function AdminReferrals() {
         onClose={() => setDetailOpen(false)}
         onViewTree={(addr) => { setSearchInput(addr); setSearch(addr); }}
       />
+
+      {deleteTarget && (
+        <DeleteMemberDialog member={deleteTarget} onClose={() => setDeleteTarget(null)} />
+      )}
     </div>
   );
 }

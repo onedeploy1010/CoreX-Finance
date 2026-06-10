@@ -24,9 +24,6 @@ const STATUS_TABS = [
   { value: "rejected", label: "已拒绝" },
 ];
 
-// Operator wallet address (derived from WITHDRAWAL_PRIVATE_KEY on server)
-const OPERATOR_WALLET = "0x4E05c5c549E45b35e03f4b285633e8AB881Cd64d";
-
 async function getContractBalance(): Promise<string> {
   try {
     const result = await readContract({
@@ -40,12 +37,13 @@ async function getContractBalance(): Promise<string> {
   }
 }
 
-async function getWalletBalance(): Promise<string> {
+async function getAddrUsdtBalance(addr: string): Promise<string> {
   try {
+    if (!addr || addr.length !== 42) return "0.000000";
     const result = await readContract({
       contract: getUSDTContract(),
       method: "balanceOf",
-      params: [OPERATOR_WALLET],
+      params: [addr],
     });
     return formatUSDT(result as bigint);
   } catch {
@@ -74,9 +72,16 @@ function BalancePanel() {
     queryFn: getContractBalance,
     refetchInterval: 30000,
   });
+  const { data: fundingWallet } = useQuery({
+    queryKey: ["/api/funding-wallet"],
+    queryFn: getFundingWallet,
+    refetchInterval: 30000,
+  });
+  const fundAddr = fundingWallet || "";
   const { data: walletBal, isLoading: loadingWallet, refetch: refetchWallet } = useQuery({
-    queryKey: ["/api/wallet-balance"],
-    queryFn: getWalletBalance,
+    queryKey: ["/api/funding-wallet-balance", fundAddr],
+    queryFn: () => getAddrUsdtBalance(fundAddr),
+    enabled: !!fundAddr,
     refetchInterval: 30000,
   });
   const { data: feeData, isLoading: loadingFee, refetch: refetchFee } = useQuery({
@@ -150,7 +155,7 @@ function BalancePanel() {
       )}
 
       <div className="text-[10px] text-muted-foreground">
-        提现钱包: <CopyableAddress address={OPERATOR_WALLET} className="text-muted-foreground inline" />
+        提现钱包: {fundAddr ? <CopyableAddress address={fundAddr} className="text-muted-foreground inline" /> : "未设置"}
       </div>
       {feeAddr && (
         <div className="text-[10px] text-muted-foreground">
