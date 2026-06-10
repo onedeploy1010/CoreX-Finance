@@ -614,7 +614,7 @@ export default function AdminReferrals() {
                 <s.icon size={14} style={{ color: s.color }} />
                 <span className="text-[11px] text-muted-foreground">{s.label}</span>
               </div>
-              <div className="font-black text-lg" style={{ color: s.color }}>{s.value}</div>
+              <div className="font-black text-base sm:text-lg break-all leading-tight" style={{ color: s.color }}>{s.value}</div>
             </div>
           ))}
         </div>

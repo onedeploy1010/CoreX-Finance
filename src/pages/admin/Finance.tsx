@@ -14,7 +14,7 @@ function StatCard({ icon: Icon, label, value, sub, color }: { icon: any; label: 
         </div>
         <span className="text-xs text-muted-foreground">{label}</span>
       </div>
-      <div className="font-black text-xl" style={{ color: color || "#C9A227" }}>{value}</div>
+      <div className="font-black text-base sm:text-xl break-all leading-tight" style={{ color: color || "#C9A227" }}>{value}</div>
       {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
     </div>
   );
@@ -377,7 +377,7 @@ function ForecastTab({ fc }: { fc: any }) {
   return (
     <div className="space-y-4">
       {/* Risk overview strip */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="rounded-xl p-3 text-center" style={cardBg}>
           <div className="text-xs text-muted-foreground">日支出</div>
           <div className="font-black text-base" style={{ color: "#ef4444" }}>{fmt(dailyTotal)}</div>

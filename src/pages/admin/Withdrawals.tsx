@@ -116,7 +116,7 @@ function BalancePanel() {
         </button>
       </div>
 
-      <div className={`grid gap-3 ${feeAddr ? "grid-cols-4" : "grid-cols-3"}`}>
+      <div className={`grid gap-3 grid-cols-2 ${feeAddr ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
         <div className="text-center p-2 rounded-lg" style={{ background: "rgba(201,162,39,0.06)" }}>
           <div className="text-[10px] text-muted-foreground mb-1">提现合约余额</div>
           <div className="text-sm font-bold" style={{ color: "#C9A227" }}>
@@ -451,7 +451,7 @@ function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => v
         )}
       </div>
       <CopyableAddress address={w.walletAddress} className="text-muted-foreground" />
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">金额</div>
           <div className="text-xs font-bold">{parseFloat(w.amount).toFixed(2)}U</div>

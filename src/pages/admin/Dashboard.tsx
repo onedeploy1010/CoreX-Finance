@@ -22,7 +22,7 @@ function StatCard({ icon: Icon, label, value, sub, color }: { icon: any; label: 
         </div>
         <span className="text-xs text-muted-foreground">{label}</span>
       </div>
-      <div className="font-black text-xl" style={{ color: color || "#C9A227" }}>{value}</div>
+      <div className="font-black text-base sm:text-xl break-all leading-tight" style={{ color: color || "#C9A227" }}>{value}</div>
       {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
     </div>
   );

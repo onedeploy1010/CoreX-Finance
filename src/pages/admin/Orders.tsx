@@ -82,7 +82,7 @@ function OrderCard({ o, onView }: { o: any; onView: () => void }) {
         </div>
       </div>
       <CopyableAddress address={o.walletAddress} className="text-muted-foreground" />
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="text-center">
           <div className="text-[10px] text-muted-foreground">金额</div>
           <div className="text-xs font-bold">{parseFloat(o.amount).toFixed(0)}U</div>
