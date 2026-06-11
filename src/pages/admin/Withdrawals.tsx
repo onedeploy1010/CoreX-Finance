@@ -12,7 +12,7 @@ import { useActiveAccount, useSendTransaction, ConnectButton } from "thirdweb/re
 import { client, bscChain, wallets } from "@/lib/thirdweb";
 import { getWithdrawalContract, getUSDTContract, formatUSDT, prepareApproveUSDTForWithdrawal, getWithdrawalAllowance, getFundingWallet, COREX_WITHDRAWAL_ADDRESS } from "@/lib/contracts";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck, Download, Calendar, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Send, Loader2, ExternalLink, AlertTriangle, Wallet, RefreshCw, Bell, CheckCheck, ShieldCheck, Download, Calendar, Search, Undo2 } from "lucide-react";
 import { CopyableAddress, shortAddr } from "@/components/CopyableAddress";
 import { Input } from "@/components/ui/input";
 
@@ -411,7 +411,7 @@ function NotificationPanel() {
   );
 }
 
-function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => void; onReject: () => void }) {
+function WithdrawalCard({ w, onApprove, onReject, onMoveToPending }: { w: any; onApprove: () => void; onReject: () => void; onMoveToPending: () => void }) {
   const statusMap: Record<string, { label: string; color: string; bg: string }> = {
     pending: { label: "待审核", color: "#eab308", bg: "rgba(234,179,8,0.1)" },
     approved: { label: "已批准", color: "#3b82f6", bg: "rgba(59,130,246,0.1)" },
@@ -429,18 +429,33 @@ function WithdrawalCard({ w, onApprove, onReject }: { w: any; onApprove: () => v
             {st.label}
           </span>
         </div>
-        {w.status === "pending" && (
+        {(w.status === "pending" || w.status === "approved") && (
           <div className="flex items-center gap-2">
-            <button
-              data-testid={`button-approve-${w.id}`}
-              className="p-2 rounded-lg flex items-center justify-center"
-              style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", minWidth: "36px", minHeight: "36px" }}
-              onClick={onApprove}
-            >
-              <Check size={16} />
-            </button>
+            {w.status === "pending" && (
+              <button
+                data-testid={`button-approve-${w.id}`}
+                title="批准"
+                className="p-2 rounded-lg flex items-center justify-center"
+                style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", minWidth: "36px", minHeight: "36px" }}
+                onClick={onApprove}
+              >
+                <Check size={16} />
+              </button>
+            )}
+            {w.status === "approved" && (
+              <button
+                data-testid={`button-repend-${w.id}`}
+                title="退回待审批"
+                className="p-2 rounded-lg flex items-center justify-center"
+                style={{ background: "rgba(234,179,8,0.1)", color: "#eab308", minWidth: "36px", minHeight: "36px" }}
+                onClick={onMoveToPending}
+              >
+                <Undo2 size={16} />
+              </button>
+            )}
             <button
               data-testid={`button-reject-${w.id}`}
+              title="取消(退回用户余额)"
               className="p-2 rounded-lg flex items-center justify-center"
               style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", minWidth: "36px", minHeight: "36px" }}
               onClick={onReject}
@@ -548,7 +563,8 @@ export default function AdminWithdrawals() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
       await updateWithdrawalStatus(id, status);
-      await adminAddLog(status === "approved" ? "批准提现" : "拒绝提现", "withdrawal", id.toString());
+      const labelMap: Record<string, string> = { approved: "批准提现", rejected: "取消提现(退回余额)", pending: "退回待审批" };
+      await adminAddLog(labelMap[status] || "更新提现状态", "withdrawal", id.toString(), { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawals"] });
@@ -781,7 +797,8 @@ export default function AdminWithdrawals() {
               key={w.id}
               w={w}
               onApprove={() => updateMutation.mutate({ id: w.id, status: "approved" })}
-              onReject={() => updateMutation.mutate({ id: w.id, status: "rejected" })}
+              onReject={() => { if (confirm(`确定取消提现 #${w.id}?金额将退回用户余额。`)) updateMutation.mutate({ id: w.id, status: "rejected" }); }}
+              onMoveToPending={() => updateMutation.mutate({ id: w.id, status: "pending" })}
             />
           ))}
         </div>
